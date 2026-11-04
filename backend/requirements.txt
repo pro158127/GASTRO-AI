@@ -5,6 +5,7 @@ psycopg2-binary==2.9.10
 pydantic==2.10.4
 pydantic-settings==2.7.0
 celery==5.4.0
+kombu==5.5.4
 redis==5.2.1
 minio==7.2.12
 alembic==1.14.0
