@@ -82,6 +82,10 @@ Léelas antes de tocar `src/services/` o `src/types/`.
   migración a cookie HttpOnly es una decisión pendiente con el backend.
 - **No agregues dependencias** (ni `pnpm add`) sin aprobación explícita del usuario. Si
   hace falta una, explica para qué y qué alternativa sin dependencia existe.
+- Las únicas dependencias aprobadas son `react-router` (en modo declarativo o de datos,
+  nunca en modo framework ni SSR) y `@fontsource-variable/inter`. Se instalan con versión
+  exacta (`--save-exact`).
+- Toda dependencia nueva se audita con `pnpm audit --prod` antes del commit.
 
 ## 7. API
 
@@ -89,6 +93,21 @@ Léelas antes de tocar `src/services/` o `src/types/`.
 - No inventes endpoints ni formatos de respuesta. Si una pantalla necesita datos que la API
   todavía no entrega, detente y pregunta antes de continuar.
 - Todas las llamadas pasan por `src/services/`; los componentes no llaman a `fetch`.
+
+### Datos simulados
+
+Excepción a la regla anterior: las pantallas cuyo endpoint todavía no existe se construyen
+con datos simulados, con estas reglas:
+
+- Van aislados en `src/services/simulados/`. Cada función simulada tiene la misma firma que
+  tendrá la real, de modo que pasar a la API se hace cambiando el import en `src/services/`
+  sin tocar las pantallas.
+- Cada función simulada lleva un comentario que dice qué endpoint falta:
+  `// SIMULADO: falta endpoint POST /api/...`.
+- Los datos son ficticios y coherentes con los ejemplos de Figma. Nunca son datos reales.
+- Cada formato de datos que se proponga se documenta en `CONTRATOS_API.md` (en esta
+  carpeta) para entregárselo al equipo del backend. Mientras el backend no lo confirme,
+  es una propuesta, no un endpoint existente.
 
 ## 8. Forma de trabajar
 
