@@ -1,0 +1,130 @@
+/* Botón (Figma 13:606). Altura 40 px (44 px en celular); foco: anillo de 2 px con 2 px de separación. */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-2);
+  min-height: var(--tamano-control);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-4);
+  border: var(--borde-grosor) solid transparent;
+  border-radius: var(--radio-md);
+  font: var(--texto-etiqueta-boton);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.boton:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.anchoCompleto {
+  width: 100%;
+}
+
+/* ---------- Primario ---------- */
+.primario {
+  background: var(--color-accion-primaria);
+  border-color: var(--color-accion-primaria);
+  color: var(--color-texto-sobre-oscuro);
+}
+.primario:hover {
+  background: var(--color-accion-primaria-hover);
+  border-color: var(--color-accion-primaria-hover);
+}
+.primario:active {
+  background: var(--color-accion-primaria-presionada);
+  border-color: var(--color-accion-primaria-presionada);
+}
+
+/* ---------- Secundario ---------- */
+.secundario {
+  background: var(--color-fondo-superficie);
+  border-color: var(--color-accion-primaria);
+  color: var(--color-marca-primario);
+}
+.secundario:hover {
+  background: var(--color-accion-secundaria-hover);
+}
+.secundario:active {
+  background: var(--color-fondo-seleccion);
+}
+
+/* ---------- Terciario ---------- */
+.terciario {
+  background: transparent;
+  color: var(--color-texto-enlace);
+}
+.terciario:hover {
+  background: var(--color-accion-secundaria-hover);
+}
+.terciario:active {
+  background: var(--color-fondo-seleccion);
+}
+
+/* ---------- Destructivo ---------- */
+.destructivo {
+  background: var(--color-accion-destructiva);
+  border-color: var(--color-accion-destructiva);
+  color: var(--color-texto-sobre-oscuro);
+}
+.destructivo:hover,
+.destructivo:active {
+  background: var(--color-accion-destructiva-hover);
+  border-color: var(--color-accion-destructiva-hover);
+}
+
+/* ---------- Deshabilitado ---------- */
+/* El selector duplica la especificidad para ganarle a `button:disabled` de index.css. */
+.boton.boton:disabled {
+  background: var(--color-fondo-superficie-sutil);
+  border-color: var(--color-borde-sutil);
+  color: var(--color-texto-deshabilitado);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+/* ---------- Cargando ---------- */
+/* Conserva el aspecto del estado normal, sin cambios de color al pasar el cursor. */
+.cargando {
+  cursor: progress;
+}
+.cargando.primario,
+.cargando.primario:hover,
+.cargando.primario:active {
+  background: var(--color-accion-primaria);
+  border-color: var(--color-accion-primaria);
+}
+.cargando.secundario,
+.cargando.secundario:hover,
+.cargando.secundario:active {
+  background: var(--color-fondo-superficie);
+}
+.cargando.terciario,
+.cargando.terciario:hover,
+.cargando.terciario:active {
+  background: transparent;
+  text-decoration: underline;
+}
+.cargando.destructivo,
+.cargando.destructivo:hover,
+.cargando.destructivo:active {
+  background: var(--color-accion-destructiva);
+  border-color: var(--color-accion-destructiva);
+}
+
+/* El giro (y su desactivación con prefers-reduced-motion) lo define IndicadorCarga. */
+.indicador {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .boton {
+    min-height: var(--tamano-control-tactil);
+  }
+}

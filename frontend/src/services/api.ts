@@ -18,17 +18,51 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+/**
+ * Error de una llamada a la API. `estado` es el código HTTP, o `null` si no hubo respuesta
+ * (fallo de red). Las pantallas deciden el texto según `estado`; no muestran `message`.
+ */
+export class ErrorApi extends Error {
+  readonly estado: number | null;
+
+  constructor(estado: number | null, mensaje: string) {
+    super(mensaje);
+    this.name = "ErrorApi";
+    this.estado = estado;
+  }
+}
+
+let alVencerSesion: (() => void) | null = null;
+
+/** Registra qué hacer cuando una llamada protegida responde 401 (token vencido o inválido). */
+export function registrarAlVencerSesion(manejador: (() => void) | null): void {
+  alVencerSesion = manejador;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  protegida = true
+): Promise<T> {
+  const token = protegida ? getToken() : null;
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> | undefined),
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(path, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...options, headers });
+  } catch {
+    throw new ErrorApi(null, "Sin conexión");
+  }
   if (!res.ok) {
-    throw new Error(`${res.status} ${await res.text()}`);
+    if (res.status === 401 && protegida) {
+      clearToken();
+      alVencerSesion?.();
+    }
+    throw new ErrorApi(res.status, `${res.status} ${await res.text()}`);
   }
   return res.json() as Promise<T>;
 }
@@ -37,11 +71,15 @@ export async function login(
   email: string,
   password: string
 ): Promise<TokenResponse> {
-  return request<TokenResponse>("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
+  return request<TokenResponse>(
+    "/api/auth/login",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+    false
+  );
 }
 
 export async function crearAnalisis(
