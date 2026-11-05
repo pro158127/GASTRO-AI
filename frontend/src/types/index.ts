@@ -30,3 +30,18 @@ export interface AnalisisEvent {
   estado: AnalisisEstado;
   explicacion?: string;
 }
+
+/** Nombres de rol que guarda el backend (`seed.py`: admin, doctor, tecnico). */
+export type RolBackend = "admin" | "doctor" | "tecnico";
+
+/** Propuesta `GET /api/auth/me` (ver CONTRATOS_API.md). Los campos reflejan el modelo `User`. */
+export interface UsuarioActual {
+  full_name: string;
+  email: string;
+  role: RolBackend;
+}
+
+/** Propuesta `GET /api/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
+export interface ResumenCasosRecibidos {
+  sin_revisar: number;
+}

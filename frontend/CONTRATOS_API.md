@@ -67,3 +67,52 @@ Las funciones simuladas viven en `src/services/simulados/` y llevan un comentari
        responda `401`, para que nadie quede atrapado en una sesión que no puede cerrar.
     4. Mantener el aviso «Cerró sesión correctamente» de W-01f. Si el backend prefiere que no
        se muestre cuando falla la invalidación en el servidor, lo ajustamos.
+
+### `GET /api/auth/me` · estructura de las pantallas internas (barra lateral y barra superior)
+
+- **Estado:** propuesto
+- **Solicitud:** requiere `Authorization: Bearer <token>`. Sin cuerpo.
+- **Respuesta:** `200` con los datos del usuario del token. Los campos reflejan el modelo
+  `User` del backend (`full_name`, `email`, rol):
+
+  ```json
+  { "full_name": "Dra. Ana Pérez", "email": "ana.perez@ejemplo.test", "role": "doctor" }
+  ```
+
+  `role` toma los nombres que ya crea `seed.py`: `admin`, `doctor` o `tecnico`.
+- **Errores:** `401` (token ausente, vencido o invalidado); `5xx` (ver el código de referencia).
+- **Notas:**
+  - Hoy el login solo devuelve el token y no hay endpoint de usuario actual, así que el
+    frontend no puede saber el rol ni el nombre. El frontend **no decodifica el JWT** para
+    obtenerlos.
+  - El frontend usa `role` solo para elegir qué menú mostrar (comodidad de interfaz). La
+    autorización real debe hacerse en cada endpoint del backend, a partir del token.
+  - Figma dibuja menús para Doctor y Administrador. **Pregunta para el backend:** ¿qué es el
+    rol `tecnico` y qué debería ver? Hoy el frontend no le muestra ningún ítem.
+  - Figma escribe el nombre con tratamiento («Dra. Ana Pérez»). Se simula como parte de
+    `full_name`; el backend decide si lo guarda así o entrega otro campo.
+  - **Qué hará el frontend cuando exista:** implementar `obtenerUsuarioActual()` en
+    `src/services/api.ts` y cambiar el export de `src/services/usuario.ts`.
+- **Simulación actual:** `src/services/simulados/usuario.ts`. El rol simulado sale de
+  `VITE_ROL_SIMULADO` (`doctor` por defecto o `admin`) en `frontend/.env.local`. Mientras esto
+  esté simulado, un build de producción muestra el menú de doctor a todos.
+
+### `GET /api/casos-recibidos/resumen` · contador del menú «Casos recibidos» (W-15, W-15b)
+
+- **Estado:** propuesto
+- **Solicitud:** requiere `Authorization: Bearer <token>`. Solo para el rol doctor.
+- **Respuesta:** `200` con la cantidad de casos trasladados por otros doctores que el doctor
+  todavía no ha revisado:
+
+  ```json
+  { "sin_revisar": 4 }
+  ```
+- **Errores:** `401`; `403` si el usuario no es doctor; `5xx`.
+- **Notas:**
+  - El contador del menú se oculta cuando vale 0 y se anuncia como «Casos recibidos, 4 sin
+    revisar» (nota del componente «Ítem de navegación» en Figma, marcado «Fase 2»).
+  - Los casos trasladados no se suman a los demás indicadores (RF-A07 CA 2); el dashboard
+    debe usar este mismo dato para su indicador «Casos recibidos».
+  - Pendiente definir cuándo se actualiza (al cargar la pantalla, al abrir un traslado).
+- **Simulación actual:** valor fijo 4 en `src/services/simulados/usuario.ts`, único lugar del
+  dato. Es un valor de ejemplo del componente de Figma; el dashboard W-15 dibuja 0.
