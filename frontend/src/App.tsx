@@ -1,16 +1,21 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
-import Dashboard from "./pages/Dashboard";
+import DisposicionInterna from "./disposicion/DisposicionInterna";
+import { pantallas, tituloDePantalla } from "./navegacion/pantallas";
+import type { Pantalla } from "./navegacion/pantallas";
 import InicioSesion from "./pages/InicioSesion";
-import { ProveedorSesion, useSesion } from "./sesion/ProveedorSesion";
+import { ProveedorSesion } from "./sesion/ProveedorSesion";
+import RutaPorRol from "./sesion/RutaPorRol";
 import RutaProtegida from "./sesion/RutaProtegida";
 import RutaPublica from "./sesion/RutaPublica";
+import { useUsuarioActual } from "./sesion/UsuarioActual";
 
-// Mientras no exista la pantalla W-15, la ruta protegida muestra el Dashboard actual.
 // Al cerrar sesión, RutaProtegida redirige a /iniciar-sesion; el aviso de W-01f lo lleva
 // `motivoCierre` en ProveedorSesion.
-function PanelPrivado() {
-  const { cerrarSesion } = useSesion();
-  return <Dashboard onLogout={cerrarSesion} />;
+
+/** Pantalla interna con su título según el rol (solo se monta con el usuario ya cargado). */
+function ElementoPantalla({ pantalla }: { pantalla: Pantalla }) {
+  const { rol } = useUsuarioActual();
+  return <>{pantalla.elemento(tituloDePantalla(pantalla, rol))}</>;
 }
 
 export default function App() {
@@ -27,13 +32,25 @@ export default function App() {
             }
           />
           <Route
-            path="/"
             element={
               <RutaProtegida>
-                <PanelPrivado />
+                <DisposicionInterna />
               </RutaProtegida>
             }
-          />
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            {pantallas.map((pantalla) => (
+              <Route
+                key={pantalla.ruta}
+                path={pantalla.ruta}
+                element={
+                  <RutaPorRol roles={pantalla.roles}>
+                    <ElementoPantalla pantalla={pantalla} />
+                  </RutaPorRol>
+                }
+              />
+            ))}
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ProveedorSesion>

@@ -1,14 +1,13 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { clearToken, crearAnalisis, obtenerAnalisis } from "../services/api";
+import { crearAnalisis, obtenerAnalisis } from "../services/api";
 import { subscribeAnalisis } from "../services/websocket";
 import type { Analisis } from "../types";
 import { isValidDocumento } from "../utils/validators";
+import estilos from "./Dashboard.module.css";
 
-interface Props {
-  onLogout: () => void;
-}
-
-export default function Dashboard({ onLogout }: Props) {
+// Pantalla vieja, anterior al sistema de diseño. Hoy hace de «Nuevo análisis» (/nuevo-analisis)
+// hasta que se construya W-06. El cierre de sesión y el encabezado los da ahora DisposicionInterna.
+export default function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
   const [documento, setDocumento] = useState("");
   const [analisis, setAnalisis] = useState<Analisis | null>(null);
@@ -49,21 +48,11 @@ export default function Dashboard({ onLogout }: Props) {
     }
   }
 
-  function handleLogout() {
-    clearToken();
-    onLogout();
-  }
-
   return (
-    <div className="container">
-      <header>
-        <h1>Gastro-AI</h1>
-        <button onClick={handleLogout} className="secondary">
-          Cerrar sesión
-        </button>
-      </header>
+    <div className={estilos.contenedor}>
+      <h1>Nuevo análisis</h1>
 
-      <form onSubmit={handleSubmit} className="card">
+      <form onSubmit={handleSubmit} className={estilos.tarjeta}>
         <label>
           Imagen clínica (JPG / PNG / DICOM)
           <input
@@ -82,14 +71,14 @@ export default function Dashboard({ onLogout }: Props) {
             required
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className={estilos.error}>{error}</p>}
         <button type="submit" disabled={uploading}>
           {uploading ? "Enviando..." : "Iniciar análisis"}
         </button>
       </form>
 
       {analisis && (
-        <section className="card">
+        <section className={estilos.tarjeta}>
           <h2>Resultado del análisis</h2>
           <p>
             <strong>ID:</strong> {analisis.id}
@@ -98,7 +87,7 @@ export default function Dashboard({ onLogout }: Props) {
             <strong>Estado:</strong> {analisis.estado}
           </p>
           {analisis.estado === "PROCESANDO" && (
-            <p className="muted">
+            <p className={estilos.apagado}>
               Procesando en segundo plano… la página se actualiza en tiempo real.
             </p>
           )}
@@ -109,7 +98,7 @@ export default function Dashboard({ onLogout }: Props) {
                 <img
                   src={analisis.grad_cam_url}
                   alt="Mapa de calor Grad-CAM"
-                  className="gradcam"
+                  className={estilos.mapaCalor}
                 />
               )}
               {analisis.resultado && (
@@ -118,7 +107,7 @@ export default function Dashboard({ onLogout }: Props) {
             </>
           )}
           {analisis.estado === "FALLIDO" && (
-            <p className="error">El análisis falló: {analisis.error}</p>
+            <p className={estilos.error}>El análisis falló: {analisis.error}</p>
           )}
         </section>
       )}

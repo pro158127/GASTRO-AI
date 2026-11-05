@@ -1,0 +1,24 @@
+.enlace {
+  position: absolute;
+  top: var(--espacio-2);
+  left: var(--espacio-2);
+  z-index: 100;
+  padding: var(--espacio-2) var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-accion-primaria);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  color: var(--color-texto-enlace);
+  font: var(--texto-etiqueta-boton);
+  text-decoration: none;
+  /* Fuera de la pantalla hasta recibir el foco. */
+  transform: translateY(-200%);
+}
+
+.enlace:focus {
+  transform: none;
+}
+
+.enlace:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}

@@ -13,6 +13,8 @@
   font: var(--texto-etiqueta-boton);
   cursor: pointer;
   white-space: nowrap;
+  /* También lo usa EnlaceBoton (un <a>): sin subrayado por defecto. */
+  text-decoration: none;
 }
 
 .boton:focus-visible {
@@ -77,7 +79,8 @@
 }
 
 /* ---------- Deshabilitado ---------- */
-/* El selector duplica la especificidad para ganarle a `button:disabled` de index.css. */
+/* El selector duplica la clase para que su especificidad (0,3,0) supere la de los estados
+   :hover y :active de cada jerarquía (0,2,0): un botón deshabilitado no cambia de color. */
 .boton.boton:disabled {
   background: var(--color-fondo-superficie-sutil);
   border-color: var(--color-borde-sutil);
