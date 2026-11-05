@@ -1,0 +1,199 @@
+/*
+ * Tokens de diseño de Gastro-AI.
+ * Fuente: archivo de Figma sjaYoAS0aItWKV5uHKNViV (colecciones Primitivos, Semánticos y
+ * Dimensiones, más los estilos de texto y de efecto). Los nombres son la sintaxis de
+ * código Web de cada variable de Figma; los estilos de texto y de efecto no la tienen y
+ * usan la misma convención. Solo modo claro.
+ */
+
+:root {
+  /* ---------- Primitivos: colores ---------- */
+  --blanco: #ffffff;
+
+  --azul-marino-50: #eef3f8;
+  --azul-marino-100: #d7e2ee;
+  --azul-marino-200: #b0c4db;
+  --azul-marino-300: #7f9dbf;
+  --azul-marino-400: #52779f;
+  --azul-marino-500: #355c85;
+  --azul-marino-600: #284b70;
+  --azul-marino-700: #1f3f62;
+  --azul-marino-800: #1a3757;
+  --azul-marino-900: #11253b;
+
+  --naranja-50: #fff3eb;
+  --naranja-100: #ffe0cc;
+  --naranja-500: #f56e19;
+  --naranja-700: #b84a06;
+  --naranja-800: #9a3d05;
+
+  --gris-50: #f9fafb;
+  --gris-100: #f3f4f6;
+  --gris-200: #e5e7eb;
+  --gris-300: #d1d5db;
+  --gris-400: #9ca3af;
+  --gris-500: #6b7280;
+  --gris-600: #4b5563;
+  --gris-700: #374151;
+  --gris-800: #1f2937;
+  --gris-900: #111827;
+
+  --verde-50: #f0fdf4;
+  --verde-100: #dcfce7;
+  --verde-700: #15803d;
+  --verde-800: #166534;
+
+  --ambar-50: #fffbeb;
+  --ambar-100: #fef3c7;
+  --ambar-700: #b45309;
+  --ambar-800: #92400e;
+
+  --rojo-50: #fef2f2;
+  --rojo-100: #fee2e2;
+  --rojo-700: #b91c1c;
+  --rojo-800: #991b1b;
+
+  --celeste-50: #f0f9ff;
+  --celeste-100: #e0f2fe;
+  --celeste-700: #0369a1;
+  --celeste-800: #075985;
+
+  --azul-600: #2563eb;
+
+  --superposicion-60: rgb(17 24 39 / 0.6);
+
+  /* ---------- Semánticos: colores (referencian a los primitivos) ---------- */
+  --color-fondo-lienzo: var(--gris-50);
+  --color-fondo-superficie: var(--blanco);
+  --color-fondo-superficie-sutil: var(--gris-100);
+  --color-fondo-navegacion: var(--azul-marino-800);
+  --color-fondo-navegacion-activo: var(--azul-marino-700);
+  --color-fondo-seleccion: var(--azul-marino-50);
+  --color-fondo-superposicion: var(--superposicion-60);
+
+  --color-texto-primario: var(--gris-900);
+  --color-texto-secundario: var(--gris-700);
+  --color-texto-terciario: var(--gris-600);
+  --color-texto-deshabilitado: var(--gris-400);
+  --color-texto-sobre-oscuro: var(--blanco);
+  --color-texto-enlace: var(--azul-marino-600);
+
+  --color-borde-sutil: var(--gris-200);
+  --color-borde-campo: var(--gris-500);
+  --color-borde-fuerte: var(--gris-700);
+
+  --color-accion-primaria: var(--azul-marino-800);
+  --color-accion-primaria-hover: var(--azul-marino-700);
+  --color-accion-primaria-presionada: var(--azul-marino-900);
+  --color-accion-secundaria-hover: var(--azul-marino-50);
+  --color-accion-destructiva: var(--rojo-700);
+  --color-accion-destructiva-hover: var(--rojo-800);
+
+  --color-foco-anillo: var(--azul-600);
+
+  --color-marca-primario: var(--azul-marino-800);
+  --color-marca-acento: var(--naranja-500);
+  --color-marca-acento-texto: var(--naranja-700);
+
+  --color-navegacion-indicador: var(--naranja-500);
+
+  --color-estado-exito-texto: var(--verde-800);
+  --color-estado-exito-fondo: var(--verde-50);
+  --color-estado-exito-borde: var(--verde-700);
+  --color-estado-exito-icono: var(--verde-700);
+
+  --color-estado-advertencia-texto: var(--ambar-800);
+  --color-estado-advertencia-fondo: var(--ambar-50);
+  --color-estado-advertencia-borde: var(--ambar-700);
+  --color-estado-advertencia-icono: var(--ambar-700);
+
+  --color-estado-error-texto: var(--rojo-800);
+  --color-estado-error-fondo: var(--rojo-50);
+  --color-estado-error-borde: var(--rojo-700);
+  --color-estado-error-icono: var(--rojo-700);
+
+  --color-estado-info-texto: var(--celeste-800);
+  --color-estado-info-fondo: var(--celeste-50);
+  --color-estado-info-borde: var(--celeste-700);
+  --color-estado-info-icono: var(--celeste-700);
+
+  --color-experimental-texto: var(--ambar-800);
+  --color-experimental-fondo: var(--ambar-100);
+  --color-experimental-borde: var(--ambar-700);
+  --color-experimental-icono: var(--ambar-700);
+
+  /* ---------- Dimensiones (px, igual que en Figma) ---------- */
+  --espacio-0: 0px;
+  --espacio-1: 4px;
+  --espacio-2: 8px;
+  --espacio-3: 12px;
+  --espacio-4: 16px;
+  --espacio-5: 20px;
+  --espacio-6: 24px;
+  --espacio-8: 32px;
+  --espacio-10: 40px;
+  --espacio-12: 48px;
+  --espacio-16: 64px;
+
+  --radio-sm: 4px;
+  --radio-md: 8px;
+  --radio-lg: 12px;
+  --radio-completo: 999px;
+
+  --tamano-objetivo-minimo: 24px;
+  --tamano-icono: 20px;
+  --tamano-control: 40px;
+  --tamano-control-tactil: 44px;
+
+  --borde-grosor: 1px;
+  --borde-grosor-foco: 2px;
+
+  /* ---------- Tipografía ----------
+   * Tamaño e interlineado en rem (16 px = 1 rem) para respetar el tamaño de letra que
+   * el usuario configure en el navegador (WCAG 1.4.4). Formato: peso tamaño/interlineado.
+   */
+  --fuente-familia: "Inter Variable", sans-serif;
+
+  --texto-titulo-h1: 600 1.75rem/2.25rem var(--fuente-familia);
+  --texto-titulo-h2: 600 1.5rem/2rem var(--fuente-familia);
+  --texto-titulo-h3: 600 1.25rem/1.75rem var(--fuente-familia);
+  --texto-titulo-h4: 600 1rem/1.5rem var(--fuente-familia);
+
+  --texto-cuerpo-base: 400 1rem/1.5rem var(--fuente-familia);
+  --texto-cuerpo-base-enfasis: 600 1rem/1.5rem var(--fuente-familia);
+  --texto-cuerpo-pequeno: 400 0.875rem/1.25rem var(--fuente-familia);
+  --texto-cuerpo-pequeno-enfasis: 600 0.875rem/1.25rem var(--fuente-familia);
+
+  --texto-etiqueta-campo: 500 0.875rem/1.25rem var(--fuente-familia);
+  --texto-etiqueta-boton: 600 0.875rem/1.25rem var(--fuente-familia);
+
+  --texto-leyenda: 400 0.75rem/1rem var(--fuente-familia);
+
+  --texto-dato-kpi: 600 2rem/2.5rem var(--fuente-familia);
+  --texto-dato-tabla: 400 0.875rem/1.25rem var(--fuente-familia);
+
+  /* ---------- Sombras (estilos de efecto "Elevación") ---------- */
+  --sombra-elevacion-1-tarjeta:
+    0 1px 2px 0 color-mix(in srgb, var(--gris-900) 6%, transparent),
+    0 1px 3px 0 color-mix(in srgb, var(--gris-900) 10%, transparent);
+  --sombra-elevacion-2-menu:
+    0 4px 8px -2px color-mix(in srgb, var(--gris-900) 10%, transparent),
+    0 2px 4px -2px color-mix(in srgb, var(--gris-900) 6%, transparent);
+  --sombra-elevacion-3-dialogo:
+    0 20px 24px -4px color-mix(in srgb, var(--gris-900) 12%, transparent),
+    0 8px 8px -4px color-mix(in srgb, var(--gris-900) 6%, transparent);
+}
+
+/*
+ * Clases utilitarias de datos numéricos: la propiedad `font` no admite
+ * `font-variant-numeric`, así que se aplican juntas aquí (números tabulares).
+ */
+.texto-dato-kpi {
+  font: var(--texto-dato-kpi);
+  font-variant-numeric: tabular-nums;
+}
+
+.texto-dato-tabla {
+  font: var(--texto-dato-tabla);
+  font-variant-numeric: tabular-nums;
+}
