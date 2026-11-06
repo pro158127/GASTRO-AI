@@ -7,6 +7,10 @@ equipo del backend; ninguno es un endpoint existente hasta que el backend lo con
 Las funciones simuladas viven en `src/services/simulados/` y llevan un comentario
 `// SIMULADO: falta endpoint ...`.
 
+Las propuestas marcadas **implementado** ya existen en el backend (commit `b770076`, rama
+`feature/63-backend-base`, base `/api/v1`) y el frontend las usa; se conservan aquí como
+registro de en qué quedó cada una.
+
 ## Plantilla de cada propuesta
 
 ### `MÉTODO /ruta` · Pantalla(s) que lo usan
@@ -17,102 +21,84 @@ Las funciones simuladas viven en `src/services/simulados/` y llevan un comentari
 - **Errores:** códigos y significado.
 - **Notas:** permisos, paginación, dudas para el backend.
 
+## Resumen
+
+| Propuesta | Estado | Cómo quedó en el backend |
+|---|---|---|
+| Código de referencia en errores 5xx | implementado | `error.id_error` en todo error |
+| `POST /api/auth/logout` | implementado | `POST /api/v1/auth/logout`, con cookie |
+| `GET /api/auth/me` | implementado | `GET /api/v1/auth/sesion` |
+| `GET /api/casos-recibidos/resumen` | propuesto | pendiente (ruta pasa a `/api/v1`) |
+
 ## Propuestas
 
-### Cuerpo de error 5xx con código de referencia · W-01, W-31
+### Cuerpo de error con código de referencia · W-01, W-31
 
-- **Estado:** propuesto
-- **Solicitud:** aplica a cualquier endpoint de `/api`.
-- **Respuesta (cuando el servidor responde 5xx):** JSON con un código corto que el
-  administrador pueda buscar en los registros, sin detalles técnicos ni rastros del sistema
-  (CWE-209, nota de W-31 en Figma):
+- **Estado:** implementado. El backend lo resolvió para **todos** los errores, no solo los 5xx,
+  con otra forma que la propuesta (`codigo_referencia`).
+- **Forma real** (`../ARCHITECTURE.md` § 3.5):
 
   ```json
-  { "codigo_referencia": "ERR-7F3A" }
+  { "error": { "codigo": "ERROR_INTERNO", "mensaje": "Algo salió mal. Intenta de nuevo.", "id_error": "ERR-7F3A" } }
   ```
 
-- **Errores:** solo 5xx.
-- **Notas:** W-31 en Figma pide mostrar «informe al administrador este código: ERR-7F3A».
-  Hoy la API no lo entrega, así que el frontend muestra solo «Algo salió mal» y «Ocurrió un
-  error inesperado. Intente de nuevo.». Cuando el campo exista, el frontend añade la frase
-  del código. Es una propuesta; el nombre del campo lo decide el backend.
+- **Qué hace el frontend:** `ErrorApi` (`src/services/api.ts`) guarda `estado`, `codigo` e
+  `idError`. Los textos que ve el usuario salen de Figma y se eligen por `codigo`; el
+  `mensaje` del servidor no se muestra. Con `idError`, W-31 y el inicio de sesión agregan la
+  frase «Si continúa, informe al administrador este código: ERR-7F3A.».
+- **Notas:** el backend también responde `PETICION_INVALIDA` (400), `METODO_NO_PERMITIDO`
+  (405), `ARCHIVO_DEMASIADO_GRANDE` (413), `DEMASIADOS_INTENTOS` (429) y `SIN_VINCULACION`
+  (409), que no aparecen en la tabla de § 3.5. El frontend los trata como error inesperado
+  (W-31) hasta que el diseño diga otra cosa.
 
 ### `POST /api/auth/logout` · W-01f
 
-- **Estado:** propuesto
-- **Solicitud:** requiere `Authorization: Bearer <token>`. Sin cuerpo.
-- **Respuesta:** `204 No Content`, sin cuerpo. Desde ese momento el token usado queda
-  invalidado en el servidor.
-- **Errores:**
-  - `401`: el token falta, ya venció o ya estaba invalidado.
-  - `5xx`: fallo del servidor (ver la propuesta del código de referencia, arriba).
-- **Notas:**
-  - Hoy no existe: `../ARCHITECTURE.md` § 3.5 no lista un endpoint de cierre de sesión.
-    El frontend solo borra el token del navegador, y ese token sigue siendo válido en el
-    servidor hasta que vence a los 60 minutos (no hay refresh). La nota de W-01f en Figma
-    dice que «la sesión se invalida en el servidor» (RF-U10 CA 1 y 2); con el cierre solo
-    local eso no se cumple, y es relevante en consultorios con equipos compartidos.
-  - Tras el cierre, cualquier petición con ese token debe responder `401`, para que el
-    frontend cierre la sesión como ya lo hace con un token vencido.
-  - El mecanismo de invalidación (por ejemplo, una lista de tokens revocados con
-    vencimiento igual al que les queda de vida) lo decide el backend.
-  - Más adelante, el cierre automático por inactividad (W-05, RF-U10 CA 5) debería usar el
-    mismo endpoint.
-  - **Qué hará el frontend cuando exista:**
-    1. Agregar en `src/services/api.ts` una función que llame a este endpoint con el token
-       actual.
-    2. Hacer que `cerrarSesion()` de `ProveedorSesion` la llame antes de borrar el token
-       local.
-    3. Cerrar la sesión local siempre, aunque la llamada falle (por ejemplo, sin conexión) o
-       responda `401`, para que nadie quede atrapado en una sesión que no puede cerrar.
-    4. Mantener el aviso «Cerró sesión correctamente» de W-01f. Si el backend prefiere que no
-       se muestre cuando falla la invalidación en el servidor, lo ajustamos.
+- **Estado:** implementado como `POST /api/v1/auth/logout`.
+- **Cómo quedó:** la sesión viaja en la cookie `gastro_sesion` (HttpOnly), así que no hay
+  token ni `Authorization`. Cuerpo opcional `{motivo: "manual" | "inactividad"}`. Responde
+  **siempre** `204` y borra la cookie, aunque la sesión ya hubiera vencido o no existiera.
+  Funciona en cualquier etapa del inicio de sesión.
+- **Qué hace el frontend:** `ProveedorSesion.cerrarSesion` llama con `{motivo: "manual"}` y
+  cierra la sesión local siempre. Si el servidor responde 204, muestra W-01f. Si la llamada
+  falla, muestra una alerta de advertencia («Se cerró la sesión en este equipo, pero no
+  pudimos confirmarlo con el servidor…», pendiente de agregar a Figma) y guarda la marca de
+  «cierre pendiente» en `sessionStorage`; al recargar reintenta el logout antes de consultar
+  la sesión.
+- **Notas:** `motivo: "inactividad"` se usará con W-05 (cierre automático por inactividad).
 
 ### `GET /api/auth/me` · estructura de las pantallas internas (barra lateral y barra superior)
 
-- **Estado:** propuesto
-- **Solicitud:** requiere `Authorization: Bearer <token>`. Sin cuerpo.
-- **Respuesta:** `200` con los datos del usuario del token. Los campos reflejan el modelo
-  `User` del backend (`full_name`, `email`, rol):
-
-  ```json
-  { "full_name": "Dra. Ana Pérez", "email": "ana.perez@ejemplo.test", "role": "doctor" }
-  ```
-
-  `role` toma los nombres que ya crea `seed.py`: `admin`, `doctor` o `tecnico`.
-- **Errores:** `401` (token ausente, vencido o invalidado); `5xx` (ver el código de referencia).
-- **Notas:**
-  - Hoy el login solo devuelve el token y no hay endpoint de usuario actual, así que el
-    frontend no puede saber el rol ni el nombre. El frontend **no decodifica el JWT** para
-    obtenerlos.
-  - El frontend usa `role` solo para elegir qué menú mostrar (comodidad de interfaz). La
-    autorización real debe hacerse en cada endpoint del backend, a partir del token.
-  - Figma dibuja menús para Doctor y Administrador. **Pregunta para el backend:** ¿qué es el
-    rol `tecnico` y qué debería ver? Hoy el frontend no le muestra ningún ítem.
-  - Figma escribe el nombre con tratamiento («Dra. Ana Pérez»). Se simula como parte de
-    `full_name`; el backend decide si lo guarda así o entrega otro campo.
-  - **Qué hará el frontend cuando exista:** implementar `obtenerUsuarioActual()` en
-    `src/services/api.ts` y cambiar el export de `src/services/usuario.ts`.
-- **Simulación actual:** `src/services/simulados/usuario.ts`. El rol simulado sale de
-  `VITE_ROL_SIMULADO` (`doctor` por defecto o `admin`) en `frontend/.env.local`. Mientras esto
-  esté simulado, un build de producción muestra el menú de doctor a todos.
+- **Estado:** implementado como `GET /api/v1/auth/sesion`.
+- **Cómo quedó:** responde `{etapa, vence_en, usuario: {id, nombre, apellido, rol}}`, con
+  `rol` igual a `DOCTOR` o `ADMINISTRADOR`. Sirve en cualquier etapa del inicio de sesión;
+  con `X-Actividad: pasiva` no renueva la inactividad. El nombre y el apellido vienen
+  separados (el tratamiento «Dra.» de los ejemplos de Figma ya no se muestra).
+- **Respuestas a las preguntas de la propuesta:** el rol `tecnico` no existe; solo hay
+  `DOCTOR` y `ADMINISTRADOR`. El frontend usa `rol` solo para elegir el menú; la autorización
+  real la hace el backend en cada endpoint.
+- **Qué hace el frontend:** `ProveedorSesion` lo consulta al cargar la página y tras el
+  login. Se eliminó el usuario simulado y `VITE_ROL_SIMULADO`. `vence_en` se guarda, pero
+  todavía no se usa (lo necesita W-05).
 
 ### `GET /api/casos-recibidos/resumen` · contador del menú «Casos recibidos» (W-15, W-15b)
 
-- **Estado:** propuesto
-- **Solicitud:** requiere `Authorization: Bearer <token>`. Solo para el rol doctor.
+- **Estado:** propuesto. La ruta pasa a `GET /api/v1/casos-recibidos/resumen` por la nueva
+  base; el backend aún lista los traslados como «planeados».
+- **Solicitud:** requiere sesión en etapa `ACTIVA` (cookie). Solo para el rol doctor.
 - **Respuesta:** `200` con la cantidad de casos trasladados por otros doctores que el doctor
   todavía no ha revisado:
 
   ```json
   { "sin_revisar": 4 }
   ```
-- **Errores:** `401`; `403` si el usuario no es doctor; `5xx`.
+- **Errores:** `401` (`SIN_SESION`, `SESION_VENCIDA`); `403` `SIN_PERMISO` si el usuario no es
+  doctor; `5xx` `ERROR_INTERNO`.
 - **Notas:**
   - El contador del menú se oculta cuando vale 0 y se anuncia como «Casos recibidos, 4 sin
     revisar» (nota del componente «Ítem de navegación» en Figma, marcado «Fase 2»).
   - Los casos trasladados no se suman a los demás indicadores (RF-A07 CA 2); el dashboard
     debe usar este mismo dato para su indicador «Casos recibidos».
-  - Pendiente definir cuándo se actualiza (al cargar la pantalla, al abrir un traslado).
+  - Pendiente definir cuándo se actualiza (al cargar la pantalla, al abrir un traslado). Si
+    se consulta automáticamente, debería llevar `X-Actividad: pasiva`.
 - **Simulación actual:** valor fijo 4 en `src/services/simulados/usuario.ts`, único lugar del
   dato. Es un valor de ejemplo del componente de Figma; el dashboard W-15 dibuja 0.

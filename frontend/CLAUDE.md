@@ -85,8 +85,11 @@ Léelas antes de tocar `src/services/` o `src/types/`.
   reintente el cierre antes de consultar `GET /auth/sesion`, y se borra solo cuando el
   servidor responde 204. No contiene ningún dato personal. No se guarda nada más en
   `localStorage` ni en `sessionStorage`.
-- El token hoy se guarda en `localStorage` (código existente). No amplíes ese uso; la
-  migración a cookie HttpOnly es una decisión pendiente con el backend.
+- **No hay token en el frontend.** La sesión viaja en la cookie `gastro_sesion` (HttpOnly,
+  Secure, SameSite=Strict), que el frontend nunca lee ni guarda: no hay `access_token`, ni
+  header `Authorization`, ni nada de la sesión en `localStorage`. Las llamadas usan
+  `credentials: "same-origin"`. El código viejo `gastroai_token` solo se borra una vez al
+  arrancar (`src/sesion/limpiezaTokenAnterior.ts`).
 - **No agregues dependencias** (ni `pnpm add`) sin aprobación explícita del usuario. Si
   hace falta una, explica para qué y qué alternativa sin dependencia existe.
 - Las únicas dependencias aprobadas son `react-router` (en modo declarativo o de datos,
@@ -96,7 +99,14 @@ Léelas antes de tocar `src/services/` o `src/types/`.
 
 ## 7. API
 
-- Solo existen los endpoints de `../ARCHITECTURE.md` § 3.5 y el WebSocket de § 3.9.
+- Solo existen los endpoints de `../ARCHITECTURE.md` § 3.5, bajo la base `/api/v1`. No hay
+  WebSocket: el seguimiento del análisis se hace por HTTP (§ 3.9).
+- Las consultas automáticas (las que no son una acción del usuario, como el seguimiento de un
+  análisis en proceso) llevan el header `X-Actividad: pasiva`, para que no renueven la
+  inactividad de la sesión (`pasiva: true` en `solicitar` de `src/services/api.ts`).
+- Los errores de la API tienen la forma `{error: {codigo, mensaje, id_error}}`. Los textos
+  que ve el usuario salen de Figma y se eligen por `codigo`; el `mensaje` del servidor no se
+  muestra. W-31 muestra el `id_error`.
 - No inventes endpoints ni formatos de respuesta. Si una pantalla necesita datos que la API
   todavía no entrega, detente y pregunta antes de continuar.
 - Todas las llamadas pasan por `src/services/`; los componentes no llaman a `fetch`.
@@ -110,7 +120,7 @@ con datos simulados, con estas reglas:
   tendrá la real, de modo que pasar a la API se hace cambiando el import en `src/services/`
   sin tocar las pantallas.
 - Cada función simulada lleva un comentario que dice qué endpoint falta:
-  `// SIMULADO: falta endpoint POST /api/...`.
+  `// SIMULADO: falta endpoint POST /api/v1/...`.
 - Los datos son ficticios y coherentes con los ejemplos de Figma. Nunca son datos reales.
 - Cada formato de datos que se proponga se documenta en `CONTRATOS_API.md` (en esta
   carpeta) para entregárselo al equipo del backend. Mientras el backend no lo confirme,
@@ -123,5 +133,6 @@ con datos simulados, con estas reglas:
 - Antes de dar una tarea por terminada, `pnpm build` debe pasar sin errores (ejecuta
   `tsc --noEmit` y `vite build`).
 - Commits pequeños, en español, con el formato del repositorio:
-  `feat(frontend): pantalla W-01 inicio de sesión`.
+  `feat(frontend): pantalla W-01 inicio de sesión`. Cada mensaje incluye el issue al final
+  del cuerpo (por ejemplo `Refs #72 #84`).
 - Al terminar, resume qué archivos cambiaste y cómo probarlo en el navegador.
