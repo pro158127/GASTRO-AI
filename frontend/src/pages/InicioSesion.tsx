@@ -10,6 +10,7 @@ import CampoTexto from "../components/CampoTexto";
 import Logo from "../components/Logo";
 import { ErrorApi, login } from "../services/api";
 import { avisoDeError } from "../utils/avisosError";
+import { borrarCierrePendiente } from "../sesion/cierrePendiente";
 import { useSesion } from "../sesion/ProveedorSesion";
 import { isValidEmail } from "../utils/validators";
 import estilos from "./InicioSesion.module.css";
@@ -35,6 +36,13 @@ const AVISOS = {
     titulo: "Su contraseña temporal venció",
     mensaje:
       "Pasaron más de 72 horas desde que se generó. Pida una nueva al administrador de la plataforma.",
+  },
+  // No está en Figma (pendiente de agregar): el servidor no confirmó el cierre de sesión.
+  cierreSinConfirmar: {
+    tipo: "advertencia",
+    titulo: "",
+    mensaje:
+      "Se cerró la sesión en este equipo, pero no pudimos confirmarlo con el servidor. Cierre el navegador para terminar la sesión por completo.",
   },
   // W-01f.
   cierre: {
@@ -63,7 +71,11 @@ export default function InicioSesion() {
   const [contrasena, setContrasena] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(() =>
-    motivoCierre === "cierre" ? AVISOS.cierre : null
+    motivoCierre === "cierre"
+      ? AVISOS.cierre
+      : motivoCierre === "cierre_sin_confirmar"
+        ? AVISOS.cierreSinConfirmar
+        : null
   );
   // Evita dobles peticiones aunque el envío se dispare dos veces antes de repintar.
   const enviandoRef = useRef(false);
@@ -92,6 +104,9 @@ export default function InicioSesion() {
     setAviso(null);
     try {
       await login(correo.trim(), contrasena);
+      // La cookie nueva reemplazó a la anterior: ya no hay nada que cerrar en el servidor desde
+      // este navegador, y la marca cerraría por error la sesión recién abierta al recargar.
+      borrarCierrePendiente();
       // La cookie ya quedó puesta. Se consulta la sesión para tener usuario y etapa; en cuanto
       // cambia el estado, RutaPublica lleva a la pantalla de la etapa que sigue.
       await refrescarSesion();

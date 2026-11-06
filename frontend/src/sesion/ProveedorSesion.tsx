@@ -1,11 +1,23 @@
 // Estado de sesión en memoria. La sesión real vive en el servidor y viaja en la cookie HttpOnly
 // `gastro_sesion`; aquí solo se guarda lo que responde GET /auth/sesion (etapa, usuario y
 // vencimiento). Nada se escribe en localStorage ni en sessionStorage.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ErrorApi, obtenerSesion, registrarManejadoresGlobales } from "../services/api";
+import {
+  ErrorApi,
+  cerrarSesionEnServidor,
+  obtenerSesion,
+  registrarManejadoresGlobales,
+} from "../services/api";
 import type { EtapaSesion, RespuestaSesion, UsuarioActual } from "../types";
+import { borrarCierrePendiente, hayCierrePendiente, marcarCierrePendiente } from "./cierrePendiente";
 import PantallaEstadoSesion from "./PantallaEstadoSesion";
+
+/**
+ * `cierre`: el servidor confirmó el cierre (W-01f). `cierre_sin_confirmar`: el servidor no
+ * respondió; la sesión local se cerró pero la del servidor puede seguir viva.
+ */
+type MotivoCierre = "cierre" | "cierre_sin_confirmar";
 
 type EstadoSesion =
   | { fase: "cargando" }
@@ -26,13 +38,18 @@ interface ValorSesion {
    * cualquier estado enviado con `navigate`. Se marca en el mismo `setState` que cierra la
    * sesión, así no hay carrera.
    */
-  motivoCierre: "cierre" | null;
+  motivoCierre: MotivoCierre | null;
   /**
    * Vuelve a consultar GET /auth/sesion y actualiza el estado. Devuelve la etapa, o `null` si
    * ya no hay sesión. Lanza ErrorApi si falla por red o por el servidor.
    */
   refrescarSesion: () => Promise<EtapaSesion | null>;
-  cerrarSesion: () => void;
+  /**
+   * Cierra la sesión en el servidor (POST /auth/logout) y, pase lo que pase con esa llamada
+   * (sin conexión, error), también la local, para que nadie quede atrapado en una sesión que
+   * no puede cerrar. Si el servidor no confirma, deja la marca de cierre pendiente.
+   */
+  cerrarSesion: () => Promise<void>;
   /** La pantalla de inicio de sesión lo llama al montar: el aviso se muestra una sola vez. */
   consumirMotivoCierre: () => void;
 }
@@ -58,7 +75,7 @@ function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<EstadoSesion>({ fase: "cargando" });
-  const [motivoCierre, setMotivoCierre] = useState<"cierre" | null>(null);
+  const [motivoCierre, setMotivoCierre] = useState<MotivoCierre | null>(null);
   const [intento, setIntento] = useState(0);
 
   const refrescarSesion = useCallback(async (): Promise<EtapaSesion | null> => {
@@ -79,7 +96,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(() => {
     let vigente = true;
     setEstado({ fase: "cargando" });
-    obtenerSesion()
+    // Si un cierre de sesión quedó sin confirmar, primero se reintenta; la marca se borra solo
+    // cuando el servidor responde 204. Si el reintento falla, no se consulta la sesión (podría
+    // reabrir la cuenta anterior) y se muestra el error con «Reintentar».
+    const reintentoCierre = hayCierrePendiente()
+      ? cerrarSesionEnServidor().then(borrarCierrePendiente)
+      : Promise.resolve();
+    reintentoCierre
+      .then(() => obtenerSesion())
       .then((respuesta) => {
         if (vigente) setEstado(estadoDesdeRespuesta(respuesta));
       })
@@ -93,8 +117,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     };
   }, [intento]);
 
-  const cerrarSesion = useCallback(() => {
-    setMotivoCierre("cierre");
+  // Evita dobles llamadas si se pulsa «Cerrar sesión» dos veces antes de que responda.
+  const cerrandoRef = useRef(false);
+  const cerrarSesion = useCallback(async () => {
+    if (cerrandoRef.current) return;
+    cerrandoRef.current = true;
+    let confirmado = true;
+    try {
+      await cerrarSesionEnServidor();
+      borrarCierrePendiente();
+    } catch {
+      // La cookie HttpOnly solo la borra el servidor: la local se cierra de todos modos, pero
+      // se deja la marca para reintentar el cierre al recargar y se avisa que no se confirmó.
+      confirmado = false;
+      marcarCierrePendiente();
+    }
+    cerrandoRef.current = false;
+    setMotivoCierre(confirmado ? "cierre" : "cierre_sin_confirmar");
     setEstado({ fase: "sin_sesion" });
   }, []);
 

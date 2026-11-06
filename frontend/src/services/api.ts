@@ -121,6 +121,18 @@ export function obtenerSesion(opciones: { pasiva?: boolean } = {}): Promise<Resp
   return solicitar<RespuestaSesion>("/auth/sesion", { ...opciones, global: false });
 }
 
+/**
+ * POST /auth/logout. Cierra la sesión en el servidor y borra la cookie. Siempre responde 204,
+ * incluso si la sesión ya había vencido. Funciona en cualquier etapa.
+ */
+export function cerrarSesionEnServidor(): Promise<void> {
+  return solicitar<void>("/auth/logout", {
+    metodo: "POST",
+    cuerpo: { motivo: "manual" },
+    global: false,
+  });
+}
+
 export function fetchHealth(): Promise<HealthResponse> {
   return solicitar<HealthResponse>("/health");
 }

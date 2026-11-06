@@ -78,6 +78,13 @@ Léelas antes de tocar `src/services/` o `src/types/`.
 - Campos de contraseña: se permite pegar, gestores de contraseñas y botón «Mostrar».
 - El error de inicio de sesión es genérico: no dice si falló el correo o la contraseña.
 - La validación del cliente es solo ayuda; la autoridad es el servidor.
+- **Única excepción de almacenamiento en el navegador:** la marca booleana de «cierre de
+  sesión pendiente» (`gastroai_cierre_pendiente` en `sessionStorage`, ver
+  `src/sesion/cierrePendiente.ts`). Con la cookie HttpOnly solo el servidor borra la
+  sesión; si `POST /auth/logout` falla, la marca hace que al cargar la aplicación se
+  reintente el cierre antes de consultar `GET /auth/sesion`, y se borra solo cuando el
+  servidor responde 204. No contiene ningún dato personal. No se guarda nada más en
+  `localStorage` ni en `sessionStorage`.
 - El token hoy se guarda en `localStorage` (código existente). No amplíes ese uso; la
   migración a cookie HttpOnly es una decisión pendiente con el backend.
 - **No agregues dependencias** (ni `pnpm add`) sin aprobación explícita del usuario. Si
