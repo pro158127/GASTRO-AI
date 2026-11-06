@@ -1,32 +1,33 @@
 # Documento de Contexto Técnico — Gastro-AI
 
-> Guía de referencia para que cualquier persona o IA pueda trabajar en el
-> proyecto sin perderse: cómo se accede a cada componente, qué hace cada
-> módulo y cómo están conectados. Complementa a `README.md` (orientado a
-> GitHub) y `AGENTS.md` (resumen operativo para agentes).
+> Guía de referencia para que cualquier persona o IA pueda trabajar en el proyecto sin
+> perderse: cómo se accede a cada componente, qué hace cada módulo y cómo están
+> conectados. Complementa a `README.md` (orientado a GitHub) y `AGENTS.md` (resumen
+> operativo para agentes). **La sección 3.5 es el contrato de la API que usa el frontend.**
 
 ---
 
 ## 1. Visión general
 
-Sistema de análisis de imágenes clínicas con IA. Flujo principal:
-
-1. El **frontend** (React) sube una imagen + documento → `POST /api/analisis`.
-2. La **API** (FastAPI) guarda la imagen en MinIO, crea un registro en
-   PostgreSQL con estado `PROCESANDO` y encola una tarea en Redis.
-3. El **worker** (Celery) procesa la tarea, genera el Grad-CAM y la
-   explicación, actualiza el registro a `COMPLETADO` y publica un evento en
-   Redis.
-4. El **frontend** recibe la notificación por **WebSocket** y muestra el
-   resultado sin recargar.
+1. El **frontend** (React) inicia sesión en dos pasos (contraseña y código TOTP); la sesión
+   queda en la cookie `gastro_sesion`.
+2. El doctor sube una imagen con el tipo y número de documento del paciente. La **API**
+   valida la imagen, calcula el seudónimo HMAC (el documento nunca se guarda), sube la
+   imagen sin EXIF a MinIO, crea el análisis y responde **202** con su código `A-AAAA-NNNNNN`.
+3. El **worker** (Celery) llama al Space privado de Hugging Face, guarda resultados y mapas
+   de calor y, **después**, pide la explicación a Gemini enviándole solo el JSON de
+   probabilidades y regiones.
+4. El frontend consulta el estado por HTTP con `X-Actividad: pasiva` hasta que termina.
 
 ```
-Navegador → Nginx :80 →  /      → frontend (React estático)
-                        /api/* → api (FastAPI :8000)
-                        /ws/*  → api (WebSocket)
-api → encola → Redis → worker (Celery) → MinIO + PostgreSQL
-worker → publish Redis "analisis:{id}" → api (WS) → Navegador
+Navegador → nginx :80 →  /         → frontend (React estático)
+                         /api/v1/* → api (FastAPI :8000)
+api → encola → redis → worker (Celery) → Space HF / Gemini
+api, worker → postgres (datos) + minio (archivos)
 ```
+
+> Estado actual: están la base de datos completa (20 tablas), la autenticación y la sesión
+> (sección 3.5). Los demás módulos se agregan en los siguientes pull requests.
 
 ---
 
@@ -35,298 +36,245 @@ worker → publish Redis "analisis:{id}" → api (WS) → Navegador
 ### 2.1 Comandos Docker
 
 ```bash
-docker compose up -d --build      # construir + arrancar todo
-docker compose ps                 # estado (postgres y minio con healthcheck)
-docker compose logs -f api        # logs API (la siembra corre al arrancar)
-docker compose logs -f worker     # logs Celery
-docker compose restart nginx      # recargar nginx tras cambiar nginx.conf
-docker compose down               # detener (añadir -v para borrar volúmenes)
+cp backend/.env.example backend/.env   # una vez
+docker compose up -d --build           # construir y arrancar todo
+docker compose ps
+docker compose logs -f api
+docker compose logs -f worker
+docker compose restart nginx           # tras cambiar backend/docker/nginx/nginx.conf
+docker compose down                    # agregar -v borra los volúmenes
 ```
+
+El servicio `preparar` corre antes que la API: `alembic upgrade head`, crea el bucket y
+hace la carga inicial. Termina con estado `Exited (0)`; eso es lo esperado.
 
 ### 2.2 URLs y puertos (host)
 
-| Servicio | URL | Puerto host | Notas |
-|---|---|---|---|
-| Web (SPA + API + WS) | `http://localhost` | 80 | Punto de entrada único (Nginx). |
-| Health API | `http://localhost/api/health` | — | `{"status","database","minio"}`. |
-| MinIO (S3 API) | `http://localhost:9000` | 9000 | Sin consola web en este build. |
-| PostgreSQL | `localhost:5432` | 5432 | Para clientes como DBeaver/psql. |
-| Redis | interno | 6379 | No expuesto al host; solo `api`/`worker`. |
-
-### 2.3 Credenciales por defecto (definidas en `.env`)
-
-| Recurso | Usuario | Contraseña |
+| Servicio | URL | Notas |
 |---|---|---|
-| App (superadmin) | `admin@gastroai.com` | `admin12345` |
-| MinIO | `minioadmin` | `minioadmin` |
-| PostgreSQL | `gastroai` | `gastroai` |
+| Web (SPA + API) | `http://localhost` | Punto de entrada único (nginx) |
+| Salud de la API | `http://localhost/api/v1/health` | `{"status","database"}` |
+| Documentación de la API | `http://localhost:8000/docs` | Swagger de FastAPI; solo con `backend/docker-compose.yml` o con uvicorn local |
+| MinIO (API S3) | `http://localhost:9000` | El navegador abre aquí las URL firmadas |
+| MinIO (consola) | `http://localhost:9001` | Solo ver archivos (edición comunitaria) |
+| PostgreSQL | `localhost:5432` | Para DBeaver o psql |
+
+### 2.3 Credenciales de desarrollo
+
+Todas salen de `backend/.env` (plantilla `backend/.env.example`):
+
+| Recurso | Variables |
+|---|---|
+| Primer administrador | `ADMIN_CORREO` / `ADMIN_TEMPORAL` (temporal: se cambia en el primer ingreso) |
+| PostgreSQL | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
+| MinIO | `S3_ACCESS_KEY` / `S3_SECRET_KEY` |
 
 ---
 
 ## 3. Backend (`backend/`)
 
-### 3.1 Estructura
+### 3.1 Estructura (Controlador → Servicio → Repositorio)
 
 ```
 backend/
-├── Dockerfile.backend     # imagen compartida por API y worker
-├── requirements.txt
-├── alembic.ini            # configurado; NO usado al arrancar (ver §3.10)
-├── migrations/            # migraciones Alembic (futuras)
+├── Dockerfile               # imagen de api, worker y preparar
+├── docker-compose.yml       # solo el backend, para trabajar sin el frontend
+├── alembic/                 # migraciones (0001 tablas, 0002 restricciones) + sql/
+├── docker/minio/            # MinIO compilado desde el código oficial
+├── docker/nginx/nginx.conf  # puerta de entrada (la usan los dos compose)
+├── scripts/init_storage.py  # crea el bucket
 └── app/
-    ├── main.py            # instancia FastAPI + registro de routers
-    ├── config.py          # Settings (Pydantic) leyendo variables de entorno
-    ├── db.py              # engine, SessionLocal, Base, get_db()
-    ├── security.py        # hash/verify password (bcrypt) + JWT (PyJWT)
-    ├── deps.py            # dependencia get_current_user (Bearer JWT)
-    ├── seed.py            # create_all + roles + superadmin + bucket MinIO
-    ├── worker.py          # instancia Celery (broker/backend Redis)
-    ├── tasks.py           # tareas asíncronas (procesar_analisis)
-    ├── models/            # ORM: Role, User, Analisis
-    ├── schemas/           # DTOs Pydantic: auth, analisis
-    ├── routers/           # health, auth, analisis, ws
-    ├── services/          # lógica de negocio (analisis_service)
-    └── adapters/          # minio_adapter, llm_adapter (externos)
+    ├── main.py              # FastAPI, manejadores de error y routers
+    ├── seed.py              # carga inicial (python -m app.seed)
+    ├── api/routers/         # controladores: HTTP, cookie y validación. Sin SQL
+    ├── api/deps.py          # inyección: sesión de BD, sesión de usuario, etapa y rol
+    ├── schemas/             # JSON de entrada y salida (Pydantic)
+    ├── services/            # reglas del negocio; no importan FastAPI ni escriben SQL
+    ├── repositories/        # única capa que usa la sesión de SQLAlchemy
+    ├── models/              # 20 tablas en 5 módulos + base.py
+    ├── adapters/            # Gemini, MinIO (S3) y contraseñas filtradas (HIBP)
+    ├── workers/             # Celery
+    └── core/                # configuración, base de datos, errores y seguridad
 ```
 
-### 3.2 Configuración (`app/config.py`)
+### 3.2 Configuración (`app/core/config.py`)
 
-`Settings` extiende `pydantic_settings.BaseSettings` y lee variables de entorno
-(case-insensitive). Los campos más importantes y sus *properties* derivadas:
+`Settings` (pydantic-settings) lee `backend/.env` o variables de entorno. Toda variable
+nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 
-| Campo (env var) | Default | Uso |
-|---|---|---|
-| `POSTGRES_USER/PASSWORD/DB/HOST/PORT` | gastroai / gastroai / gastroai / localhost / 5432 | `database_url` |
-| `REDIS_HOST` / `REDIS_PORT` | localhost / 6379 | `redis_url`, `celery_broker_url` (db 0), `celery_result_backend` (db 1) |
-| `MINIO_ENDPOINT` | `minio:9000` | operaciones internas (subir/leer) |
-| `MINIO_PUBLIC_ENDPOINT` | `localhost:9000` | URLs firmadas que usa el navegador |
-| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | minioadmin | credenciales S3 |
-| `MINIO_BUCKET` | gastroai | bucket de objetos |
-| `SECRET_KEY` / `JWT_ALGORITHM` / `ACCESS_TOKEN_EXPIRE_MINUTES` | — / HS256 / 60 | firma JWT |
-| `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` | admin@gastroai.com / admin12345 | siembra inicial |
-| `HUGGINGFACE_API_URL/TOKEN`, `LLM_API_URL/KEY` | vacío | modo *stub* si están vacíos |
+| Grupo | Variables |
+|---|---|
+| Base de datos y cola | `DATABASE_URL`, `REDIS_URL` |
+| MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS` |
+| Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
+| Modelo | `HF_SPACE_URL`, `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256` |
+| Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO`, `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
+| Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
+| Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |
+| Primer administrador | `ADMIN_CORREO`, `ADMIN_TEMPORAL` |
+| Correo | `SMTP_*` |
 
-La URL de BD se construye como:
-`postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}`.
+### 3.3 Base de datos
 
-### 3.3 Base de datos y ORM (`app/db.py`)
+PostgreSQL 16 con SQLAlchemy 2.0 (estilo `Mapped`) y psycopg 3. El esquema se crea **solo
+con Alembic**:
 
-```python
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-Base = declarative_base()
-
-def get_db():            # dependencia de FastAPI
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-```
-
-- Se usa **SQLAlchemy 2.0** con sesiones **síncronas** y `psycopg2-binary`.
-- Inyecta la sesión en los endpoints con `db: Session = Depends(get_db)`.
+- `0001_inicial`: las 20 tablas y los 17 tipos ENUM.
+- `0002_restricciones`: ejecuta `alembic/sql/restricciones.sql` — CHECK de rangos, un solo
+  modelo vigente, bitácora inmutable (solo INSERT y SELECT), seudónimo y caso de un
+  análisis inmutables, y la secuencia `analisis_codigo_seq`.
 
 ### 3.4 Modelos (`app/models/`)
 
-Todos heredan de `Base`. Se importan en `app/models/__init__.py` (necesario para
-que `create_all` y Alembic los vean).
+| Módulo | Archivo | Tablas |
+|---|---|---|
+| 1 · Usuarios y acceso | `usuarios.py` | Rol, Usuario, Sesion, EnvioCredencial |
+| 2 · Casos y análisis | `analisis.py` | CasoPaciente, Analisis, ResultadoCaracteristica, RegionInteres, ExplicacionLlm, ObservacionProfesional |
+| 3 · Modelo y configuración | `modelo.py` | Caracteristica, ModeloDesplegado, MetricaModelo, ConfiguracionInferencia |
+| 4 · Reportes | `reportes.py` | Reporte, ReporteAnalisis |
+| 5 · Auditoría y trazabilidad | `auditoria.py` | Bitacora, LogInferencia, Traslado, TrasladoCaso |
 
-- **Role** — `id (int)`, `name (unique)`.
-- **User** — `id (UUID)`, `email (unique)`, `full_name`, `password_hash`,
-  `role_id (FK roles.id)`, `is_active`, `created_at`, `role (relationship)`.
-- **Analisis** — `id (UUID)`, `documento`, `tipo_documento`, `estado`
-  (`PROCESANDO|COMPLETADO|FALLIDO`), `imagen_key`, `grad_cam_key`,
-  `resultado (JSONB)`, `explicacion (Text)`, `error`, `created_at`, `updated_at`.
+No existe ninguna columna con el documento del paciente: solo el seudónimo HMAC y la
+versión de la clave con que se calculó.
 
-> `imagen_key` / `grad_cam_key` guardan la *clave* del objeto en MinIO, no el
-> binario. Las URLs firmadas se generan en tiempo de consulta.
+### 3.5 Contrato de la API
 
-### 3.5 Endpoints REST
+Base: **`/api/v1`**. Todo el intercambio es JSON (UTF-8), salvo la carga de imágenes
+(multipart) y las descargas (PDF y CSV).
 
-Todos bajo `/api`. Los de `analisis` requieren `Authorization: Bearer <token>`.
+**Sesión.** El token viaja en la cookie `gastro_sesion` (HttpOnly, Secure, SameSite=Strict).
+El frontend nunca lo lee ni lo guarda: no hay `access_token` ni header `Authorization`.
+Basta con `fetch(ruta, { credentials: "same-origin" })` pasando por nginx. Cada petición
+renueva la inactividad (10 min), salvo las que lleven `X-Actividad: pasiva`.
 
-| Método | Ruta | Auth | Body / Params | Respuesta |
-|---|---|---|---|---|
-| GET | `/api/health` | no | — | `{status, database, minio}` |
-| POST | `/api/auth/login` | no | JSON `{email, password}` | `{access_token, token_type}` |
-| POST | `/api/analisis` | sí | `multipart/form-data`: `file`, `documento`, `tipo_documento` (default `CC`) | `202` + `AnalisisOut` (estado `PROCESANDO`) |
-| GET | `/api/analisis/{id}` | sí | `id` (UUID) | `AnalisisOut` |
-| WS | `/ws/analisis/{id}` | no | `id` (UUID) | eventos JSON `{id, estado, explicacion}` |
+**Errores.** Siempre con esta forma, sin trazas ni detalles técnicos:
 
-**`AnalisisOut`** (schema en `app/schemas/analisis.py`):
-`id, documento, tipo_documento, estado, resultado, explicacion, error,
-imagen_url, grad_cam_url, created_at, updated_at`. `imagen_url`/`grad_cam_url`
-son URLs firmadas de MinIO (expiran en 5 min) o `null`.
-
-Ejemplos:
-
-```bash
-# Login → token
-curl -s -X POST http://localhost/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@gastroai.com","password":"admin12345"}'
-
-# Crear análisis (202)
-curl -s -X POST http://localhost/api/analisis \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "file=@imagen.png" -F "documento=12345678" -F "tipo_documento=CC"
-
-# Consultar estado/resultado
-curl -s http://localhost/api/analisis/$ID -H "Authorization: Bearer $TOKEN"
+```json
+{ "error": { "codigo": "SIN_PERMISO", "mensaje": "No tienes permiso para esta acción.", "id_error": "ERR-7F3A" } }
 ```
+
+`id_error` es el código que el usuario le dicta al administrador; el mismo queda en el log.
+
+| HTTP | `codigo` | Qué hace el frontend |
+|---|---|---|
+| 401 | `SIN_SESION`, `SESION_VENCIDA` | Ir a «Iniciar sesión» |
+| 401 | `CREDENCIALES_INVALIDAS` | Mensaje genérico de W-01 (mismo para correo, contraseña, cuenta inactiva o bloqueada) |
+| 401 | `TEMPORAL_EXPIRADA` | W-01e: pedir una nueva al administrador |
+| 401 | `CODIGO_INVALIDO` | Código TOTP incorrecto, vencido o ya usado |
+| 403 | `ETAPA_INVALIDA` | Falta un paso del inicio de sesión (consultar `GET /auth/sesion`) |
+| 403 | `SIN_PERMISO` | W-28 «Sin permisos» |
+| 404 | `NO_ENCONTRADO` | No existe o no es del usuario |
+| 422 | `DATOS_INVALIDOS`, `CONTRASENA_DEBIL` | Revisar los campos |
+| 5xx | `ERROR_INTERNO` | W-31 con el `id_error` |
+
+**Etapas del inicio de sesión.**
+
+```
+login ─┬─ contraseña temporal ──► CAMBIO_CONTRASENA ─► VINCULAR_TOTP (o PENDIENTE_2FA) ─► ACTIVA
+       ├─ sin app vinculada ────► VINCULAR_TOTP ─────────────────────────────────────────► ACTIVA
+       └─ con app vinculada ────► PENDIENTE_2FA ─────────────────────────────────────────► ACTIVA
+```
+
+Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: `DOCTOR` y
+`ADMINISTRADOR`, leídos de la base en cada petición.
+
+**Endpoints disponibles.**
+
+| Método | Ruta | Etapa o rol | Cuerpo | Respuesta |
+|---|---|---|---|---|
+| GET | `/health` | Público | — | `{status, database}` |
+| POST | `/auth/login` | Público | `{correo, contrasena}` | `200 {etapa}` + cookie |
+| POST | `/auth/2fa` | `PENDIENTE_2FA` | `{codigo}` | `{etapa: "ACTIVA", usuario}` |
+| POST | `/auth/contrasena-temporal` | `CAMBIO_CONTRASENA` | `{nueva_contrasena}` (12 a 64) | `{etapa}` |
+| POST | `/auth/totp/vinculacion` | `VINCULAR_TOTP` | — | `{otpauth_uri, qr_png, clave_texto}` |
+| POST | `/auth/totp/confirmacion` | `VINCULAR_TOTP` | `{codigo}` | `{etapa: "ACTIVA", usuario}` |
+| GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, vence_en, usuario}` |
+| POST | `/auth/sesion/actividad` | `ACTIVA` | — | `{vence_en}` |
+| POST | `/auth/logout` | Cualquiera (o ninguna) | `{motivo: "manual" \| "inactividad"}` opcional | `204`, borra la cookie |
+
+`usuario` = `{id, nombre, apellido, rol}`. `qr_png` es un `data:image/png;base64,…`;
+`clave_texto` es la clave en grupos de 4, como alternativa accesible al QR. `vence_en`
+sirve para mostrar la advertencia del minuto 9.
+
+**Planeados** (detalle en la especificación del equipo): perfil, gestión de usuarios,
+traslados, pacientes y análisis (`POST /analisis` → 202), explicación, observaciones,
+historial, reportes PDF, dashboards, configuración de inferencia, bitácora y monitoreo.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
-Los routers delegan la lógica a un servicio que recibe la sesión de BD:
+Las reglas del negocio viven aquí y reciben sus dependencias por el constructor, para
+probarlas sin base de datos (RNF-19).
 
-```python
-class AnalisisService:
-    def __init__(self, db): self.db = db
-    def crear_analisis(self, file, documento, tipo_documento) -> AnalisisOut: ...
-    def obtener_analisis(self, analisis_id) -> AnalisisOut | None: ...
-```
+- `autenticacion.py`: login, segundo factor, cambio de temporal, vinculación TOTP, control
+  de la sesión e inactividad, bloqueo tras 5 fallos (15 min).
+- `politica_contrasena.py`: 12 a 64 caracteres, sin reglas de composición; rechaza las
+  comunes, las obvias, las que llevan el correo o el nombre de la app, y las filtradas.
+- `auditoria.py`: bitácora con patrón Observador. El evento rechaza en `detalle` cualquier
+  dato del paciente, resultado clínico o secreto.
 
-`crear_analisis` hace: leer bytes → subir a MinIO (`original/{uuid}.{ext}`) →
-crear registro `Analisis` → commit → `procesar_analisis.delay(str(id))` →
-devolver `AnalisisOut`. El servicio es el **único** sitio que conoce MinIO y
-Celery; los routers solo validan entrada y mapean a HTTP.
+Cuando un fallo debe quedar guardado antes de responder error (intentos fallidos), el
+servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
 
 ### 3.7 Adaptadores (`app/adapters/`)
 
-- **`minio_adapter.py`** — singleton `minio_adapter` con dos clientes:
-  - `client` → `MINIO_ENDPOINT` (`minio:9000`) para `ensure_bucket`, `put_bytes`,
-    `ping`.
-  - `public_client` → `MINIO_PUBLIC_ENDPOINT` (`localhost:9000`) para
-    `presigned_get` (URLs que el navegador puede alcanzar).
-  - Ambos usan `region="us-east-1"` (evita la llamada de descubrimiento de
-    región).
-- **`llm_adapter.py`** — `LLMAdapter.generar_explicacion(resultado)`. Hoy es un
-  *stub*; la implementación real hará HTTPS a `settings.llm_api_url`. Regla:
-  **nunca** enviar la imagen original al LLM, solo JSON (probabilidades + ROI).
+- `almacen.py`: MinIO por boto3, con dos clientes: el interno (`minio:9000`) sube y lee; el
+  público firma URL con el host que alcanza el navegador (5 min de vigencia).
+- `llm.py`: Gemini (`google-genai`) con salida JSON, timeout de 15 s y sin reintentos
+  automáticos. Rechaza cualquier imagen o mapa de calor en lo que se le envía.
+- `filtraciones.py`: Have I Been Pwned por k-anonimato (solo sale el inicio del SHA-1). Si
+  no responde, el cambio de contraseña no se bloquea.
 
-### 3.8 Worker Celery (`app/worker.py` + `app/tasks.py`)
+### 3.8 Worker (`app/workers/celery_app.py`)
 
-- Instancia: `celery_app = Celery("gastroai", broker=redis/0, backend=redis/1,
-  include=["app.tasks"])`.
-- Comando en compose: `celery -A app.worker.celery_app worker --loglevel=info`.
-- Tarea `procesar_analisis(analisis_id)`:
-  1. `time.sleep(3)` (simula inferencia; sustituir por llamada a Hugging Face).
-  2. Genera `resultado` (clases/probabilidades/ROI).
-  3. Sube un PNG placeholder a MinIO (`gradcam/{id}.png`).
-  4. Genera `explicacion` con `llm_adapter`.
-  5. Actualiza `Analisis` → `COMPLETADO` (o `FALLIDO` en excepción).
-  6. Publica en Redis: `publish("analisis:{id}", json)`.
+Celery con Redis como intermediario. Comando en compose:
+`celery -A app.workers.celery_app worker --loglevel=info` (en Windows, `--pool=solo`).
+Las tareas de inferencia y explicación llegan con el módulo de análisis.
 
-El worker abre su **propia** sesión con `SessionLocal()` (no comparte la de
-FastAPI). Para añadir una tarea: definirla en `tasks.py` y llamarla con
-`.delay(...)` desde un servicio.
+### 3.9 Seguimiento del análisis (sin WebSocket)
 
-### 3.9 Tiempo real (WebSocket + Pub/Sub)
+No hay WebSocket. Mientras el análisis está `PROCESANDO`, el frontend consulta su estado y
+la explicación por HTTP con `X-Actividad: pasiva`, que no renueva la sesión; así el cierre
+por inactividad sigue funcionando aunque la pantalla esté esperando.
 
-Cadena: `worker` → `redis.publish("analisis:{id}")` → `api` (suscriptor) →
-`WebSocket /ws/analisis/{id}` → navegador.
-
-Implementación en `app/routers/ws.py`: usa `redis.asyncio` para suscribirse al
-canal y reenvía cada mensaje al cliente. Alternativa sin WebSocket: **polling**
-de `GET /api/analisis/{id}` cada 2s hasta que `estado != PROCESANDO`.
-
-### 3.10 Migraciones Alembic
-
-El esquema se crea en tiempo de arranque con `Base.metadata.create_all()` en
-`app/seed.py` (NO con Alembic). Alembic queda listo para versionar cambios:
+### 3.10 Migraciones y carga inicial
 
 ```bash
 cd backend
-alembic revision --autogenerate -m "descripcion"
-alembic upgrade head
+alembic upgrade head          # aplica 0001 y 0002
+python -m app.seed            # roles, características, umbral 50 %, modelo vigente, primer admin
+alembic revision --autogenerate -m "descripcion"   # cuando cambie un modelo
 ```
+
+Nunca `create_all`. Un modelo nuevo se importa en `app/models/__init__.py` para que Alembic
+lo vea.
 
 ### 3.11 Cómo añadir una funcionalidad nueva (backend)
 
-1. **Modelo** → crear en `app/models/`, importar en `app/models/__init__.py`.
-2. **Schema** → crear en `app/schemas/`.
-3. **Servicio** → encapsular lógica en `app/services/`.
-4. **Router** → crear en `app/routers/` y registrar en `app/main.py`.
-5. **Si es asíncrono** → añadir tarea en `app/tasks.py` y llamarla con `.delay`.
+1. Modelo en `app/models/` (si hace falta) y migración con Alembic.
+2. Repositorio en `app/repositories/` (la única capa con SQL).
+3. Servicio en `app/services/`, con dependencias por el constructor.
+4. Esquemas en `app/schemas/`.
+5. Router en `app/api/routers/`, registrado en `app/main.py`, con `SesionDoctor`,
+   `SesionAdmin` o `SesionActiva` de `app/api/deps.py`.
+6. Errores con `ErrorApi(estado, codigo, mensaje)`; acciones críticas a la bitácora con
+   `EventoAuditoria`.
 
 ---
 
 ## 4. Frontend (`frontend/`)
 
-### 4.1 Estructura
+La estructura y las convenciones del frontend las mantiene su equipo (`frontend/CLAUDE.md`).
+Lo que cambia del lado del backend:
 
-```
-frontend/
-├── Dockerfile.frontend   # multi-etapa: node build → nginx (sirve dist)
-├── package.json          # pnpm 9.15.4, build = tsc --noEmit && vite build
-├── vite.config.ts        # proxy dev de /api y /ws hacia api:8000
-├── index.html
-└── src/
-    ├── main.tsx          # punto de entrada React
-    ├── App.tsx           # enruta Login ↔ Dashboard según token
-    ├── index.css
-    ├── components/       # Spinner.tsx (UI reutilizable)
-    ├── pages/            # Login.tsx, Dashboard.tsx
-    ├── services/         # api.ts (HTTP), websocket.ts (WS)
-    ├── types/            # index.ts (contratos TS)
-    └── utils/            # validators.ts
-```
-
-### 4.2 Cliente HTTP (`src/services/api.ts`)
-
-Toda llamada pasa por `request<T>()`, que inyecta el token JWT desde
-`localStorage`:
-
-```ts
-async function request<T>(path, options) {
-  const token = getToken();
-  const headers = { ...(options.headers ?? {}) };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(path, { ...options, headers });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.json() as Promise<T>;
-}
-```
-
-Funciones exportadas: `login`, `crearAnalisis`, `obtenerAnalisis`, `fetchHealth`
-y helpers `getToken/setToken/clearToken` (clave `gastroai_token` en
-`localStorage`).
-
-> Las rutas son **relativas** (`/api/...`): en producción las sirve Nginx en el
-> mismo origen (sin CORS); en desarrollo `vite.config.ts` hace proxy a
-> `api:8000`.
-
-### 4.3 WebSocket (`src/services/websocket.ts`)
-
-```ts
-export function subscribeAnalisis(id, onMessage): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws/analisis/${id}`);
-  ws.onmessage = (e) => onMessage(JSON.parse(e.data));
-  return () => ws.close();   // cleanup
-}
-```
-
-### 4.4 Tipos (`src/types/index.ts`)
-
-`Analisis`, `AnalisisEstado`, `TokenResponse`, `HealthResponse`,
-`AnalisisEvent`. Espejo de los schemas Pydantic del backend; mantener en
-sincronía.
-
-### 4.5 Páginas
-
-- **`Login.tsx`** — formulario → `login()` → `setToken()` → `onLoggedIn()`.
-- **`Dashboard.tsx`** — sube imagen + documento → `crearAnalisis()` → se
-  suscribe con `subscribeAnalisis()`; al recibir `COMPLETADO`/`FALLIDO` llama
-  `obtenerAnalisis()` para cargar URLs firmadas y mostrarlas (`<img
-  src={grad_cam_url}>`).
-
-### 4.6 Cómo añadir una página/servicio (frontend)
-
-1. Añadir tipo en `src/types/`.
-2. Añadir función en `src/services/api.ts` (usa `request<T>`).
-3. Crear la página en `src/pages/` y enlazarla desde `App.tsx`.
+- **4.2 Cliente HTTP:** las rutas pasan a `/api/v1/...`. Sin token en `localStorage` ni
+  header `Authorization`: la cookie viaja sola con `credentials: "same-origin"`. Un `401`
+  lleva al inicio de sesión; un `403 SIN_PERMISO`, a W-28.
+- **4.3 Tiempo real:** el WebSocket se retira; ver 3.9.
+- **4.4 Tipos:** los campos del usuario son `nombre`, `apellido` y `rol` (`DOCTOR` |
+  `ADMINISTRADOR`).
+- **Desarrollo con `pnpm dev`:** apuntar el proxy de `/api` a `http://localhost` (nginx) y
+  entrar por `http://localhost:5173`. Los navegadores aceptan la cookie `Secure` en
+  `localhost`.
 
 ---
 
@@ -334,89 +282,54 @@ sincronía.
 
 ### 5.1 PostgreSQL
 
-- Host (dentro de la red docker): `postgres:5432`; desde el host: `localhost:5432`.
-- BD/usuario/clave: `gastroai` / `gastroai` / `gastroai`.
-- Desde el host:
-  ```bash
-  docker compose exec postgres psql -U gastroai -d gastroai
-  ```
-- En el código: **solo** a través del ORM (`app/db.py`), no SQL crudo (salvo
-  el `SELECT 1` del healthcheck).
+- Dentro de Docker: `postgres:5432`; desde el host: `localhost:5432`.
+- `docker compose exec postgres psql -U gastroia -d gastroia`
+- En el código, solo a través de los repositorios.
 
 ### 5.2 MinIO
 
-- Endpoint interno: `minio:9000`; público (host): `localhost:9000`.
-- Bucket: `gastroai` (se crea automáticamente en `seed.py`).
-- Objetos: `original/{uuid}.{ext}` y `gradcam/{id}.png`.
-- Acceso programático: `minio_adapter` (`app/adapters/minio_adapter.py`).
-- URLs firmadas: `presigned_get(key)` devuelve URL pública con vigencia 5 min.
-- **No hay consola web** (build `bitnamilegacy/minio`); usar el SDK o `mc`.
+- Interno `minio:9000`; público `localhost:9000`; consola `localhost:9001`.
+- Bucket `gastroia-imagenes`, creado por `preparar` (`python -m scripts.init_storage`).
+- Se compila desde el código oficial (`backend/docker/minio/Dockerfile`, versión
+  RELEASE.2025-10-15T17-29-55Z) porque ya no hay imágenes ni binarios publicados.
 
 ### 5.3 Redis
 
-- Solo interno (`redis:6379`), no expuesto.
-- Base de datos 0 → broker Celery y canal pub/sub; base de datos 1 → backend de
-  resultados Celery.
-- Canal de tiempo real: `analisis:{id}` (JSON con `id`, `estado`, `explicacion`).
+- Solo interno (`redis:6379`), con AOF para no perder tareas en cola.
 
-### 5.4 Nginx (`nginx.conf`) — tabla de rutas
+### 5.4 nginx (`backend/docker/nginx/nginx.conf`)
 
 | Ruta | Destino | Notas |
 |---|---|---|
-| `/api/` | `api:8000` | headers `Host`, `X-Forwarded-*`. |
-| `/ws/` | `api:8000` | `Upgrade`/`Connection` para WebSocket; timeouts 300s. |
-| `/` | `frontend:80` | SPA compilada. |
+| `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
+| `/` | `frontend:80` | SPA compilada |
 
-Usa `resolver 127.0.0.11 valid=10s ipv6=off` para re-resolver los nombres de
-servicio (evita 502 por IP obsoleta al recrear contenedores). Si editas
-`nginx.conf`, `docker compose restart nginx`.
+`client_max_body_size 12m` (la API rechaza por encima de 10 MB con su propio 413 en JSON).
+`resolver 127.0.0.11` evita los 502 al recrear contenedores.
 
 ---
 
-## 6. Flujo de datos de ejemplo (end-to-end)
+## 6. Flujo de ejemplo (primer ingreso)
 
 ```
-1. Login
-   POST /api/auth/login {email, password}
-   → 200 {access_token}
-
-2. Subida
-   POST /api/analisis  (multipart: file, documento, tipo_documento)
-   → API: guarda imagen en MinIO "original/{uuid}.png"
-   → DB: INSERT analisis (estado=PROCESANDO)
-   → Redis: encola tarea procesar_analisis
-   → 202 {id, estado:"PROCESANDO", imagen_url}
-
-3. Procesamiento (worker)
-   → simula inferencia (3s)
-   → MinIO: sube "gradcam/{id}.png"
-   → LLM: genera explicación (stub)
-   → DB: UPDATE estado=COMPLETADO, resultado, explicacion
-   → Redis: publish "analisis:{id}"
-
-4. Notificación (tiempo real)
-   → api (suscrita a "analisis:{id}") reenvía al WebSocket
-   → frontend recibe {estado:"COMPLETADO"} y hace GET /api/analisis/{id}
-   → muestra explicación + <img grad_cam_url> + JSON resultado
+POST /api/v1/auth/login {correo, contrasena}          → 200 {etapa: "CAMBIO_CONTRASENA"} + cookie
+POST /api/v1/auth/contrasena-temporal {nueva_contrasena} → 200 {etapa: "VINCULAR_TOTP"}
+POST /api/v1/auth/totp/vinculacion                     → 200 {otpauth_uri, qr_png, clave_texto}
+POST /api/v1/auth/totp/confirmacion {codigo}           → 200 {etapa: "ACTIVA", usuario}
+GET  /api/v1/auth/sesion                               → 200 {etapa, vence_en, usuario}
+POST /api/v1/auth/logout {motivo: "manual"}            → 204 (la sesión queda cerrada en el servidor)
 ```
 
 ---
 
-## 7. Notas / gotchas operativos
+## 7. Notas operativas
 
-- **Imagen compartida:** `api` y `worker` usan el mismo `Dockerfile.backend`;
-  solo cambia el `command` en `docker-compose.yml`.
-- **Siembra al arrancar:** `api` ejecuta `python -m app.seed` (crea tablas con
-  `create_all`, roles, superadmin y bucket MinIO). Reintenta conexión a BD y
-  MinIO hasta ~60s antes de fallar.
-- **MinIO:** las imágenes oficiales `minio/minio` ya no existen (edición
-  comunitaria solo por código). Se usa `bitnamilegacy/minio`; el directorio de
-  datos es `/bitnami/minio/data` (no `/data`).
-- **URLs firmadas:** usan `MINIO_PUBLIC_ENDPOINT`; si cambias el host/dominio,
-  ajusta esta variable. No edites la región `us-east-1`.
-- **Frontend:** `pnpm install --frozen-lockfile` exige `pnpm-lock.yaml`
-  versionado (generado con pnpm 9.15.4). Build = `tsc --noEmit && vite build`.
-- **Sin suite de tests:** verificar manualmente con `/api/health`, el login y el
-  flujo de análisis descrito arriba.
-- **JWT:** guardado en `localStorage` del navegador (clave `gastroai_token`);
-  `get_current_user` en `app/deps.py` lo valida por email.
+- **Imagen compartida:** `api`, `worker` y `preparar` usan `backend/Dockerfile`.
+- **Dos compose:** el de la raíz levanta todo; `backend/docker-compose.yml` levanta solo el
+  backend (con la API también en `localhost:8000`). No se corren los dos a la vez: comparten
+  puertos.
+- **URL firmadas:** usan `S3_PUBLIC_ENDPOINT_URL`; si cambia el dominio, se ajusta esa
+  variable. La región es `us-east-1` y no se toca.
+- **Datos reales pendientes:** los `HF_*` llegan cuando el equipo de ML publique el modelo;
+  hasta entonces la carga inicial usa valores de ejemplo.
+- **Pruebas:** las construye el equipo de calidad (RNF-20 pide cobertura ≥ 70 % y CI).

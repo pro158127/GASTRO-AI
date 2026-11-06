@@ -1,11 +1,29 @@
+"""Por aquí arranca todo. uvicorn app.main:app y a rezar."""
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.routers import analisis, auth, health, ws
+from app.api.routers import auth, health
+from app.core.config import get_settings
+from app.core.errores import registrar_manejadores
+from app.schemas.errores import RespuestaError
 
-app = FastAPI(title=settings.app_name)
+settings = get_settings()
 
-app.include_router(health.router, prefix="/api", tags=["health"])
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(analisis.router, prefix="/api", tags=["analisis"])
-app.include_router(ws.router, tags=["websocket"])
+# Todos los endpoints documentan el mismo error genérico; cada uno agrega los suyos
+app = FastAPI(
+    title=settings.app_name,
+    responses={500: {"model": RespuestaError, "description": "Error interno sin detalles"}},
+)
+registrar_manejadores(app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router, prefix=settings.api_prefix)
+app.include_router(auth.router, prefix=settings.api_prefix)

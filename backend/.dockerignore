@@ -1,5 +1,12 @@
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+# Lo que JAMÁS se mete a la imagen: el .env con los secretos, el venv y la basura de cachés
 .env
+.venv/
+.git/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+docker/
