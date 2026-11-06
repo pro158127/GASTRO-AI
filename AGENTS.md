@@ -32,13 +32,15 @@ Frontend: `cd frontend && pnpm install && pnpm build` (`tsc --noEmit && vite bui
 - **La sesión va en la cookie `gastro_sesion`** (HttpOnly, Secure, SameSite=Strict). No hay
   JWT ni header `Authorization`. El frontend usa `fetch` con `credentials: "same-origin"`.
 - **Ruta base de la API:** `/api/v1`. Errores siempre como
-  `{"error": {"codigo", "mensaje", "id_error"}}`.
+  `{"error": {"codigo", "mensaje", "campos"?, "id_solicitud"}}`; en los 5xx el `codigo` es un
+  `ERR-xxxx` genérico. Contrato completo en `ARCHITECTURE.md` §3.5.
 - **MinIO tiene dos direcciones:** `S3_ENDPOINT_URL=http://minio:9000` para uso interno y
   `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` para las URL firmadas que abre el navegador.
 - **nginx usa `resolver 127.0.0.11`** para no quedarse con IP viejas al recrear contenedores.
   Su configuración está en `backend/docker/nginx/nginx.conf`.
-- **No hay WebSocket.** El resultado del análisis se consulta por HTTP con la cabecera
-  `X-Actividad: pasiva`, que no renueva la sesión.
+- **No hay WebSocket.** El tiempo real será con SSE (`GET /api/v1/eventos`); las consultas
+  automáticas llevan `X-Actividad-Pasiva: 1`, que no renueva la sesión.
+- **nginx limita por IP** el login y los códigos TOTP (10/min) y responde 429 en JSON.
 
 ## Convenciones
 

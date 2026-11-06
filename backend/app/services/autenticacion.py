@@ -6,8 +6,12 @@ Flujo (RF-U01, RF-U02):
            └─ con TOTP ──────► PENDIENTE_2FA ─────────────────────────────────► ACTIVA
 Cada etapa solo abre los endpoints de esa etapa; los demás módulos piden ACTIVA.
 
+Rutas, campos y códigos: el contrato del frontend (ARCHITECTURE.md §3.5).
+
 Reglas que no se negocian, y dónde viven:
-- Cualquier fallo de credenciales responde lo mismo (RF-U01 CA 2) → GENERICO.
+- Cualquier fallo de credenciales responde lo mismo, incluida cuenta bloqueada, INACTIVO
+  o ELIMINADO (RF-U01 CA 2, RF-U12 CA 2): 401 AUTH_CREDENCIALES_INVALIDAS → GENERICO.
+  El contrato proponía 423 y 403 aparte; el equipo lo descartó pa no delatar cuentas.
 - La contraseña se verifica SIEMPRE antes de mirar el estado de la cuenta, pa que una
   cuenta inactiva no responda más rápido que una activa (CWE-208).
 - 5 fallos seguidos, de contraseña o de código, bloquean 15 min (RF-U12, RNF-03) → _fallo.
@@ -37,6 +41,7 @@ from app.core.seguridad import (
 )
 from app.models import (
     AccionBitacora,
+    CodigoRol,
     EstadoUsuario,
     EtapaSesion,
     ResultadoAccion,
@@ -52,8 +57,16 @@ from app.services.politica_contrasena import validar_contrasena
 ESTADOS_QUE_ENTRAN = (EstadoUsuario.ACTIVO, EstadoUsuario.PENDIENTE)
 TODAS_LAS_ETAPAS = tuple(EtapaSesion)
 
-GENERICO = ("CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.")
-CODIGO_INVALIDO = ("CODIGO_INVALIDO", "El código no es válido.")
+GENERICO = ("AUTH_CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.")
+CODIGO_INVALIDO = ("TOTP_CODIGO_INVALIDO", "El código es incorrecto o ya venció.")
+SESION_EXPIRADA = ("SESION_EXPIRADA", "Tu sesión terminó. Inicia sesión de nuevo.")
+
+# A dónde manda el front después de entrar (ARCHITECTURE.md §3.5)
+RUTAS_INICIALES = {
+    CodigoRol.DOCTOR: "/doctor/dashboard",
+    CodigoRol.ADMINISTRADOR: "/admin/dashboard",
+}
+AVISO_ANTES_DEL_CIERRE = timedelta(minutes=1)  # el aviso sale al minuto 9 (RF-U10 CA 3)
 
 
 @dataclass(frozen=True)
@@ -76,11 +89,12 @@ def _error(estado: int, codigo_mensaje: tuple[str, str]) -> ErrorApi:
     return ErrorApi(estado, *codigo_mensaje)
 
 
-def _qr_png(uri: str) -> str:
+def _qr_png_base64(uri: str) -> str:
+    """PNG del QR en Base64 pelado (sin «data:»): el front le pone el prefijo."""
     imagen = qrcode.make(uri, box_size=8, border=2)
     buffer = io.BytesIO()
     imagen.save(buffer, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+    return base64.b64encode(buffer.getvalue()).decode()
 
 
 class ServicioAutenticacion:
@@ -132,8 +146,8 @@ class ServicioAutenticacion:
             )
             self._unidad.confirmar()
             raise ErrorApi(
-                401,
-                "TEMPORAL_EXPIRADA",
+                403,
+                "AUTH_TEMPORAL_EXPIRADA",
                 "Tu contraseña temporal venció. Pide una nueva al administrador.",
             )
 
@@ -157,15 +171,16 @@ class ServicioAutenticacion:
         """Lo que corre antes de cada endpoint protegido.
 
         Cierra la sesión si venció por inactividad o si la cuenta ya no puede entrar
-        (desactivada, eliminada o bloqueada mientras estaba adentro: hallazgo S-04).
-        `pasiva` = cabecera X-Actividad: pasiva; esas consultas no renuevan (RF-U10).
+        (desactivada, eliminada o bloqueada mientras estaba adentro).
+        `pasiva` = cabecera X-Actividad-Pasiva: 1; esas consultas no renuevan (RF-U10).
+        Sin sesión, cerrada o vencida: 401 SESION_EXPIRADA; con `motivo: INACTIVIDAD`
+        cuando fue por los 10 min, pa que el front muestre W-01d.
         """
         if not token:
-            raise ErrorApi(401, "SIN_SESION", "Inicia sesión para continuar.")
+            raise _error(401, SESION_EXPIRADA)
         sesion = self._sesiones.por_token_hash(hash_token(token))
-        vencida = ErrorApi(401, "SESION_VENCIDA", "Tu sesión terminó. Inicia sesión de nuevo.")
         if sesion is None or sesion.cerrada_en is not None:
-            raise vencida
+            raise _error(401, SESION_EXPIRADA)
 
         usuario, ahora = sesion.usuario, self._reloj()
         por_inactividad = ahora - sesion.ultima_actividad_en > self._reglas.inactividad
@@ -177,17 +192,36 @@ class ServicioAutenticacion:
             if por_inactividad:
                 self._publicar(AccionBitacora.CIERRE_SESION_INACTIVIDAD, usuario, sesion.ip)
             self._unidad.confirmar()
-            raise vencida
+            raise ErrorApi(
+                401, *SESION_EXPIRADA, extra={"motivo": "INACTIVIDAD"} if por_inactividad else None
+            )
 
         if sesion.etapa not in etapas:
-            raise ErrorApi(403, "ETAPA_INVALIDA", "Completa el paso pendiente.")
+            # El contrato no le pone código a esto; va la etapa pa que el front redirija
+            # sin tener que volver a preguntar GET /auth/sesion
+            raise ErrorApi(
+                403,
+                "ETAPA_INVALIDA",
+                "Completa el paso pendiente.",
+                extra={"etapa": sesion.etapa.value},
+            )
         if not pasiva:
             sesion.ultima_actividad_en = ahora
             self._unidad.confirmar()
         return sesion
 
-    def vence_en(self, sesion: Sesion) -> datetime:
-        return sesion.ultima_actividad_en + self._reglas.inactividad
+    def inactividad(self, sesion: Sesion) -> dict[str, object]:
+        """Lo que pinta el aviso de inactividad: segundos desde la última actividad (W-05)."""
+        cierre = self._reglas.inactividad
+        return {
+            "aviso_en_s": int((cierre - AVISO_ANTES_DEL_CIERRE).total_seconds()),
+            "cierre_en_s": int(cierre.total_seconds()),
+            "ultima_actividad_en": sesion.ultima_actividad_en,
+        }
+
+    @staticmethod
+    def ruta_inicial(usuario: Usuario) -> str:
+        return RUTAS_INICIALES[usuario.rol.codigo]
 
     # ------------------------------------------------------------------ AUTH-02
 
@@ -207,12 +241,18 @@ class ServicioAutenticacion:
 
     # ------------------------------------------------------------------ AUTH-03
 
-    def cambiar_temporal(self, sesion: Sesion, nueva: str, ip: str | None) -> EtapaSesion:
+    def cambiar_temporal(
+        self, sesion: Sesion, nueva: str, confirmacion: str, ip: str | None
+    ) -> EtapaSesion:
         usuario = sesion.usuario
-        validar_contrasena(nueva, correo=usuario.correo, verificador=self._verificador)
-        if verificar_contrasena(nueva, usuario.hash_contrasena):
+        validar_contrasena(
+            nueva,
+            confirmacion=confirmacion,
+            correo=usuario.correo,
+            verificador=self._verificador,
             # Repetir la temporal sería no cambiarla (RF-U02 CA 4)
-            raise ErrorApi(422, "CONTRASENA_DEBIL", "La nueva contraseña debe ser distinta.")
+            es_la_temporal=verificar_contrasena(nueva, usuario.hash_contrasena),
+        )
         usuario.hash_contrasena = hashear_contrasena(nueva)
         usuario.contrasena_temporal = False
         usuario.temporal_expira_en = None
@@ -237,9 +277,9 @@ class ServicioAutenticacion:
         uri = uri_aprovisionamiento(secreto, usuario.correo or "")
         return {
             "otpauth_uri": uri,
-            "qr_png": _qr_png(uri),
-            # Clave en grupos de 4 pa escribirla a mano: alternativa accesible (RF-U01 CA 10)
-            "clave_texto": " ".join(secreto[i : i + 4] for i in range(0, len(secreto), 4)),
+            # El secreto en grupos de 4 pa «¿No puede escanear?»: alternativa accesible (CA 10)
+            "secreto_manual": " ".join(secreto[i : i + 4] for i in range(0, len(secreto), 4)),
+            "qr_png_base64": _qr_png_base64(uri),
         }
 
     # ------------------------------------------------------------------ AUTH-05
@@ -247,12 +287,14 @@ class ServicioAutenticacion:
     def confirmar_vinculacion(self, sesion: Sesion, codigo: str, ip: str | None) -> Usuario:
         usuario = sesion.usuario
         if usuario.totp_secreto_cifrado is None:
-            raise ErrorApi(409, "SIN_VINCULACION", "Primero genera el código QR.")
+            raise ErrorApi(409, "TOTP_NO_INICIADO", "Primero genera el código QR.")
         paso = self._paso_valido(usuario, codigo, None)
         if paso is None:
             self._fallo(usuario, ip, self._reloj(), sesion)
             self._unidad.confirmar()
-            raise _error(401, CODIGO_INVALIDO)
+            raise _error(
+                422, CODIGO_INVALIDO
+            )  # el contrato pide 422 aquí (W-03b) y 401 en verificar
         ahora = self._reloj()
         usuario.totp_vinculado_en = ahora
         usuario.totp_ultimo_paso = paso

@@ -47,7 +47,7 @@ def verificar_contrasena(contrasena: str, hash_guardado: str | None) -> bool:
 
     Si no hay hash (correo que no existe, cuenta eliminada) igual se corre un bcrypt contra
     uno ficticio: así ambos casos tardan lo mismo y no se puede adivinar qué correos existen
-    midiendo el tiempo de respuesta (hallazgo S-07, CWE-208).
+    midiendo el tiempo de respuesta (CWE-208).
     """
     if not hash_guardado:
         bcrypt.checkpw(_preparar(contrasena), _hash_ficticio())

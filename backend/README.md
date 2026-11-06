@@ -44,6 +44,23 @@ celery -A app.workers.celery_app worker --loglevel=info --pool=solo   # --pool=s
 
 Si PowerShell bloquea `activate`: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
+## Usuarios de prueba (solo desarrollo)
+
+La carga inicial crea el primer administrador. Para probar con otros roles:
+
+```bash
+python -m scripts.crear_usuario_prueba --correo doctor@gastroia.local            # DOCTOR
+python -m scripts.crear_usuario_prueba --correo admin2@gastroia.local --rol ADMINISTRADOR
+docker compose exec api python -m scripts.crear_usuario_prueba --correo doctor@gastroia.local
+```
+
+Imprime una contraseña temporal (vence en 72 h). Solo corre con `ENVIRONMENT=development`.
+Para probar una temporal vencida (W-01e):
+
+```sql
+UPDATE "Usuario" SET temporal_expira_en = now() - interval '1 minute' WHERE correo = 'doctor@gastroia.local';
+```
+
 ## Variables de entorno
 
 Todas están en `.env.example` con un valor de ejemplo y un comentario. Las que se generan

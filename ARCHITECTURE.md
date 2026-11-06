@@ -17,7 +17,8 @@
 3. El **worker** (Celery) llama al Space privado de Hugging Face, guarda resultados y mapas
    de calor y, **después**, pide la explicación a Gemini enviándole solo el JSON de
    probabilidades y regiones.
-4. El frontend consulta el estado por HTTP con `X-Actividad: pasiva` hasta que termina.
+4. El frontend sigue el avance con eventos SSE (`GET /api/v1/eventos`) y consulta el estado
+   por HTTP con `X-Actividad-Pasiva: 1`, que no renueva la sesión.
 
 ```
 Navegador → nginx :80 →  /         → frontend (React estático)
@@ -139,33 +140,52 @@ versión de la clave con que se calculó.
 
 ### 3.5 Contrato de la API
 
+Sigue el contrato del frontend (Figma), con dos ajustes del equipo sobre él: todo fallo de
+credenciales responde el mismo 401 (no hay 423 ni 403 de «cuenta no disponible») y la etapa
+equivocada responde `ETAPA_INVALIDA` con la etapa actual.
+
 Base: **`/api/v1`**. Todo el intercambio es JSON (UTF-8), salvo la carga de imágenes
-(multipart) y las descargas (PDF y CSV).
+(multipart) y las descargas (PDF y CSV). Fechas ISO 8601 en UTC.
 
 **Sesión.** El token viaja en la cookie `gastro_sesion` (HttpOnly, Secure, SameSite=Strict).
 El frontend nunca lo lee ni lo guarda: no hay `access_token` ni header `Authorization`.
 Basta con `fetch(ruta, { credentials: "same-origin" })` pasando por nginx. Cada petición
-renueva la inactividad (10 min), salvo las que lleven `X-Actividad: pasiva`.
+renueva la inactividad (10 min), salvo las que lleven **`X-Actividad-Pasiva: 1`**
+(consultas automáticas).
 
 **Errores.** Siempre con esta forma, sin trazas ni detalles técnicos:
 
 ```json
-{ "error": { "codigo": "SIN_PERMISO", "mensaje": "No tienes permiso para esta acción.", "id_error": "ERR-7F3A" } }
+{ "error": { "codigo": "PERMISO_DENEGADO", "mensaje": "No tienes permiso para esta acción.",
+             "campos": [{ "campo": "correo", "mensaje": "Este campo es obligatorio." }],
+             "id_solicitud": "req_01JC5Z8X9Q2W3E4R5T6Y7U8I9O" } }
 ```
 
-`id_error` es el código que el usuario le dicta al administrador; el mismo queda en el log.
+- `id_solicitud` identifica la petición; queda en el log junto con el detalle técnico.
+- `campos` solo aparece cuando el error es de un campo concreto.
+- En los **5xx**, `codigo` es un `ERR-xxxx` genérico (W-31: «informe al administrador este
+  código»); el mismo `ERR-xxxx` queda en el log con la traza.
+- Algunos errores traen datos propios: `motivo` en `SESION_EXPIRADA`, `etapa` en
+  `ETAPA_INVALIDA` y `requisitos` en `CONTRASENA_NO_CUMPLE_POLITICA`.
 
-| HTTP | `codigo` | Qué hace el frontend |
+| HTTP | `codigo` | Cuándo · qué hace el frontend |
 |---|---|---|
-| 401 | `SIN_SESION`, `SESION_VENCIDA` | Ir a «Iniciar sesión» |
-| 401 | `CREDENCIALES_INVALIDAS` | Mensaje genérico de W-01 (mismo para correo, contraseña, cuenta inactiva o bloqueada) |
-| 401 | `TEMPORAL_EXPIRADA` | W-01e: pedir una nueva al administrador |
-| 401 | `CODIGO_INVALIDO` | Código TOTP incorrecto, vencido o ya usado |
-| 403 | `ETAPA_INVALIDA` | Falta un paso del inicio de sesión (consultar `GET /auth/sesion`) |
-| 403 | `SIN_PERMISO` | W-28 «Sin permisos» |
+| 400 | `PETICION_INVALIDA` | Petición mal formada |
+| 401 | `SESION_EXPIRADA` | Sin cookie, sesión cerrada o vencida → W-01. Con `motivo: "INACTIVIDAD"` → W-01d |
+| 401 | `AUTH_CREDENCIALES_INVALIDAS` | Login: correo o contraseña incorrectos, cuenta bloqueada, inactiva o eliminada (siempre el mismo) → W-01b |
+| 401 | `TOTP_CODIGO_INVALIDO` | `/auth/totp/verificar`: código incorrecto, vencido o ya usado → W-04b |
+| 403 | `AUTH_TEMPORAL_EXPIRADA` | Login con la temporal correcta pero vencida (72 h) → W-01e |
+| 403 | `ETAPA_INVALIDA` | Falta un paso del inicio de sesión; trae `etapa` para redirigir |
+| 403 | `PERMISO_DENEGADO` | El rol no permite la acción → W-28 (la sesión sigue abierta) |
 | 404 | `NO_ENCONTRADO` | No existe o no es del usuario |
-| 422 | `DATOS_INVALIDOS`, `CONTRASENA_DEBIL` | Revisar los campos |
-| 5xx | `ERROR_INTERNO` | W-31 con el `id_error` |
+| 405 | `METODO_NO_PERMITIDO` | Método HTTP equivocado |
+| 409 | `TOTP_NO_INICIADO` | `/auth/totp/vincular` sin haber llamado `/auth/totp/iniciar` |
+| 413 | `ARCHIVO_DEMASIADO_GRANDE` | Más de lo permitido |
+| 422 | `DATOS_INVALIDOS` | Falta un campo o tiene mal formato (ver `campos`) |
+| 422 | `CONTRASENA_NO_CUMPLE_POLITICA` | W-02b: trae `campos` y `requisitos` |
+| 422 | `TOTP_CODIGO_INVALIDO` | `/auth/totp/vincular`: el primer código no corresponde → W-03b |
+| 429 | `DEMASIADOS_INTENTOS` | Límite por IP en login y códigos (10/min); trae `Retry-After` |
+| 5xx | `ERR-xxxx` | W-31 con ese código |
 
 **Etapas del inicio de sesión.**
 
@@ -182,19 +202,27 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 
 | Método | Ruta | Etapa o rol | Cuerpo | Respuesta |
 |---|---|---|---|---|
-| GET | `/health` | Público | — | `{status, database}` |
+| GET | `/health` | Público | — | `{status: "ok"\|"degraded", database: "ok"\|"error"}` |
 | POST | `/auth/login` | Público | `{correo, contrasena}` | `200 {etapa}` + cookie |
-| POST | `/auth/2fa` | `PENDIENTE_2FA` | `{codigo}` | `{etapa: "ACTIVA", usuario}` |
-| POST | `/auth/contrasena-temporal` | `CAMBIO_CONTRASENA` | `{nueva_contrasena}` (12 a 64) | `{etapa}` |
-| POST | `/auth/totp/vinculacion` | `VINCULAR_TOTP` | — | `{otpauth_uri, qr_png, clave_texto}` |
-| POST | `/auth/totp/confirmacion` | `VINCULAR_TOTP` | `{codigo}` | `{etapa: "ACTIVA", usuario}` |
-| GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, vence_en, usuario}` |
-| POST | `/auth/sesion/actividad` | `ACTIVA` | — | `{vence_en}` |
-| POST | `/auth/logout` | Cualquiera (o ninguna) | `{motivo: "manual" \| "inactividad"}` opcional | `204`, borra la cookie |
+| POST | `/auth/contrasena/cambiar` | `CAMBIO_CONTRASENA` | `{contrasena_nueva, confirmacion}` | `{etapa}` |
+| POST | `/auth/totp/iniciar` | `VINCULAR_TOTP` | — | `{otpauth_uri, secreto_manual, qr_png_base64}` |
+| POST | `/auth/totp/vincular` | `VINCULAR_TOTP` | `{codigo}` | `{etapa: "ACTIVA", usuario, ruta_inicial}` |
+| POST | `/auth/totp/verificar` | `PENDIENTE_2FA` | `{codigo}` | `{etapa: "ACTIVA", usuario, ruta_inicial}` |
+| GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, usuario, inactividad}` |
+| POST | `/auth/sesion/continuar` | `ACTIVA` | — | `{ultima_actividad_en}` |
+| POST | `/auth/logout` | Cualquiera (o ninguna) | — | `204`, borra la cookie |
 
-`usuario` = `{id, nombre, apellido, rol}`. `qr_png` es un `data:image/png;base64,…`;
-`clave_texto` es la clave en grupos de 4, como alternativa accesible al QR. `vence_en`
-sirve para mostrar la advertencia del minuto 9.
+- `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
+- `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
+- `qr_png_base64` es el PNG en Base64 **sin** el prefijo `data:`; `secreto_manual` es el
+  secreto en grupos de 4 para «¿No puede escanear?». Llamar otra vez a `/totp/iniciar`
+  genera un secreto nuevo mientras no esté vinculado.
+- `inactividad` = `{aviso_en_s: 540, cierre_en_s: 600, ultima_actividad_en}`: segundos
+  contados desde `ultima_actividad_en` para el aviso del minuto 9 y el cierre.
+- `CONTRASENA_NO_CUMPLE_POLITICA` trae `requisitos`: `[{codigo, cumple}]` con
+  `LONGITUD_MINIMA`, `LONGITUD_MAXIMA`, `NO_COMUN`, `SIN_DATOS_PROPIOS`, `NO_FILTRADA` y
+  `DISTINTA_A_LA_TEMPORAL`, en ese orden. Si la `confirmacion` no coincide, `campos` lo dice.
+- `/auth/logout` responde 204 aunque la sesión ya hubiera vencido.
 
 **Planeados** (detalle en la especificación del equipo): perfil, gestión de usuarios,
 traslados, pacientes y análisis (`POST /analisis` → 202), explicación, observaciones,
@@ -230,10 +258,13 @@ Celery con Redis como intermediario. Comando en compose:
 `celery -A app.workers.celery_app worker --loglevel=info` (en Windows, `--pool=solo`).
 Las tareas de inferencia y explicación llegan con el módulo de análisis.
 
-### 3.9 Seguimiento del análisis (sin WebSocket)
+### 3.9 Tiempo real (SSE) y seguimiento del análisis
 
-No hay WebSocket. Mientras el análisis está `PROCESANDO`, el frontend consulta su estado y
-la explicación por HTTP con `X-Actividad: pasiva`, que no renueva la sesión; así el cierre
+No hay WebSocket. El tiempo real será con **SSE** en `GET /api/v1/eventos` (planeado, llega
+con el módulo de análisis): los eventos llevan **solo IDs**, se publican después del commit
+y el worker los emite por Redis pub/sub. Además, mientras el análisis está `PROCESANDO`, el
+frontend puede consultar `GET /analisis/{id}/estado` con `X-Actividad-Pasiva: 1`, que no
+renueva la sesión; así el cierre
 por inactividad sigue funcionando aunque la pantalla esté esperando.
 
 ### 3.10 Migraciones y carga inicial
@@ -268,8 +299,8 @@ Lo que cambia del lado del backend:
 
 - **4.2 Cliente HTTP:** las rutas pasan a `/api/v1/...`. Sin token en `localStorage` ni
   header `Authorization`: la cookie viaja sola con `credentials: "same-origin"`. Un `401`
-  lleva al inicio de sesión; un `403 SIN_PERMISO`, a W-28.
-- **4.3 Tiempo real:** el WebSocket se retira; ver 3.9.
+  lleva al inicio de sesión; un `403 PERMISO_DENEGADO`, a W-28.
+- **4.3 Tiempo real:** el WebSocket se retira; llega SSE (ver 3.9).
 - **4.4 Tipos:** los campos del usuario son `nombre`, `apellido` y `rol` (`DOCTOR` |
   `ADMINISTRADOR`).
 - **Desarrollo con `pnpm dev`:** apuntar el proxy de `/api` a `http://localhost` (nginx) y
@@ -313,10 +344,10 @@ Lo que cambia del lado del backend:
 
 ```
 POST /api/v1/auth/login {correo, contrasena}          → 200 {etapa: "CAMBIO_CONTRASENA"} + cookie
-POST /api/v1/auth/contrasena-temporal {nueva_contrasena} → 200 {etapa: "VINCULAR_TOTP"}
-POST /api/v1/auth/totp/vinculacion                     → 200 {otpauth_uri, qr_png, clave_texto}
-POST /api/v1/auth/totp/confirmacion {codigo}           → 200 {etapa: "ACTIVA", usuario}
-GET  /api/v1/auth/sesion                               → 200 {etapa, vence_en, usuario}
+POST /api/v1/auth/contrasena/cambiar {contrasena_nueva, confirmacion} → 200 {etapa: "VINCULAR_TOTP"}
+POST /api/v1/auth/totp/iniciar                         → 200 {otpauth_uri, secreto_manual, qr_png_base64}
+POST /api/v1/auth/totp/vincular {codigo}               → 200 {etapa: "ACTIVA", usuario, ruta_inicial}
+GET  /api/v1/auth/sesion                               → 200 {etapa, usuario, inactividad}
 POST /api/v1/auth/logout {motivo: "manual"}            → 204 (la sesión queda cerrada en el servidor)
 ```
 

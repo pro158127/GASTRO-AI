@@ -30,6 +30,8 @@ from app.services.health_service import HealthService
 
 # El nombre de la cookie lo fija la especificación de la API; el front no la lee nunca
 COOKIE_SESION = "gastro_sesion"
+# X-Actividad-Pasiva: 1 → la petición no renueva la inactividad (ARCHITECTURE.md §3.5)
+CABECERA_PASIVA = "X-Actividad-Pasiva"
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -106,7 +108,8 @@ def sesion_en(*etapas: EtapaSesion) -> Callable[..., Sesion]:
     """
 
     def _dependencia(request: Request, servicio: ServicioAuth) -> Sesion:
-        pasiva = request.headers.get("X-Actividad", "").strip().lower() == "pasiva"
+        # Consultas automáticas (polling, aviso de inactividad): no renuevan la sesión
+        pasiva = request.headers.get(CABECERA_PASIVA, "").strip() == "1"
         return servicio.validar_sesion(request.cookies.get(COOKIE_SESION), etapas, pasiva)
 
     return _dependencia
@@ -121,7 +124,7 @@ def requiere_rol(*roles: CodigoRol) -> Callable[..., Sesion]:
 
     def _dependencia(sesion: SesionActiva) -> Sesion:
         if sesion.usuario.rol.codigo not in roles:
-            raise ErrorApi(403, "SIN_PERMISO", "No tienes permiso para esta acción.")
+            raise ErrorApi(403, "PERMISO_DENEGADO", "No tienes permiso para esta acción.")
         return sesion
 
     return _dependencia

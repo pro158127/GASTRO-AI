@@ -1,8 +1,16 @@
-"""Controlador de /auth (AUTH-01 a AUTH-08). Aquí solo HTTP y la cookie; las reglas, en el servicio.
+"""Controlador de /auth (contrato en ARCHITECTURE.md §3.5). Aquí solo HTTP y la cookie.
 
 Pal front: la sesión viaja en la cookie gastro_sesion (HttpOnly, Secure, SameSite=Strict),
 así que JavaScript nunca la ve y no hay que mandar ningún header de Authorization. Basta
-con hacer fetch con `credentials: "include"` (o "same-origin" si todo va por nginx).
+con hacer fetch con `credentials: "same-origin"` pasando por nginx.
+
+| Etapa             | Endpoints que abre                                   |
+| ----------------- | ---------------------------------------------------- |
+| CAMBIO_CONTRASENA | /auth/contrasena/cambiar                             |
+| VINCULAR_TOTP     | /auth/totp/iniciar, /auth/totp/vincular              |
+| PENDIENTE_2FA     | /auth/totp/verificar                                 |
+| cualquiera        | /auth/sesion, /auth/logout                           |
+| ACTIVA            | /auth/sesion/continuar y el resto de la API por rol  |
 """
 
 from typing import Annotated
@@ -19,22 +27,26 @@ from app.api.deps import (
 from app.core.errores import ErrorApi
 from app.models import EtapaSesion, Sesion, Usuario
 from app.schemas.auth import (
+    CambioContrasenaEntrada,
     CodigoEntrada,
     LoginEntrada,
     LogoutEntrada,
-    NuevaContrasenaEntrada,
+    RespuestaContinuar,
     RespuestaEtapa,
     RespuestaIngreso,
     RespuestaSesion,
-    RespuestaVencimiento,
-    RespuestaVinculacion,
+    RespuestaTotpIniciar,
     UsuarioSesion,
 )
 from app.schemas.errores import RespuestaError
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
 
-ERRORES = {401: {"model": RespuestaError}, 403: {"model": RespuestaError}}
+ERRORES = {
+    401: {"model": RespuestaError},
+    403: {"model": RespuestaError},
+    422: {"model": RespuestaError},
+}
 
 SesionCualquiera = Annotated[Sesion, Depends(sesion_en(*EtapaSesion))]
 
@@ -42,6 +54,14 @@ SesionCualquiera = Annotated[Sesion, Depends(sesion_en(*EtapaSesion))]
 def _usuario(usuario: Usuario) -> UsuarioSesion:
     return UsuarioSesion(
         id=usuario.id, nombre=usuario.nombre, apellido=usuario.apellido, rol=usuario.rol.codigo
+    )
+
+
+def _ingreso(usuario: Usuario, servicio) -> RespuestaIngreso:
+    return RespuestaIngreso(
+        etapa=EtapaSesion.ACTIVA,
+        usuario=_usuario(usuario),
+        ruta_inicial=servicio.ruta_inicial(usuario),
     )
 
 
@@ -55,76 +75,84 @@ def _poner_cookie(respuesta: Response, token: str) -> None:
 
 @router.post("/login", response_model=RespuestaEtapa, responses=ERRORES)
 def login(entrada: LoginEntrada, respuesta: Response, servicio: ServicioAuth, ip: IpCliente):
-    """AUTH-01 · Correo y contraseña. Devuelve la etapa que sigue y deja la cookie puesta."""
+    """Correo y contraseña (W-01). Devuelve la etapa que sigue y deja la cookie puesta.
+
+    Cualquier fallo de credenciales: 401 AUTH_CREDENCIALES_INVALIDAS. Temporal vencida
+    (solo con la contraseña correcta): 403 AUTH_TEMPORAL_EXPIRADA (W-01e).
+    """
     inicio = servicio.iniciar_sesion(entrada.correo, entrada.contrasena, ip)
     _poner_cookie(respuesta, inicio.token)
     return RespuestaEtapa(etapa=inicio.etapa)
 
 
-@router.post("/2fa", response_model=RespuestaIngreso, responses=ERRORES)
-def segundo_factor(
+@router.post("/contrasena/cambiar", response_model=RespuestaEtapa, responses=ERRORES)
+def cambiar_contrasena(
+    entrada: CambioContrasenaEntrada,
+    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.CAMBIO_CONTRASENA))],
+    servicio: ServicioAuth,
+    ip: IpCliente,
+):
+    """Cambio obligatorio de la temporal (W-02). 422 CONTRASENA_NO_CUMPLE_POLITICA trae
+    `campos` y `requisitos` [{codigo, cumple}] pa la lista de W-02b."""
+    etapa = servicio.cambiar_temporal(sesion, entrada.contrasena_nueva, entrada.confirmacion, ip)
+    return RespuestaEtapa(etapa=etapa)
+
+
+@router.post("/totp/iniciar", response_model=RespuestaTotpIniciar, responses=ERRORES)
+def iniciar_totp(
+    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.VINCULAR_TOTP))],
+    servicio: ServicioAuth,
+):
+    """QR y secreto escrito pa vincular la app (W-03). El secreto solo viaja aquí.
+
+    Llamarlo otra vez genera un secreto nuevo mientras no esté vinculado.
+    """
+    return RespuestaTotpIniciar(**servicio.generar_vinculacion(sesion))
+
+
+@router.post("/totp/vincular", response_model=RespuestaIngreso, responses=ERRORES)
+def vincular_totp(
+    entrada: CodigoEntrada,
+    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.VINCULAR_TOTP))],
+    servicio: ServicioAuth,
+    ip: IpCliente,
+):
+    """Primer código válido: la app queda vinculada y la cuenta, activa (W-03).
+
+    Código malo: 422 TOTP_CODIGO_INVALIDO (W-03b). Sin /totp/iniciar antes: 409 TOTP_NO_INICIADO.
+    """
+    return _ingreso(servicio.confirmar_vinculacion(sesion, entrada.codigo, ip), servicio)
+
+
+@router.post("/totp/verificar", response_model=RespuestaIngreso, responses=ERRORES)
+def verificar_totp(
     entrada: CodigoEntrada,
     sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.PENDIENTE_2FA))],
     servicio: ServicioAuth,
     ip: IpCliente,
 ):
-    """AUTH-02 · Código de 6 dígitos de la app autenticadora."""
-    usuario = servicio.verificar_segundo_factor(sesion, entrada.codigo, ip)
-    return RespuestaIngreso(etapa=EtapaSesion.ACTIVA, usuario=_usuario(usuario))
-
-
-@router.post(
-    "/contrasena-temporal",
-    response_model=RespuestaEtapa,
-    responses={**ERRORES, 422: {"model": RespuestaError}},
-)
-def cambiar_temporal(
-    entrada: NuevaContrasenaEntrada,
-    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.CAMBIO_CONTRASENA))],
-    servicio: ServicioAuth,
-    ip: IpCliente,
-):
-    """AUTH-03 · Cambio obligatorio de la temporal (12 a 64 caracteres, RF-U02)."""
-    return RespuestaEtapa(etapa=servicio.cambiar_temporal(sesion, entrada.nueva_contrasena, ip))
-
-
-@router.post("/totp/vinculacion", response_model=RespuestaVinculacion, responses=ERRORES)
-def generar_vinculacion(
-    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.VINCULAR_TOTP))],
-    servicio: ServicioAuth,
-):
-    """AUTH-04 · QR y clave escrita pa vincular la app autenticadora."""
-    return RespuestaVinculacion(**servicio.generar_vinculacion(sesion))
-
-
-@router.post("/totp/confirmacion", response_model=RespuestaIngreso, responses=ERRORES)
-def confirmar_vinculacion(
-    entrada: CodigoEntrada,
-    sesion: Annotated[Sesion, Depends(sesion_en(EtapaSesion.VINCULAR_TOTP))],
-    servicio: ServicioAuth,
-    ip: IpCliente,
-):
-    """AUTH-05 · Primer código válido: la app queda vinculada y la cuenta, activa."""
-    usuario = servicio.confirmar_vinculacion(sesion, entrada.codigo, ip)
-    return RespuestaIngreso(etapa=EtapaSesion.ACTIVA, usuario=_usuario(usuario))
+    """Código de 6 dígitos en cada ingreso (W-04). Malo o vencido: 401 TOTP_CODIGO_INVALIDO."""
+    return _ingreso(servicio.verificar_segundo_factor(sesion, entrada.codigo, ip), servicio)
 
 
 @router.get("/sesion", response_model=RespuestaSesion, responses=ERRORES)
 def ver_sesion(sesion: SesionCualquiera, servicio: ServicioAuth):
-    """AUTH-06 · Quién soy, en qué etapa voy y a qué hora vence la sesión.
+    """Quién soy, en qué etapa voy y cómo va la inactividad. Funciona en cualquier etapa.
 
-    Es lo que el front llama al recargar la página. Si la manda con X-Actividad: pasiva
-    no renueva la sesión.
+    Lo llama el front al cargar la app. Con X-Actividad-Pasiva: 1 no renueva la sesión.
+    Sin sesión o vencida: 401 SESION_EXPIRADA (con motivo INACTIVIDAD si fue por eso).
     """
     return RespuestaSesion(
-        etapa=sesion.etapa, vence_en=servicio.vence_en(sesion), usuario=_usuario(sesion.usuario)
+        etapa=sesion.etapa,
+        usuario=_usuario(sesion.usuario),
+        inactividad=servicio.inactividad(sesion),
     )
 
 
-@router.post("/sesion/actividad", response_model=RespuestaVencimiento, responses=ERRORES)
-def seguir_activo(sesion: SesionActiva, servicio: ServicioAuth):
-    """AUTH-07 · «Sigo aquí» del diálogo del minuto 9. La dependencia ya renovó la sesión."""
-    return RespuestaVencimiento(vence_en=servicio.vence_en(sesion))
+@router.post("/sesion/continuar", response_model=RespuestaContinuar, responses=ERRORES)
+def continuar_sesion(sesion: SesionActiva):
+    """«Sigo aquí» del aviso del minuto 9 (RF-U10 CA 4). La dependencia ya renovó la sesión."""
+    return RespuestaContinuar(ultima_actividad_en=sesion.ultima_actividad_en)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -134,11 +162,11 @@ def logout(
     ip: IpCliente,
     entrada: LogoutEntrada | None = None,
 ):
-    """AUTH-08 · Cierra la sesión en el servidor y borra la cookie. Siempre responde 204.
+    """Cierra la sesión en el servidor y borra la cookie. Siempre responde 204.
 
-    Si la sesión ya había vencido (el front llama esto al llegar a los 10 min), no hay
-    nada que cerrar y tampoco se le responde error: así nadie queda atrapado en una
-    sesión que no puede cerrar. Se valida en modo pasivo pa no renovarla justo al cerrar.
+    Si la sesión ya había vencido, no hay nada que cerrar y tampoco se le responde error:
+    así nadie queda atrapado en una sesión que no puede cerrar. Se valida en modo pasivo
+    pa no renovarla justo al cerrar.
     """
     try:
         sesion = servicio.validar_sesion(

@@ -1,4 +1,4 @@
-"""JSON de entrada y salida de /auth. Los nombres de campo son los de la especificación."""
+"""JSON de entrada y salida de /auth, con los nombres del contrato (ARCHITECTURE.md §3.5)."""
 
 from datetime import datetime
 from typing import Literal
@@ -19,11 +19,13 @@ class CodigoEntrada(BaseModel):
     codigo: str = Field(min_length=1, max_length=10, examples=["482913"])
 
 
-class NuevaContrasenaEntrada(BaseModel):
-    nueva_contrasena: str = Field(min_length=1, max_length=256)
+class CambioContrasenaEntrada(BaseModel):
+    contrasena_nueva: str = Field(min_length=1, max_length=256)
+    confirmacion: str = Field(min_length=1, max_length=256)
 
 
 class LogoutEntrada(BaseModel):
+    # Opcional: el contrato no manda cuerpo; el servidor registra la inactividad por su cuenta
     motivo: Literal["manual", "inactividad"] = "manual"
 
 
@@ -41,19 +43,28 @@ class RespuestaEtapa(BaseModel):
 class RespuestaIngreso(BaseModel):
     etapa: EtapaSesion
     usuario: UsuarioSesion
+    ruta_inicial: str = Field(examples=["/doctor/dashboard"])
+
+
+class Inactividad(BaseModel):
+    """Segundos contados desde `ultima_actividad_en`: aviso al 540 y cierre al 600 (RF-U10)."""
+
+    aviso_en_s: int = Field(examples=[540])
+    cierre_en_s: int = Field(examples=[600])
+    ultima_actividad_en: datetime
 
 
 class RespuestaSesion(BaseModel):
     etapa: EtapaSesion
-    vence_en: datetime  # el front pinta la advertencia del minuto 9 con esto (RF-U10 CA 3)
     usuario: UsuarioSesion
+    inactividad: Inactividad
 
 
-class RespuestaVencimiento(BaseModel):
-    vence_en: datetime
+class RespuestaContinuar(BaseModel):
+    ultima_actividad_en: datetime
 
 
-class RespuestaVinculacion(BaseModel):
+class RespuestaTotpIniciar(BaseModel):
     otpauth_uri: str
-    qr_png: str  # data:image/png;base64,…
-    clave_texto: str  # alternativa accesible al QR (RF-U01 CA 10)
+    secreto_manual: str = Field(examples=["JBSW Y3DP EHPK 3PXP"])  # «¿No puede escanear?»
+    qr_png_base64: str  # PNG en Base64, sin el prefijo data:
