@@ -9,11 +9,6 @@ import { useUsuarioActual } from "./UsuarioActual";
  */
 export default function RutaPorRol({ roles, children }: { roles: RolInterfaz[]; children: ReactNode }) {
   const { rol } = useUsuarioActual();
-  // Rol sin diseño en Figma (`tecnico`): no hay pantallas que mostrar. Se devuelve null y no un
-  // Navigate, porque redirigir a /dashboard desde /dashboard sería un bucle.
-  if (rol === null) {
-    return null;
-  }
   if (!roles.includes(rol)) {
     return <Navigate to="/dashboard" replace />;
   }

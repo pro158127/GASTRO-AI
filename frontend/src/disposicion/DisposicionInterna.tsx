@@ -3,13 +3,10 @@
 // diálogo (PanelMenuMovil). Se usa como ruta de diseño: las pantallas entran por <Outlet />.
 import { useEffect, useId, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigationType } from "react-router";
-import Alerta from "../components/Alerta";
 import AvisoExperimental from "../components/AvisoExperimental";
-import Boton from "../components/Boton";
-import IndicadorCarga from "../components/iconos/IndicadorCarga";
 import { buscarPantalla, tituloDePantalla } from "../navegacion/pantallas";
-import { etiquetaRol, menusPorRol, rolDeInterfaz } from "../navegacion/menus";
-import { ProveedorUsuario, useEstadoUsuario } from "../sesion/UsuarioActual";
+import { etiquetaRol, menusPorRol } from "../navegacion/menus";
+import { ProveedorUsuario, useUsuarioActual } from "../sesion/UsuarioActual";
 import { useSesion } from "../sesion/ProveedorSesion";
 import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
@@ -26,7 +23,7 @@ export default function DisposicionInterna() {
 }
 
 function Armazon() {
-  const { estado, reintentar } = useEstadoUsuario();
+  const { usuario, rol, casosSinRevisar } = useUsuarioActual();
   const { cerrarSesion } = useSesion();
   const ubicacion = useLocation();
   const tipoNavegacion = useNavigationType();
@@ -36,12 +33,9 @@ function Armazon() {
   const botonMenuRef = useRef<HTMLButtonElement>(null);
   const ultimaRuta = useRef<string | null>(null);
 
-  const listo = estado.fase === "listo";
-  const usuario = estado.fase === "listo" ? estado.usuario : null;
-  const rol = usuario ? rolDeInterfaz(usuario.role) : null;
-  const items = rol ? menusPorRol[rol] : [];
-  const casosSinRevisar = estado.fase === "listo" ? estado.casosSinRevisar : 0;
-  const rolEtiqueta = rol ? etiquetaRol[rol] : undefined;
+  const items = menusPorRol[rol];
+  const rolEtiqueta = etiquetaRol[rol];
+  const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   const pantalla = buscarPantalla(ubicacion.pathname);
   const tituloPantalla = pantalla ? tituloDePantalla(pantalla, rol) : undefined;
@@ -58,7 +52,7 @@ function Armazon() {
   // en la carga o recarga directa (tipo POP), para no robar el foco ni saltarse el enlace
   // «Saltar al contenido»; sí se hace al entrar tras iniciar sesión (REPLACE).
   useEffect(() => {
-    if (!listo || ultimaRuta.current === ubicacion.pathname) return;
+    if (ultimaRuta.current === ubicacion.pathname) return;
     const esPrimera = ultimaRuta.current === null;
     ultimaRuta.current = ubicacion.pathname;
     if (esPrimera && tipoNavegacion === "POP") return;
@@ -72,7 +66,7 @@ function Armazon() {
     } else {
       principal.focus({ preventScroll: true });
     }
-  }, [listo, ubicacion.pathname, tipoNavegacion]);
+  }, [ubicacion.pathname, tipoNavegacion]);
 
   // Si la ventana pasa a tableta o escritorio con el panel abierto, se cierra.
   useEffect(() => {
@@ -84,33 +78,6 @@ function Armazon() {
     return () => consulta.removeEventListener("change", alCambiar);
   }, []);
 
-  let contenido;
-  if (estado.fase === "cargando") {
-    contenido = (
-      <p className={estilos.cargando} role="status">
-        <IndicadorCarga className={estilos.indicador} />
-        Cargando…
-      </p>
-    );
-  } else if (estado.fase === "error") {
-    // Mismos textos de W-30 y W-31 que usa el inicio de sesión.
-    const sinConexion = estado.estadoHttp === null;
-    contenido = (
-      <div className={estilos.error}>
-        <Alerta tipo="error" titulo={sinConexion ? "Sin conexión a internet" : "Algo salió mal"}>
-          {sinConexion ? "Revise su conexión e intente de nuevo." : "Ocurrió un error inesperado. Intente de nuevo."}
-        </Alerta>
-        <div>
-          <Boton jerarquia="secundario" onClick={reintentar}>
-            Reintentar
-          </Boton>
-        </div>
-      </div>
-    );
-  } else {
-    contenido = <Outlet />;
-  }
-
   return (
     <div className={estilos.disposicion}>
       <EnlaceSaltarContenido onActivar={() => principalRef.current?.focus()} />
@@ -118,7 +85,7 @@ function Armazon() {
       <div className={estilos.area}>
         <BarraSuperior
           titulo={tituloBarra}
-          nombre={usuario?.full_name}
+          nombre={nombreCompleto}
           rolEtiqueta={rolEtiqueta}
           menuAbierto={menuAbierto}
           idPanel={idPanel}
@@ -127,7 +94,7 @@ function Armazon() {
           onCerrarSesion={cerrarSesion}
         />
         <main id="contenido" ref={principalRef} tabIndex={-1} className={estilos.principal}>
-          {contenido}
+          <Outlet />
         </main>
         <footer className={estilos.pie}>
           <AvisoExperimental />
@@ -138,7 +105,7 @@ function Armazon() {
           id={idPanel}
           items={items}
           casosSinRevisar={casosSinRevisar}
-          usuario={usuario ? `${usuario.full_name}${rolEtiqueta ? ` · ${rolEtiqueta}` : ""}` : undefined}
+          usuario={`${nombreCompleto} · ${rolEtiqueta}`}
           onCerrar={() => setMenuAbierto(false)}
           onCerrarSesion={cerrarSesion}
         />

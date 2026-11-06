@@ -2,8 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import DisposicionInterna from "./disposicion/DisposicionInterna";
 import { pantallas, tituloDePantalla } from "./navegacion/pantallas";
 import type { Pantalla } from "./navegacion/pantallas";
+import EtapaPendiente from "./pages/EtapaPendiente";
 import InicioSesion from "./pages/InicioSesion";
 import { ProveedorSesion } from "./sesion/ProveedorSesion";
+import RutaEtapa from "./sesion/RutaEtapa";
 import RutaPorRol from "./sesion/RutaPorRol";
 import RutaProtegida from "./sesion/RutaProtegida";
 import RutaPublica from "./sesion/RutaPublica";
@@ -29,6 +31,31 @@ export default function App() {
               <RutaPublica>
                 <InicioSesion />
               </RutaPublica>
+            }
+          />
+          {/* TEMPORAL: reemplazar antes de la entrega (W-02, W-03 y W-04). */}
+          <Route
+            path="/cambiar-contrasena"
+            element={
+              <RutaEtapa etapa="CAMBIO_CONTRASENA">
+                <EtapaPendiente codigo="W-02" titulo="Cambio obligatorio de contraseña" />
+              </RutaEtapa>
+            }
+          />
+          <Route
+            path="/vincular-aplicacion"
+            element={
+              <RutaEtapa etapa="VINCULAR_TOTP">
+                <EtapaPendiente codigo="W-03" titulo="Vincular app autenticadora" />
+              </RutaEtapa>
+            }
+          />
+          <Route
+            path="/verificar-codigo"
+            element={
+              <RutaEtapa etapa="PENDIENTE_2FA">
+                <EtapaPendiente codigo="W-04" titulo="Código del segundo factor" />
+              </RutaEtapa>
             }
           />
           <Route

@@ -41,30 +41,6 @@
   padding: var(--espacio-3) var(--espacio-8);
 }
 
-.cargando {
-  display: flex;
-  align-items: center;
-  gap: var(--espacio-2);
-  margin: 0;
-  font: var(--texto-cuerpo-base);
-  color: var(--color-texto-secundario);
-}
-
-.indicador {
-  display: block;
-  width: var(--tamano-icono);
-  height: var(--tamano-icono);
-  flex-shrink: 0;
-}
-
-.error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--espacio-4);
-  max-width: 640px;
-}
-
 @media (max-width: 1279px) {
   .principal {
     gap: var(--espacio-5);

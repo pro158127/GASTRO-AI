@@ -12,7 +12,7 @@ import IconoNuevoAnalisis from "../components/iconos/IconoNuevoAnalisis";
 import IconoUsuario from "../components/iconos/IconoUsuario";
 import IconoUsuarios from "../components/iconos/IconoUsuarios";
 import type { PropiedadesIcono } from "../components/iconos/PropiedadesIcono";
-import type { RolBackend } from "../types";
+import type { RolUsuario } from "../types";
 
 export type RolInterfaz = "doctor" | "administrador";
 
@@ -57,12 +57,7 @@ export const etiquetaRol: Record<RolInterfaz, string> = {
   administrador: "Administrador",
 };
 
-/**
- * Del nombre de rol del backend al rol de la interfaz. `tecnico` existe en el backend pero
- * Figma no dibuja menú para él: devuelve `null` y la interfaz no muestra ítems.
- */
-export function rolDeInterfaz(rol: RolBackend): RolInterfaz | null {
-  if (rol === "doctor") return "doctor";
-  if (rol === "admin") return "administrador";
-  return null;
+/** Del rol del backend (`DOCTOR` o `ADMINISTRADOR`) al rol de la interfaz. */
+export function rolDeInterfaz(rol: RolUsuario): RolInterfaz {
+  return rol === "DOCTOR" ? "doctor" : "administrador";
 }

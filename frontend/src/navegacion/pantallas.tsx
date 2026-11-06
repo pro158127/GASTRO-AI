@@ -3,7 +3,6 @@
 // Las pantallas que todavía no se construyen usan PantallaPendiente, marcada para encontrarla
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
-import Dashboard from "../pages/Dashboard";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import type { RolInterfaz } from "./menus";
 
@@ -30,8 +29,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/nuevo-analisis",
     titulo: "Nuevo análisis",
     roles: SOLO_DOCTOR,
-    // Pantalla vieja: se queda aquí hasta que se construya W-06.
-    elemento: () => <Dashboard />,
+    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-06)
   },
   {
     ruta: "/historial",
@@ -99,8 +97,8 @@ export function buscarPantalla(ruta: string): Pantalla | undefined {
   return pantallas.find((pantalla) => pantalla.ruta === ruta);
 }
 
-/** Título de la pantalla para el rol dado; sin rol conocido usa el del doctor. */
-export function tituloDePantalla(pantalla: Pantalla, rol: RolInterfaz | null): string {
+/** Título de la pantalla para el rol dado. */
+export function tituloDePantalla(pantalla: Pantalla, rol: RolInterfaz): string {
   if (typeof pantalla.titulo === "string") return pantalla.titulo;
-  return pantalla.titulo[rol ?? "doctor"];
+  return pantalla.titulo[rol];
 }

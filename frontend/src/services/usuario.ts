@@ -1,3 +1,3 @@
-// Punto de cambio entre datos simulados y API real: cuando el backend confirme los endpoints,
-// estas funciones se implementan en api.ts y aquí solo cambia el origen del export.
-export { obtenerResumenCasosRecibidos, obtenerUsuarioActual } from "./simulados/usuario";
+// Punto de cambio entre datos simulados y API real: cuando el backend confirme el endpoint,
+// la función se implementa en api.ts y aquí solo cambia el origen del export.
+export { obtenerResumenCasosRecibidos } from "./simulados/usuario";

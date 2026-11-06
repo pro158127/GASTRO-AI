@@ -9,6 +9,7 @@ import CampoContrasena from "../components/CampoContrasena";
 import CampoTexto from "../components/CampoTexto";
 import Logo from "../components/Logo";
 import { ErrorApi, login } from "../services/api";
+import { avisoDeError } from "../utils/avisosError";
 import { useSesion } from "../sesion/ProveedorSesion";
 import { isValidEmail } from "../utils/validators";
 import estilos from "./InicioSesion.module.css";
@@ -20,26 +21,20 @@ interface Aviso {
 }
 
 const AVISOS = {
-  // W-01b. Mensaje genérico: nunca dice si falló el correo o la contraseña. Se usa también
-  // cuando el correo o la contraseña están vacíos o mal escritos (no se llama al servidor).
+  // W-01b. Mensaje genérico: nunca dice si falló el correo o la contraseña (ni si la cuenta está
+  // inactiva o bloqueada). Se usa también cuando el correo o la contraseña están vacíos o mal
+  // escritos (no se llama al servidor) y cuando el servidor rechaza los datos (422).
   credenciales: {
     tipo: "error",
     titulo: "No se pudo iniciar sesión",
     mensaje: "Verifique su correo y su contraseña e intente de nuevo.",
   },
-  // Título de W-30; el cuerpo es una frase corta propia porque el de W-30 habla de datos
-  // desactualizados y reintentos automáticos que el inicio de sesión no tiene.
-  sinConexion: {
-    tipo: "error",
-    titulo: "Sin conexión a internet",
-    mensaje: "Revise su conexión e intente de nuevo.",
-  },
-  // W-31 sin la frase del código de referencia: la API todavía no lo entrega
-  // (propuesta en CONTRATOS_API.md).
-  inesperado: {
-    tipo: "error",
-    titulo: "Algo salió mal",
-    mensaje: "Ocurrió un error inesperado. Intente de nuevo.",
+  // W-01e. TEMPORAL_EXPIRADA.
+  temporalVencida: {
+    tipo: "advertencia",
+    titulo: "Su contraseña temporal venció",
+    mensaje:
+      "Pasaron más de 72 horas desde que se generó. Pida una nueva al administrador de la plataforma.",
   },
   // W-01f.
   cierre: {
@@ -52,15 +47,17 @@ const AVISOS = {
 
 function avisoDesdeError(error: unknown): Aviso {
   if (error instanceof ErrorApi) {
-    if (error.estado === null) return AVISOS.sinConexion;
-    if (error.estado === 401) return AVISOS.credenciales;
+    if (error.codigo === "TEMPORAL_EXPIRADA") return AVISOS.temporalVencida;
+    if (error.codigo === "CREDENCIALES_INVALIDAS" || error.codigo === "DATOS_INVALIDOS") {
+      return AVISOS.credenciales;
+    }
   }
-  // 5xx y cualquier otro fallo no previsto.
-  return AVISOS.inesperado;
+  // Sin conexión (W-30), 5xx y cualquier otro fallo no previsto (W-31, con el código de referencia).
+  return { tipo: "error", ...avisoDeError(error) };
 }
 
 export default function InicioSesion() {
-  const { iniciarSesion, motivoCierre, consumirMotivoCierre } = useSesion();
+  const { refrescarSesion, motivoCierre, consumirMotivoCierre } = useSesion();
 
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
@@ -94,9 +91,10 @@ export default function InicioSesion() {
     setEnviando(true);
     setAviso(null);
     try {
-      const respuesta = await login(correo.trim(), contrasena);
-      // RutaPublica lleva a la pantalla principal cuando cambia el estado de sesión.
-      iniciarSesion(respuesta.access_token);
+      await login(correo.trim(), contrasena);
+      // La cookie ya quedó puesta. Se consulta la sesión para tener usuario y etapa; en cuanto
+      // cambia el estado, RutaPublica lleva a la pantalla de la etapa que sigue.
+      await refrescarSesion();
     } catch (error) {
       // Se conserva lo escrito en ambos campos.
       setAviso(avisoDesdeError(error));
