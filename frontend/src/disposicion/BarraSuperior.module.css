@@ -1,0 +1,122 @@
+/* Barra superior: blanca de 64 px (escritorio y tableta) o azul marino de 56 px (celular). */
+
+.escritorio {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  min-height: 64px;
+  padding: 0 var(--espacio-8);
+  border-bottom: var(--borde-grosor) solid var(--color-borde-sutil);
+  background: var(--color-fondo-superficie);
+}
+
+.movil {
+  display: none;
+}
+
+.titulo {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-secundario);
+}
+
+.iconoUsuario {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  color: var(--color-texto-primario);
+}
+
+.usuario {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-primario);
+  white-space: nowrap;
+}
+
+.iconoBoton {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+}
+
+.botonIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tamano-control-tactil);
+  height: var(--tamano-control-tactil);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-md);
+  background: transparent;
+  color: var(--color-texto-sobre-oscuro);
+  cursor: pointer;
+}
+
+.botonIcono:hover {
+  background: var(--color-fondo-navegacion-activo);
+}
+
+/* Anillo blanco sobre la barra azul marino, hacia adentro para que no se recorte. */
+.botonIcono:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-texto-sobre-oscuro);
+  outline-offset: -2px;
+}
+
+.iconoGrande {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.espacio {
+  flex: 1 1 0;
+}
+
+/* ---------- Tableta (768 a 1279 px, T-15) ---------- */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .escritorio {
+    padding: 0 var(--espacio-6);
+  }
+
+  .titulo {
+    color: var(--color-texto-primario);
+  }
+
+  .iconoUsuario {
+    width: 24px;
+    height: 24px;
+  }
+
+  .rolEnLinea {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- Celular (< 768 px, M-15) ---------- */
+@media (max-width: 767px) {
+  .escritorio {
+    display: none;
+  }
+
+  .movil {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-3);
+    height: 56px;
+    padding: 0 var(--espacio-4);
+    background: var(--color-fondo-navegacion);
+  }
+}

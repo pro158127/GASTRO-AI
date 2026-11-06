@@ -1,32 +1,39 @@
-export type AnalisisEstado = "PROCESANDO" | "COMPLETADO" | "FALLIDO";
+// Tipos del contrato de la API (../ARCHITECTURE.md § 3.5). Los campos JSON conservan los
+// nombres que define el backend.
 
-export interface Analisis {
+/** Etapas del inicio de sesión: cada una solo abre sus endpoints; el resto exige ACTIVA. */
+export type EtapaSesion = "CAMBIO_CONTRASENA" | "VINCULAR_TOTP" | "PENDIENTE_2FA" | "ACTIVA";
+
+/** Roles del backend, leídos de la base en cada petición. */
+export type RolUsuario = "DOCTOR" | "ADMINISTRADOR";
+
+/** `usuario` de `GET /auth/sesion`. */
+export interface UsuarioActual {
   id: string;
-  documento: string;
-  tipo_documento: string;
-  estado: AnalisisEstado;
-  resultado?: Record<string, unknown> | null;
-  explicacion?: string | null;
-  error?: string | null;
-  imagen_url?: string | null;
-  grad_cam_url?: string | null;
-  created_at: string;
-  updated_at: string;
+  nombre: string;
+  apellido: string;
+  rol: RolUsuario;
 }
 
-export interface TokenResponse {
-  access_token: string;
-  token_type: string;
+/** Respuesta de `POST /auth/login`. */
+export interface RespuestaEtapa {
+  etapa: EtapaSesion;
 }
 
+/** Respuesta de `GET /auth/sesion`. `vence_en` es una fecha ISO 8601. */
+export interface RespuestaSesion {
+  etapa: EtapaSesion;
+  vence_en: string;
+  usuario: UsuarioActual;
+}
+
+/** Respuesta de `GET /health`. */
 export interface HealthResponse {
   status: string;
   database: boolean;
-  minio: boolean;
 }
 
-export interface AnalisisEvent {
-  id: string;
-  estado: AnalisisEstado;
-  explicacion?: string;
+/** Propuesta `GET /api/v1/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
+export interface ResumenCasosRecibidos {
+  sin_revisar: number;
 }

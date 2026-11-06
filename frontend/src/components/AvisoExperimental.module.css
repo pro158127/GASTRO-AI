@@ -1,0 +1,8 @@
+.aviso {
+  width: 100%;
+  max-width: 640px;
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+  text-align: center;
+}

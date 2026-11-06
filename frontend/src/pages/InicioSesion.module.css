@@ -1,0 +1,58 @@
+/* Pantalla W-01. Figma solo dibuja 1440 px: aquí el diseño es fluido para tableta y celular. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-6);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--espacio-6) var(--espacio-4);
+  background: var(--color-fondo-lienzo);
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-5);
+  width: 100%;
+  max-width: 440px;
+  padding: var(--espacio-8);
+  background: var(--color-fondo-superficie);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.descripcion {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h2);
+  color: var(--color-texto-primario);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-5);
+}
+
+.ayuda {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+@media (max-width: 479px) {
+  .tarjeta {
+    padding: var(--espacio-6);
+  }
+}
