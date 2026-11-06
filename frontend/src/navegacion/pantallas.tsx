@@ -4,6 +4,7 @@
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
 import PantallaPendiente from "../pages/PantallaPendiente";
+import SinPermisos from "../pages/SinPermisos";
 import type { RolInterfaz } from "./menus";
 
 export interface Pantalla {
@@ -90,6 +91,12 @@ export const pantallas: Pantalla[] = [
     titulo: "Parámetros",
     roles: SOLO_ADMINISTRADOR,
     elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+  },
+  {
+    ruta: "/sin-permisos",
+    titulo: "Acceso no permitido",
+    roles: AMBOS,
+    elemento: () => <SinPermisos />, // W-28
   },
 ];
 

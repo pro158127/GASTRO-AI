@@ -3,6 +3,7 @@
 // vencimiento). Nada se escribe en localStorage ni en sessionStorage.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router";
 import {
   ErrorApi,
   cerrarSesionEnServidor,
@@ -74,6 +75,7 @@ function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
 }
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [estado, setEstado] = useState<EstadoSesion>({ fase: "cargando" });
   const [motivoCierre, setMotivoCierre] = useState<MotivoCierre | null>(null);
   const [intento, setIntento] = useState(0);
@@ -140,11 +142,13 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
   // 401 SIN_SESION / SESION_VENCIDA: se descarta la sesión local y las guardas llevan a
-  // /iniciar-sesion sin mensaje (no marca motivo). ETAPA_INVALIDA: falta un paso; se vuelve
+  // /iniciar-sesion sin mensaje (no marca motivo). SIN_PERMISO lleva a W-28. ETAPA_INVALIDA: falta un paso; se vuelve
   // a consultar y las guardas llevan a la pantalla de la etapa correcta.
   useEffect(() => {
     registrarManejadoresGlobales({
       alSinSesion: () => setEstado({ fase: "sin_sesion" }),
+      // 403 SIN_PERMISO: W-28. La sesión sigue activa; solo se informa.
+      alSinPermiso: () => navigate("/sin-permisos"),
       alEtapaInvalida: () => {
         refrescarSesion().catch(() => {
           // Si la consulta falla, la siguiente acción del usuario volverá a intentarlo.
@@ -152,7 +156,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       },
     });
     return () => registrarManejadoresGlobales(null);
-  }, [refrescarSesion]);
+  }, [refrescarSesion, navigate]);
 
   const valor = useMemo<ValorSesion>(() => {
     const conSesion = estado.fase === "con_sesion" ? estado : null;
