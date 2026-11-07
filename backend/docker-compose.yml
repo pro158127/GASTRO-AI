@@ -67,6 +67,11 @@ services:
       S3_ENDPOINT_URL: http://minio:9000
       # Las URL firmadas sí van con el host que ve el navegador
       S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      # Correo de desarrollo: Mailpit lo atrapa todo (http://localhost:8025). En producción
+      # se quita esto y manda el SMTP real de backend/.env
+      SMTP_HOST: ${SMTP_HOST_DOCKER:-mailpit}
+      SMTP_PORT: ${SMTP_PORT_DOCKER:-1025}
+      SMTP_STARTTLS: ${SMTP_STARTTLS_DOCKER:-false}
     ports:
       - "8000:8000"   # directo pa ver /docs en desarrollo; en producción solo se entra por nginx
     depends_on: &dependencias
@@ -91,6 +96,12 @@ services:
         required: false
     environment: *red_interna
     depends_on: *dependencias
+
+  # Solo desarrollo: servidor SMTP de mentiras con bandeja web en http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "8025:8025"   # bandeja web; el SMTP (1025) solo se usa dentro de Docker
 
   nginx:
     image: nginx:1.28-alpine

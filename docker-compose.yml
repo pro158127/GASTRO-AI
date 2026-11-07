@@ -24,6 +24,11 @@ x-backend: &backend
     S3_SECRET_KEY: ${S3_SECRET_KEY:-gastroia_dev_secret}
     # Las URL firmadas van con el host que ve el navegador
     S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+    # Correo de desarrollo: Mailpit lo atrapa todo (http://localhost:8025). En producción se
+    # quitan estas tres líneas y manda el SMTP real de backend/.env
+    SMTP_HOST: ${SMTP_HOST_DOCKER:-mailpit}
+    SMTP_PORT: ${SMTP_PORT_DOCKER:-1025}
+    SMTP_STARTTLS: ${SMTP_STARTTLS_DOCKER:-false}
 
 services:
   postgres:
@@ -104,6 +109,13 @@ services:
     <<: *backend
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
     depends_on: *listo
+
+  # Solo desarrollo: servidor SMTP de mentiras con bandeja web en http://localhost:8025.
+  # Ahí llegan las contraseñas temporales de las cuentas que crea el administrador.
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "8025:8025"
 
   frontend:
     build:

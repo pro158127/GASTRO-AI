@@ -44,6 +44,13 @@ celery -A app.workers.celery_app worker --loglevel=info --pool=solo   # --pool=s
 
 Si PowerShell bloquea `activate`: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
+## Correo en desarrollo
+
+Los dos compose traen **Mailpit**: atrapa todos los correos que manda el backend (por
+ejemplo, las contraseñas temporales al crear una cuenta) y los muestra en
+http://localhost:8025. En producción se quitan las líneas `SMTP_*` del compose y manda el
+SMTP real configurado en `backend/.env`.
+
 ## Usuarios de prueba (solo desarrollo)
 
 La carga inicial crea el primer administrador. Para probar con otros roles:

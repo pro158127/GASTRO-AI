@@ -28,6 +28,7 @@ class EstadoInferencia(enum.StrEnum):
 class TipoTraslado(enum.StrEnum):
     DESACTIVACION = "DESACTIVACION"
     ELIMINACION = "ELIMINACION"
+    REASIGNACION = "REASIGNACION"  # reasignación manual del admin (RF-A06); llegó en 0003
 
 
 class ResultadoAccion(enum.StrEnum):  # RF-DB02 CA 10

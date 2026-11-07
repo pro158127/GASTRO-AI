@@ -1,4 +1,4 @@
-"""Aquí se registran las tablas: 20 tablas y 17 enums repartidos en 5 módulos.
+"""Aquí se registran las tablas: 20 tablas y 18 enums repartidos en 5 módulos.
 
 Modelo nuevo que no importes aquí = Alembic no lo ve y la migración sale vacía. Luego no
 digas que nadie te avisó.
@@ -11,6 +11,7 @@ from app.models.analisis import (
     EstadoAnalisis,
     EstadoCaso,
     EstadoExplicacion,
+    EtapaProceso,
     ExplicacionLlm,
     FormatoImagen,
     ObservacionProfesional,
@@ -66,6 +67,7 @@ __all__ = [
     "EstadoExplicacion",
     "EstadoInferencia",
     "EstadoUsuario",
+    "EtapaProceso",
     "EtapaSesion",
     "ExplicacionLlm",
     "FormatoImagen",

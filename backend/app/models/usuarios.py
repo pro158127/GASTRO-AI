@@ -116,6 +116,10 @@ class Usuario(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     eliminado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Cuándo vio el recorrido de bienvenida de TOPOLOGO; null = todavía no (llegó en 0003)
+    recorrido_visto_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     rol: Mapped[Rol] = relationship(back_populates="usuarios")
     # Autorreferencia: quién creó la cuenta. El remote_side es lo que la hace funcionar

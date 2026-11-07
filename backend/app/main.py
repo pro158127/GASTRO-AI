@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import auth, health
+from app.api.routers import admin_usuarios, auth, health, perfil
 from app.core.config import get_settings
 from app.core.errores import registrar_manejadores
 from app.schemas.errores import RespuestaError
@@ -27,3 +27,5 @@ app.add_middleware(
 
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(auth.router, prefix=settings.api_prefix)
+app.include_router(perfil.router, prefix=settings.api_prefix)
+app.include_router(admin_usuarios.router, prefix=settings.api_prefix)

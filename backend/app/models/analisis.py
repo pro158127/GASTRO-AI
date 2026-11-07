@@ -48,6 +48,15 @@ class EstadoAnalisis(enum.StrEnum):
     FALLIDO = "FALLIDO"
 
 
+class EtapaProceso(enum.StrEnum):
+    """Las 4 etapas que pinta W-07 mientras el análisis va PROCESANDO (llegó en 0003)."""
+
+    ANONIMIZAR = "ANONIMIZAR"
+    CALIDAD = "CALIDAD"
+    CLASIFICAR = "CLASIFICAR"
+    GRAD_CAM = "GRAD_CAM"
+
+
 class FormatoImagen(enum.StrEnum):
     JPEG = "JPEG"
     PNG = "PNG"
@@ -147,6 +156,10 @@ class Analisis(Base):
         ENUM(EstadoAnalisis, name="EstadoAnalisis", create_type=True),
         server_default=text("'PROCESANDO'"),
     )
+    # Etapa en curso; null antes de empezar y cuando ya terminó (W-07)
+    etapa_proceso: Mapped[EtapaProceso | None] = mapped_column(
+        ENUM(EtapaProceso, name="EtapaProceso", create_type=True), nullable=True
+    )
     # El ERR-xxxx que le enseñamos al usuario en vez de la traza (RF-R05 CA 5)
     codigo_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     solicitado_en: Mapped[datetime] = mapped_column(
@@ -223,6 +236,8 @@ class RegionInteres(Base):
     caja_alto: Mapped[Decimal] = mapped_column(Numeric(6, 4))
     area_porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2))
     mapa_calor_clave_objeto: Mapped[str] = mapped_column(Text)  # el PNG del Grad-CAM en MinIO
+    # «Región 1», «Región 2»… en el orden que las muestra W-08 (llegó en 0003)
+    orden: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
     resultado: Mapped[ResultadoCaracteristica] = relationship(back_populates="regiones")
 

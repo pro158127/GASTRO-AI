@@ -211,6 +211,20 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, usuario, inactividad}` |
 | POST | `/auth/sesion/continuar` | `ACTIVA` | — | `{ultima_actividad_en}` |
 | POST | `/auth/logout` | Cualquiera (o ninguna) | — | `204`, borra la cookie |
+| GET | `/perfil` | Cualquier rol | — | `{id, nombre, apellido, correo, telefono, rol: {codigo, nombre}, estado, creado_en, totp_vinculado}` |
+| PATCH | `/perfil` | Cualquier rol | `{nombre?, apellido?, telefono?}` | el perfil (correo y rol se ignoran) |
+| GET | `/admin/usuarios` | `ADMINISTRADOR` | `?q&rol&estado&excluir&pagina&por_pagina` | `{items, paginacion}` |
+| POST | `/admin/usuarios` | `ADMINISTRADOR` | `{nombre, apellido, correo, telefono?, rol}` | `201 {usuario, credencial}` |
+| GET | `/admin/usuarios/{id}` | `ADMINISTRADOR` | — | usuario + `casos_activos, totp_vinculado, intentos_fallidos, bloqueado_hasta, envios_credencial` |
+| PATCH | `/admin/usuarios/{id}` | `ADMINISTRADOR` | `{nombre?, apellido?, telefono?, correo?}` | `{usuario, credencial?}` |
+| POST | `/admin/usuarios/{id}/rol` | `ADMINISTRADOR` | `{rol}` | `{usuario}` |
+| POST | `/admin/usuarios/{id}/activar` | `ADMINISTRADOR` | — | `{usuario}` |
+| POST | `/admin/usuarios/{id}/desactivar` | `ADMINISTRADOR` | `{destino_id?}` | `{usuario, traslado}` |
+| POST | `/admin/usuarios/{id}/eliminar` | `ADMINISTRADOR` | `{destino_id?}` | `{usuario, traslado}` |
+| POST | `/admin/usuarios/{id}/reasignar-casos` | `ADMINISTRADOR` | `{destino_id, caso_ids?}` | `{traslado}` |
+| POST | `/admin/usuarios/{id}/restablecer-contrasena` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
+| POST | `/admin/usuarios/{id}/reenviar-credencial` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
+| POST | `/admin/usuarios/{id}/desbloquear` | `ADMINISTRADOR` | — | `{usuario}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
 - `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
@@ -223,6 +237,33 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `LONGITUD_MINIMA`, `LONGITUD_MAXIMA`, `NO_COMUN`, `SIN_DATOS_PROPIOS`, `NO_FILTRADA` y
   `DISTINTA_A_LA_TEMPORAL`, en ese orden. Si la `confirmacion` no coincide, `campos` lo dice.
 - `/auth/logout` responde 204 aunque la sesión ya hubiera vencido.
+
+**Usuarios (administrador).**
+
+- `usuario` = `{id, nombre, apellido, correo, telefono, rol, estado, bloqueado, creado_en,
+  activado_en, estado_activacion, temporal_expira_en}`. Los dos últimos solo vienen en las
+  cuentas `PENDIENTE` (`estado_activacion` = `PENDIENTE` o `EXPIRADA`, RF-U06).
+- `credencial` = `{motivo, estado, intentado_en, codigo_error}`; con el correo caído:
+  `estado: "FALLIDO"`, `codigo_error: "CORREO_NO_ENVIADO"` → la UI ofrece reenviar. **La
+  contraseña temporal nunca viaja en la respuesta**, solo por correo.
+- `traslado` = `{id, tipo, casos_trasladados}` o `null`.
+- Paginación: `?pagina=1&por_pagina=20` (máximo 100) → `{items, paginacion: {pagina, por_pagina, total}}`.
+- Las cuentas eliminadas no salen en la lista salvo `estado=ELIMINADO`. Se pueden consultar,
+  pero cualquier cambio sobre ellas responde 404.
+- Desactivar, eliminar, restablecer y cambiar el correo cierran las sesiones abiertas de esa
+  cuenta. Restablecer, además, desvincula la app autenticadora (RF-U09 CA 9).
+- Para elegir el doctor de destino: `GET /admin/usuarios?rol=DOCTOR&estado=ACTIVO&excluir={id}`.
+
+| HTTP | `codigo` | Cuándo |
+|---|---|---|
+| 409 | `CORREO_YA_REGISTRADO` | Crear o cambiar el correo a uno que ya usa otra cuenta (trae `campos`) |
+| 409 | `ULTIMO_ADMINISTRADOR` | Desactivar, eliminar o quitarle el rol al último administrador activo |
+| 409 | `DESTINO_REQUERIDO` | Desactivar o eliminar a un doctor con casos activos sin `destino_id` (trae `casos_activos`) |
+| 409 | `CASOS_SIN_REASIGNAR` | Pasar a administrador a un doctor que tiene casos activos |
+| 409 | `TRANSICION_INVALIDA` | La acción no aplica al estado de la cuenta (p. ej. activar una ACTIVO) |
+| 409 | `SIN_CASOS_ACTIVOS` | Reasignar casos de un doctor que no tiene |
+| 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
+| 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
 **Planeados** (detalle en la especificación del equipo): perfil, gestión de usuarios,
 traslados, pacientes y análisis (`POST /analisis` → 202), explicación, observaciones,

@@ -13,6 +13,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -104,6 +105,16 @@ class MetricaModelo(Base):
             "metrica",
             "conjunto_prueba",
             name="MetricaModelo_unica",
+        ),
+        # En Postgres los NULL no chocan en un UNIQUE: sin esto las métricas macro (sin
+        # característica) se podían repetir. Índice parcial, llegó en 0003
+        Index(
+            "MetricaModelo_macro_unica",
+            "modelo_id",
+            "metrica",
+            "conjunto_prueba",
+            unique=True,
+            postgresql_where=text("caracteristica_id IS NULL"),
         ),
     )
 

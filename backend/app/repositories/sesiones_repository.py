@@ -1,8 +1,9 @@
 """Sesiones: en la base solo vive el hash SHA-256 del token, nunca el token."""
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import EtapaSesion, Sesion, Usuario
@@ -19,6 +20,15 @@ class RepositorioSesiones:
         self.db.add(sesion)
         self.db.flush()
         return sesion
+
+    def cerrar_todas(self, usuario_id: UUID, cuando: datetime) -> int:
+        """Cierra las sesiones abiertas de un usuario (desactivar, eliminar, restablecer…)."""
+        resultado = self.db.execute(
+            update(Sesion)
+            .where(Sesion.usuario_id == usuario_id, Sesion.cerrada_en.is_(None))
+            .values(cerrada_en=cuando)
+        )
+        return resultado.rowcount or 0
 
     def por_token_hash(self, token_hash: str) -> Sesion | None:
         # Una sola consulta trae sesión, usuario y rol: el rol sale fresco de la base (RF-U03)

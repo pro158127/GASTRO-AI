@@ -6,13 +6,14 @@ LA MISMA sesión de base (FastAPI la cachea), así la acción y su bitácora van
 """
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
+from app.adapters.correo import EnviadorCorreo, crear_enviador
 from app.adapters.filtraciones import VerificadorFiltraciones, crear_verificador
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
@@ -20,13 +21,18 @@ from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.models import CodigoRol, EtapaSesion, Sesion
 from app.repositories.bitacora_repository import RepositorioBitacora
+from app.repositories.credenciales_repository import RepositorioCredenciales
 from app.repositories.health_repository import HealthRepository
 from app.repositories.sesiones_repository import RepositorioSesiones
+from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
+from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
+from app.services.perfil import ServicioPerfil
+from app.services.usuarios import ServicioUsuarios
 
 # El nombre de la cookie lo fija la especificación de la API; el front no la lee nunca
 COOKIE_SESION = "gastro_sesion"
@@ -91,6 +97,42 @@ def get_servicio_autenticacion(
 
 
 ServicioAuth = Annotated[ServicioAutenticacion, Depends(get_servicio_autenticacion)]
+
+
+def get_enviador_correo(ajustes: Ajustes) -> EnviadorCorreo:
+    return crear_enviador(ajustes)
+
+
+def _ahora() -> datetime:
+    return datetime.now(UTC)
+
+
+def get_servicio_usuarios(
+    db: DbSession,
+    publicador: Publicador,
+    enviador: Annotated[EnviadorCorreo, Depends(get_enviador_correo)],
+) -> ServicioUsuarios:
+    credenciales_repo = RepositorioCredenciales(db)
+    return ServicioUsuarios(
+        usuarios=RepositorioUsuarios(db),
+        sesiones=RepositorioSesiones(db),
+        traslados=RepositorioTraslados(db),
+        credenciales_repo=credenciales_repo,
+        credenciales=ServicioCredenciales(credenciales_repo, enviador, publicador, _ahora),
+        publicador=publicador,
+        unidad=UnidadTrabajo(db),
+        reloj=_ahora,
+    )
+
+
+ServicioCuentas = Annotated[ServicioUsuarios, Depends(get_servicio_usuarios)]
+
+
+def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:
+    return ServicioPerfil(publicador, UnidadTrabajo(db))
+
+
+ServicioMiPerfil = Annotated[ServicioPerfil, Depends(get_servicio_perfil)]
 
 
 def ip_cliente(request: Request) -> str | None:
