@@ -77,14 +77,21 @@ class AdaptadorProveedorLLM:
     poemas y markdown. Temperatura baja pa que no se ponga creativo con datos clínicos.
     """
 
-    def __init__(self, cliente: genai.Client, modelo: str) -> None:
+    def __init__(self, cliente: genai.Client, modelo: str, razonamiento: str = "") -> None:
         self._cliente = cliente
         self._modelo = modelo
+        # Razonamiento bajo: pa explicar 3 números no hace falta que piense un minuto
+        pensar = (
+            types.ThinkingConfig(thinking_level=razonamiento.strip().upper())
+            if razonamiento.strip()
+            else None
+        )
         self._config = types.GenerateContentConfig(
             system_instruction=INSTRUCCIONES,
             response_mime_type="application/json",
             response_schema=_RespuestaExplicacion,
             temperature=0.2,
+            thinking_config=pensar,
         )
 
     def explicar(self, resumen: dict[str, Any]) -> str:
@@ -115,4 +122,4 @@ def crear_adaptador_llm(settings: Settings) -> AdaptadorProveedorLLM:
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     )
-    return AdaptadorProveedorLLM(cliente, settings.llm_modelo)
+    return AdaptadorProveedorLLM(cliente, settings.llm_modelo, settings.llm_razonamiento)

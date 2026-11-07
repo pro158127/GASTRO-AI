@@ -68,7 +68,11 @@ class Settings(BaseSettings):
 
     # Gemini, el que redacta la explicación bonita (RF-R05)
     llm_proveedor: str = "gemini"
-    llm_modelo: str = "gemini-3.8-flash"
+    # 3.5-flash: en las pruebas del 2026-11-07 respondió en ~2 s; 3.7 y 3.8 se pasaban de 15 s
+    llm_modelo: str = "gemini-3.5-flash"
+    # Cuánto «piensa» el modelo antes de contestar: LOW, MEDIUM o HIGH; vacío = lo que traiga
+    # el modelo. Los 3.x piensan harto por defecto y eso los vuelve lentos (RF-R05 CA 3: ≤ 10 s)
+    llm_razonamiento: str = "LOW"
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_seconds: float = 15.0  # RF-R05 CA 4: si pasa de 15 s, lo soltamos
 

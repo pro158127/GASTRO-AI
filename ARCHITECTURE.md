@@ -109,7 +109,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS` |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
 | Modelo | `HF_SPACE_URL`, `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256` |
-| Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO`, `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
+| Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
 | Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
 | Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |
 | Primer administrador | `ADMIN_CORREO`, `ADMIN_TEMPORAL` |
