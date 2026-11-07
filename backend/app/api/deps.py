@@ -19,18 +19,23 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
+from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
 from app.repositories.bitacora_repository import RepositorioBitacora
+from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
 from app.repositories.health_repository import HealthRepository
+from app.repositories.pacientes_repository import RepositorioPacientes
 from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
+from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
+from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
 from app.services.usuarios import ServicioUsuarios
 
@@ -126,6 +131,39 @@ def get_servicio_usuarios(
 
 
 ServicioCuentas = Annotated[ServicioUsuarios, Depends(get_servicio_usuarios)]
+
+
+def get_servicio_configuracion(
+    db: DbSession, publicador: Publicador
+) -> ServicioConfiguracionInferencia:
+    return ServicioConfiguracionInferencia(RepositorioCatalogo(db), publicador, UnidadTrabajo(db))
+
+
+ServicioConfiguracion = Annotated[
+    ServicioConfiguracionInferencia, Depends(get_servicio_configuracion)
+]
+
+
+def get_catalogo(db: DbSession) -> RepositorioCatalogo:
+    return RepositorioCatalogo(db)
+
+
+Catalogo = Annotated[RepositorioCatalogo, Depends(get_catalogo)]
+
+
+def get_seudonimizador(ajustes: Ajustes) -> Seudonimizador:
+    """Con todas las versiones de HMAC_CLAVES. Mal configuradas → 500 genérico + log."""
+    claves = {version: clave.get_secret_value() for version, clave in ajustes.hmac_claves.items()}
+    return Seudonimizador(claves, ajustes.hmac_version_actual)
+
+
+def get_servicio_pacientes(
+    db: DbSession, seudonimizador: Annotated[Seudonimizador, Depends(get_seudonimizador)]
+) -> ServicioPacientes:
+    return ServicioPacientes(RepositorioPacientes(db), seudonimizador)
+
+
+ServicioDePacientes = Annotated[ServicioPacientes, Depends(get_servicio_pacientes)]
 
 
 def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:

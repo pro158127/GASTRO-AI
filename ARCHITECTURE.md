@@ -225,6 +225,11 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/admin/usuarios/{id}/restablecer-contrasena` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
 | POST | `/admin/usuarios/{id}/reenviar-credencial` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
 | POST | `/admin/usuarios/{id}/desbloquear` | `ADMINISTRADOR` | — | `{usuario}` |
+| GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
+| GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
+| POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
+| GET | `/admin/configuracion-inferencia` | `ADMINISTRADOR` | — | `{usar_umbral_por_caracteristica, umbral_global, rango, caracteristicas, actualizado_por, actualizado_en}` |
+| PUT | `/admin/configuracion-inferencia` | `ADMINISTRADOR` | `{usar_umbral_por_caracteristica, umbral_global, umbrales: [{caracteristica_id, umbral}]}` | igual que el GET |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
 - `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
@@ -237,6 +242,24 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `LONGITUD_MINIMA`, `LONGITUD_MAXIMA`, `NO_COMUN`, `SIN_DATOS_PROPIOS`, `NO_FILTRADA` y
   `DISTINTA_A_LA_TEMPORAL`, en ese orden. Si la `confirmacion` no coincide, `campos` lo dice.
 - `/auth/logout` responde 204 aunque la sesión ya hubiera vencido.
+
+**Paciente y documento.**
+
+- El documento solo viaja en el cuerpo de un `POST`; nunca en la URL, en la respuesta ni en
+  los logs. Se normaliza (sin puntos, espacios ni guiones) y se valida por tipo: **CC hasta
+  10 dígitos, TI hasta 11, CE hasta 6**. Mal escrito: `422 DOCUMENTO_INVALIDO` con `campos`
+  (`tipo_documento` o `numero_documento`) → W-06e.
+- La consulta solo cuenta los casos del doctor que pregunta (propios o recibidos por
+  traslado): no revela si el paciente tiene análisis con otros doctores (RF-H01 CA 5).
+- nginx limita `/pacientes/consulta` por IP (30/min) para que no se use para adivinar documentos.
+
+**Configuración de inferencia.**
+
+- Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
+  (`umbral_global`, `umbrales[i].umbral`) y `rango`.
+- En modo por característica deben venir todas las activas con su umbral, o
+  `422 UMBRALES_INCOMPLETOS`. `umbral: null` quita el umbral propio (usa el global).
+- Solo afecta análisis futuros: cada resultado guarda el umbral con que se evaluó.
 
 **Usuarios (administrador).**
 

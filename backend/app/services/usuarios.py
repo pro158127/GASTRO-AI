@@ -203,13 +203,13 @@ class ServicioUsuarios:
                 "El rol no existe.",
                 [{"campo": "rol", "mensaje": "El rol no existe."}],
             )
-        usuario.rol_id = rol_bd.id
+        usuario.rol = rol_bd  # la relación, no el id: así la respuesta sale con el rol nuevo
         self._publicar(
             AccionBitacora.ROL_CAMBIADO, actor, usuario, ip, {"de": anterior.value, "a": rol.value}
         )
         self._unidad.confirmar()
         # Como el rol se lee de la base en cada petición, el cambio aplica ya (RF-U08 CA 2)
-        return self._usuarios.por_id(usuario.id)
+        return usuario
 
     # ----------------------------------------------------------- activar/desactivar
 
