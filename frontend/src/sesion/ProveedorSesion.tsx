@@ -1,6 +1,6 @@
 // Estado de sesión en memoria. La sesión real vive en el servidor y viaja en la cookie HttpOnly
-// `gastro_sesion`; aquí solo se guarda lo que responde GET /auth/sesion (etapa, usuario y
-// vencimiento). Nada se escribe en localStorage ni en sessionStorage.
+// `gastro_sesion`; aquí solo se guarda lo que responde GET /auth/sesion (etapa, usuario e
+// inactividad). Nada se escribe en localStorage ni en sessionStorage.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -10,7 +10,8 @@ import {
   obtenerSesion,
   registrarManejadoresGlobales,
 } from "../services/api";
-import type { EtapaSesion, RespuestaSesion, UsuarioActual } from "../types";
+import { CodigoErrorApi } from "../services/codigosError";
+import type { EtapaSesion, Inactividad, RespuestaSesion, UsuarioActual } from "../types";
 import { borrarCierrePendiente, hayCierrePendiente, marcarCierrePendiente } from "./cierrePendiente";
 import PantallaEstadoSesion from "./PantallaEstadoSesion";
 
@@ -24,7 +25,7 @@ type EstadoSesion =
   | { fase: "cargando" }
   | { fase: "error"; error: ErrorApi | null }
   | { fase: "sin_sesion" }
-  | { fase: "con_sesion"; etapa: EtapaSesion; venceEn: string; usuario: UsuarioActual };
+  | { fase: "con_sesion"; etapa: EtapaSesion; inactividad: Inactividad; usuario: UsuarioActual };
 
 interface ValorSesion {
   /** Etapa de la sesión actual; `null` si no hay sesión. */
@@ -61,7 +62,7 @@ function esSinSesion(error: unknown): boolean {
   return (
     error instanceof ErrorApi &&
     error.estado === 401 &&
-    (error.codigo === "SIN_SESION" || error.codigo === "SESION_VENCIDA")
+    error.codigo === CodigoErrorApi.SESION_EXPIRADA
   );
 }
 
@@ -69,7 +70,7 @@ function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
   return {
     fase: "con_sesion",
     etapa: respuesta.etapa,
-    venceEn: respuesta.vence_en,
+    inactividad: respuesta.inactividad,
     usuario: respuesta.usuario,
   };
 }
@@ -141,15 +142,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
-  // 401 SIN_SESION / SESION_VENCIDA: se descarta la sesión local y las guardas llevan a
-  // /iniciar-sesion sin mensaje (no marca motivo). SIN_PERMISO lleva a W-28. ETAPA_INVALIDA: falta un paso; se vuelve
-  // a consultar y las guardas llevan a la pantalla de la etapa correcta.
+  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion sin
+  // mensaje (no marca motivo). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
+  // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
+  // las guardas llevan a la pantalla de esa etapa.
   useEffect(() => {
     registrarManejadoresGlobales({
       alSinSesion: () => setEstado({ fase: "sin_sesion" }),
-      // 403 SIN_PERMISO: W-28. La sesión sigue activa; solo se informa.
+      // La sesión sigue activa; solo se informa.
       alSinPermiso: () => navigate("/sin-permisos"),
-      alEtapaInvalida: () => {
+      alEtapaInvalida: (etapa) => {
+        if (etapa !== null) {
+          setEstado((previo) => (previo.fase === "con_sesion" ? { ...previo, etapa } : previo));
+          return;
+        }
         refrescarSesion().catch(() => {
           // Si la consulta falla, la siguiente acción del usuario volverá a intentarlo.
         });

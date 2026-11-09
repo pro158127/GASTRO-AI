@@ -9,6 +9,7 @@ import CampoContrasena from "../components/CampoContrasena";
 import CampoTexto from "../components/CampoTexto";
 import Logo from "../components/Logo";
 import { ErrorApi, login } from "../services/api";
+import { CodigoErrorApi } from "../services/codigosError";
 import { avisoDeError } from "../utils/avisosError";
 import { borrarCierrePendiente } from "../sesion/cierrePendiente";
 import { useSesion } from "../sesion/ProveedorSesion";
@@ -30,12 +31,19 @@ const AVISOS = {
     titulo: "No se pudo iniciar sesión",
     mensaje: "Verifique su correo y su contraseña e intente de nuevo.",
   },
-  // W-01e. TEMPORAL_EXPIRADA.
+  // W-01e. AUTH_TEMPORAL_EXPIRADA (403).
   temporalVencida: {
     tipo: "advertencia",
     titulo: "Su contraseña temporal venció",
     mensaje:
       "Pasaron más de 72 horas desde que se generó. Pida una nueva al administrador de la plataforma.",
+  },
+  // No está en Figma (pendiente de agregar): 429 DEMASIADOS_INTENTOS (límite de 10 por minuto
+  // por IP en login y códigos; el servidor manda Retry-After: 60).
+  demasiadosIntentos: {
+    tipo: "advertencia",
+    titulo: "",
+    mensaje: "Demasiados intentos. Espere un minuto e intente de nuevo.",
   },
   // No está en Figma (pendiente de agregar): el servidor no confirmó el cierre de sesión.
   cierreSinConfirmar: {
@@ -55,8 +63,15 @@ const AVISOS = {
 
 function avisoDesdeError(error: unknown): Aviso {
   if (error instanceof ErrorApi) {
-    if (error.codigo === "TEMPORAL_EXPIRADA") return AVISOS.temporalVencida;
-    if (error.codigo === "CREDENCIALES_INVALIDAS" || error.codigo === "DATOS_INVALIDOS") {
+    // El 429 puede venir de nginx sin cuerpo JSON, por eso también se mira el estado.
+    if (error.estado === 429 || error.codigo === CodigoErrorApi.DEMASIADOS_INTENTOS) {
+      return AVISOS.demasiadosIntentos;
+    }
+    if (error.codigo === CodigoErrorApi.AUTH_TEMPORAL_EXPIRADA) return AVISOS.temporalVencida;
+    if (
+      error.codigo === CodigoErrorApi.AUTH_CREDENCIALES_INVALIDAS ||
+      error.codigo === CodigoErrorApi.DATOS_INVALIDOS
+    ) {
       return AVISOS.credenciales;
     }
   }

@@ -1,5 +1,5 @@
 // Pantalla W-28 · Sin permisos (RF-U03 CA 5). Un usuario intenta abrir una sección de otro rol.
-// La validación real ocurre en el servidor (403 SIN_PERMISO); esta pantalla solo informa y no
+// La validación real ocurre en el servidor (403 PERMISO_DENEGADO); esta pantalla solo informa y no
 // revela qué contiene la sección.
 import EstadoVacio from "../components/EstadoVacio";
 import EnlaceBoton from "../components/EnlaceBoton";

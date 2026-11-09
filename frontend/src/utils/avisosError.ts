@@ -13,7 +13,7 @@ const SIN_CONEXION: AvisoError = {
   mensaje: "Revise su conexión e intente de nuevo.",
 };
 
-/** W-31. Con `idError`, agrega la frase del código que el usuario le dicta al administrador. */
+/** W-31. Con `idError` (el `ERR-xxxx` de los 5xx), agrega la frase del código que el usuario dicta al administrador. */
 export function avisoInesperado(idError: string | null): AvisoError {
   const base = "Ocurrió un error inesperado. Intente de nuevo.";
   return {

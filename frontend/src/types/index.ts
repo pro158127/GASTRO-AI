@@ -20,17 +20,28 @@ export interface RespuestaEtapa {
   etapa: EtapaSesion;
 }
 
-/** Respuesta de `GET /auth/sesion`. `vence_en` es una fecha ISO 8601. */
+/**
+ * Inactividad de la sesión: segundos contados desde `ultima_actividad_en` (fecha ISO 8601 en
+ * UTC) para el aviso del minuto 9 (`aviso_en_s`: 540) y el cierre (`cierre_en_s`: 600). W-05
+ * la usará para el aviso de inactividad.
+ */
+export interface Inactividad {
+  aviso_en_s: number;
+  cierre_en_s: number;
+  ultima_actividad_en: string;
+}
+
+/** Respuesta de `GET /auth/sesion`. */
 export interface RespuestaSesion {
   etapa: EtapaSesion;
-  vence_en: string;
   usuario: UsuarioActual;
+  inactividad: Inactividad;
 }
 
 /** Respuesta de `GET /health`. */
 export interface HealthResponse {
-  status: string;
-  database: boolean;
+  status: "ok" | "degraded";
+  database: "ok" | "error";
 }
 
 /** Propuesta `GET /api/v1/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
