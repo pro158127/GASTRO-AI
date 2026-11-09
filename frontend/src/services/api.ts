@@ -59,8 +59,8 @@ export class ErrorApi extends Error {
 
 /** Reacciones globales a los errores que no dependen de la pantalla que hizo la llamada. */
 export interface ManejadoresGlobales {
-  /** 401 SESION_EXPIRADA. */
-  alSinSesion?: () => void;
+  /** 401 SESION_EXPIRADA. Trae el `motivo` (`INACTIVIDAD` si fue por inactividad), si vino. */
+  alSinSesion?: (motivo: string | null) => void;
   /** 403 PERMISO_DENEGADO. */
   alSinPermiso?: () => void;
   /** 403 ETAPA_INVALIDA: falta un paso del inicio de sesión. Trae la etapa actual, si vino. */
@@ -126,7 +126,7 @@ async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Pro
     const error = errorDesdeCuerpo(respuesta.status, await leerCuerpoJson(respuesta));
     if (global) {
       if (error.codigo === CodigoErrorApi.SESION_EXPIRADA) {
-        manejadores?.alSinSesion?.();
+        manejadores?.alSinSesion?.(error.motivo);
       } else if (error.codigo === CodigoErrorApi.PERMISO_DENEGADO) {
         manejadores?.alSinPermiso?.();
       } else if (error.codigo === CodigoErrorApi.ETAPA_INVALIDA) {

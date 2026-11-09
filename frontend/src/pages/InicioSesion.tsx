@@ -13,6 +13,7 @@ import { CodigoErrorApi } from "../services/codigosError";
 import { avisoDeError } from "../utils/avisosError";
 import { borrarCierrePendiente } from "../sesion/cierrePendiente";
 import { useSesion } from "../sesion/ProveedorSesion";
+import type { MotivoCierre } from "../sesion/ProveedorSesion";
 import { isValidEmail } from "../utils/validators";
 import estilos from "./InicioSesion.module.css";
 
@@ -52,6 +53,13 @@ const AVISOS = {
     mensaje:
       "Se cerró la sesión en este equipo, pero no pudimos confirmarlo con el servidor. Cierre el navegador para terminar la sesión por completo.",
   },
+  // W-01d. SESION_EXPIRADA con motivo INACTIVIDAD.
+  inactividad: {
+    tipo: "info",
+    titulo: "Su sesión se cerró por inactividad",
+    mensaje:
+      "Por seguridad, la sesión se cierra tras 10 minutos sin actividad. Inicie sesión de nuevo para continuar.",
+  },
   // W-01f.
   cierre: {
     tipo: "exito",
@@ -60,6 +68,13 @@ const AVISOS = {
       "Para volver a entrar, inicie sesión. Si usa un equipo compartido, cierre también el navegador.",
   },
 } satisfies Record<string, Aviso>;
+
+/** Aviso que se muestra al llegar al inicio de sesión según por qué se cerró la sesión. */
+const AVISO_POR_MOTIVO: Record<MotivoCierre, Aviso> = {
+  cierre: AVISOS.cierre,
+  cierre_sin_confirmar: AVISOS.cierreSinConfirmar,
+  inactividad: AVISOS.inactividad,
+};
 
 function avisoDesdeError(error: unknown): Aviso {
   if (error instanceof ErrorApi) {
@@ -86,11 +101,7 @@ export default function InicioSesion() {
   const [contrasena, setContrasena] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(() =>
-    motivoCierre === "cierre"
-      ? AVISOS.cierre
-      : motivoCierre === "cierre_sin_confirmar"
-        ? AVISOS.cierreSinConfirmar
-        : null
+    motivoCierre === null ? null : AVISO_POR_MOTIVO[motivoCierre]
   );
   // Evita dobles peticiones aunque el envío se dispare dos veces antes de repintar.
   const enviandoRef = useRef(false);

@@ -17,9 +17,10 @@ import PantallaEstadoSesion from "./PantallaEstadoSesion";
 
 /**
  * `cierre`: el servidor confirmó el cierre (W-01f). `cierre_sin_confirmar`: el servidor no
- * respondió; la sesión local se cerró pero la del servidor puede seguir viva.
+ * respondió; la sesión local se cerró pero la del servidor puede seguir viva. `inactividad`: el
+ * servidor cerró la sesión por inactividad (W-01d).
  */
-type MotivoCierre = "cierre" | "cierre_sin_confirmar";
+export type MotivoCierre = "cierre" | "cierre_sin_confirmar" | "inactividad";
 
 type EstadoSesion =
   | { fase: "cargando" }
@@ -66,6 +67,11 @@ function esSinSesion(error: unknown): boolean {
   );
 }
 
+/** `motivo: "INACTIVIDAD"` en SESION_EXPIRADA: la sesión se cerró por inactividad. */
+function motivoDeExpiracion(motivo: string | null): MotivoCierre | null {
+  return motivo === "INACTIVIDAD" ? "inactividad" : null;
+}
+
 function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
   return {
     fase: "con_sesion",
@@ -88,6 +94,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       return respuesta.etapa;
     } catch (error) {
       if (esSinSesion(error)) {
+        setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo));
         setEstado({ fase: "sin_sesion" });
         return null;
       }
@@ -112,8 +119,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!vigente) return;
-        if (esSinSesion(error)) setEstado({ fase: "sin_sesion" });
-        else setEstado({ fase: "error", error: error instanceof ErrorApi ? error : null });
+        if (esSinSesion(error)) {
+          setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo));
+          setEstado({ fase: "sin_sesion" });
+        } else setEstado({ fase: "error", error: error instanceof ErrorApi ? error : null });
       });
     return () => {
       vigente = false;
@@ -142,13 +151,16 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
-  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion sin
-  // mensaje (no marca motivo). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
+  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; con
+  // `motivo: INACTIVIDAD` se marca el motivo para mostrar W-01d, y si no, sin mensaje. 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
   // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
   // las guardas llevan a la pantalla de esa etapa.
   useEffect(() => {
     registrarManejadoresGlobales({
-      alSinSesion: () => setEstado({ fase: "sin_sesion" }),
+      alSinSesion: (motivo) => {
+        setMotivoCierre(motivoDeExpiracion(motivo));
+        setEstado({ fase: "sin_sesion" });
+      },
       // La sesión sigue activa; solo se informa.
       alSinPermiso: () => navigate("/sin-permisos"),
       alEtapaInvalida: (etapa) => {
