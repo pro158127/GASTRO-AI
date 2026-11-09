@@ -24,14 +24,36 @@ class ErrorAlmacen(Exception):
     """MinIO no respondió o rechazó la operación. Mensaje genérico a propósito (CWE-209)."""
 
 
+# Área temporal de POST /imagenes: lo que no se usa en un día lo barre MinIO solito
+PREFIJO_TEMPORAL = "tmp/"
+DIAS_TEMPORAL = 1  # S3 cuenta el ciclo de vida en días; el vencimiento fino lo revisa la API
+
+
 class Almacen(Protocol):
     """Lo único que el resto del sistema sabe del almacén. En pruebas va uno en memoria."""
 
-    def subir(self, clave: str, datos: bytes, tipo_contenido: str) -> None: ...
+    def subir(
+        self,
+        clave: str,
+        datos: bytes,
+        tipo_contenido: str,
+        metadatos: dict[str, str] | None = None,
+    ) -> None: ...
 
     def leer(self, clave: str) -> bytes: ...
 
+    def metadatos(self, clave: str) -> dict[str, str] | None: ...
+
+    def copiar(self, origen: str, destino: str) -> None: ...
+
+    def borrar(self, clave: str) -> None: ...
+
     def url_firmada(self, clave: str) -> str: ...
+
+
+def _no_existe(error: ClientError) -> bool:
+    codigo = str(error.response.get("Error", {}).get("Code", ""))
+    return codigo in {"404", "NoSuchKey", "NotFound"}
 
 
 def _cliente(endpoint: str, settings: Settings) -> BaseClient:
@@ -53,13 +75,56 @@ class AlmacenS3:
         self._bucket = bucket
         self._segundos = segundos
 
-    def subir(self, clave: str, datos: bytes, tipo_contenido: str) -> None:
+    def subir(
+        self,
+        clave: str,
+        datos: bytes,
+        tipo_contenido: str,
+        metadatos: dict[str, str] | None = None,
+    ) -> None:
+        """Sube el objeto. Los metadatos van como x-amz-meta-* (solo ASCII, ojo)."""
         try:
             self._interno.put_object(
-                Bucket=self._bucket, Key=clave, Body=datos, ContentType=tipo_contenido
+                Bucket=self._bucket,
+                Key=clave,
+                Body=datos,
+                ContentType=tipo_contenido,
+                Metadata=metadatos or {},
             )
         except (BotoCoreError, ClientError) as error:
             raise ErrorAlmacen("No se pudo guardar el archivo.") from error
+
+    def metadatos(self, clave: str) -> dict[str, str] | None:
+        """Los x-amz-meta-* del objeto, o None si no existe (ya venció o nunca estuvo)."""
+        try:
+            respuesta = self._interno.head_object(Bucket=self._bucket, Key=clave)
+        except ClientError as error:
+            if _no_existe(error):
+                return None
+            raise ErrorAlmacen("No se pudo leer el archivo.") from error
+        except BotoCoreError as error:
+            raise ErrorAlmacen("No se pudo leer el archivo.") from error
+        return dict(respuesta.get("Metadata", {}))
+
+    def copiar(self, origen: str, destino: str) -> None:
+        """Copia dentro del mismo bucket, sin bajar el archivo a la API."""
+        try:
+            self._interno.copy_object(
+                Bucket=self._bucket,
+                Key=destino,
+                CopySource={"Bucket": self._bucket, "Key": origen},
+                MetadataDirective="REPLACE",  # el destino no hereda los metadatos de tmp/
+                ContentType="image/png" if destino.endswith(".png") else "image/jpeg",
+            )
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo guardar el archivo.") from error
+
+    def borrar(self, clave: str) -> None:
+        """Borra el objeto. Si ya no estaba, S3 no se queja y nosotros tampoco."""
+        try:
+            self._interno.delete_object(Bucket=self._bucket, Key=clave)
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo borrar el archivo.") from error
 
     def leer(self, clave: str) -> bytes:
         try:
@@ -92,6 +157,26 @@ class AlmacenS3:
         except ClientError:
             self._interno.create_bucket(Bucket=self._bucket)
             return True
+
+    def asegurar_limpieza_temporal(self) -> None:
+        """Regla de ciclo de vida: lo de tmp/ se borra solo a los DIAS_TEMPORAL días.
+
+        Es la red de seguridad pa las imágenes que el doctor cargó y nunca analizó; el
+        vencimiento de verdad (IMAGEN_TEMPORAL_MINUTOS) lo revisa la API al usarlas.
+        """
+        self._interno.put_bucket_lifecycle_configuration(
+            Bucket=self._bucket,
+            LifecycleConfiguration={
+                "Rules": [
+                    {
+                        "ID": "borrar-temporales",
+                        "Status": "Enabled",
+                        "Filter": {"Prefix": PREFIJO_TEMPORAL},
+                        "Expiration": {"Days": DIAS_TEMPORAL},
+                    }
+                ]
+            },
+        )
 
 
 def crear_almacen(settings: Settings) -> AlmacenS3:

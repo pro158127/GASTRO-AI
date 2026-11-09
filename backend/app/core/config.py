@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     s3_secret_key: str = "gastroia_dev_secret"
     s3_bucket: str = "gastroia-imagenes"
     s3_url_firmada_segundos: int = 300  # 5 min y la URL se vuelve calabaza
+    # Cuánto aguanta la imagen en el área temporal (tmp/) entre POST /imagenes y POST /analisis.
+    # Además MinIO borra lo de tmp/ al día con una regla de ciclo de vida (init_storage).
+    imagen_temporal_minutos: int = 30
 
     # Llaves del seudónimo (RF-D01, RNF-28). Es un JSON {"versión": "clave"} con TODAS las
     # versiones: si rotas la llave y botas la vieja, los casos viejos se pierden. No, parce.

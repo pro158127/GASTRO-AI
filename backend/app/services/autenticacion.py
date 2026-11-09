@@ -60,6 +60,7 @@ TODAS_LAS_ETAPAS = tuple(EtapaSesion)
 GENERICO = ("AUTH_CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.")
 CODIGO_INVALIDO = ("TOTP_CODIGO_INVALIDO", "El código es incorrecto o ya venció.")
 SESION_EXPIRADA = ("SESION_EXPIRADA", "Tu sesión terminó. Inicia sesión de nuevo.")
+MOTIVO_BLOQUEO = "DEMASIADOS_INTENTOS"
 
 # A dónde manda el front después de entrar (ARCHITECTURE.md §3.5)
 RUTAS_INICIALES = {
@@ -87,6 +88,10 @@ class InicioSesion:
 
 def _error(estado: int, codigo_mensaje: tuple[str, str]) -> ErrorApi:
     return ErrorApi(estado, *codigo_mensaje)
+
+
+def _sesion_expirada(motivo: str | None = None) -> ErrorApi:
+    return ErrorApi(401, *SESION_EXPIRADA, extra={"motivo": motivo} if motivo else None)
 
 
 def _qr_png_base64(uri: str) -> str:
@@ -173,27 +178,31 @@ class ServicioAutenticacion:
         Cierra la sesión si venció por inactividad o si la cuenta ya no puede entrar
         (desactivada, eliminada o bloqueada mientras estaba adentro).
         `pasiva` = cabecera X-Actividad-Pasiva: 1; esas consultas no renuevan (RF-U10).
-        Sin sesión, cerrada o vencida: 401 SESION_EXPIRADA; con `motivo: INACTIVIDAD`
-        cuando fue por los 10 min, pa que el front muestre W-01d.
+        Sin sesión, cerrada o vencida: 401 SESION_EXPIRADA, con `motivo` cuando se sabe:
+        INACTIVIDAD (los 10 min, W-01d) o DEMASIADOS_INTENTOS (cuenta bloqueada por códigos
+        o contraseñas fallidas). Este último solo lo ve quien ya tenía sesión, o sea quien
+        ya pasó la contraseña, así que no destapa nada en el login (RF-U01 CA 2).
         """
         if not token:
             raise _error(401, SESION_EXPIRADA)
         sesion = self._sesiones.por_token_hash(hash_token(token))
-        if sesion is None or sesion.cerrada_en is not None:
+        if sesion is None:
             raise _error(401, SESION_EXPIRADA)
 
         usuario, ahora = sesion.usuario, self._reloj()
+        bloqueada = usuario.bloqueado_hasta is not None and usuario.bloqueado_hasta > ahora
+        if sesion.cerrada_en is not None:
+            raise _sesion_expirada(MOTIVO_BLOQUEO if bloqueada else None)
+
         por_inactividad = ahora - sesion.ultima_actividad_en > self._reglas.inactividad
-        cuenta_fuera = usuario.estado not in ESTADOS_QUE_ENTRAN or (
-            usuario.bloqueado_hasta is not None and usuario.bloqueado_hasta > ahora
-        )
+        cuenta_fuera = usuario.estado not in ESTADOS_QUE_ENTRAN or bloqueada
         if por_inactividad or cuenta_fuera:
             sesion.cerrada_en = ahora
             if por_inactividad:
                 self._publicar(AccionBitacora.CIERRE_SESION_INACTIVIDAD, usuario, sesion.ip)
             self._unidad.confirmar()
-            raise ErrorApi(
-                401, *SESION_EXPIRADA, extra={"motivo": "INACTIVIDAD"} if por_inactividad else None
+            raise _sesion_expirada(
+                "INACTIVIDAD" if por_inactividad else MOTIVO_BLOQUEO if bloqueada else None
             )
 
         if sesion.etapa not in etapas:
@@ -229,9 +238,11 @@ class ServicioAutenticacion:
         usuario = sesion.usuario
         paso = self._paso_valido(usuario, codigo, usuario.totp_ultimo_paso)
         if paso is None:
-            self._fallo(usuario, ip, self._reloj(), sesion)
+            bloqueada = self._fallo(usuario, ip, self._reloj(), sesion)
             self._publicar(AccionBitacora.VERIFICACION_2FA, usuario, ip, ResultadoAccion.FALLO)
             self._unidad.confirmar()
+            if bloqueada:  # el quinto: el front muestra por qué lo sacaron
+                raise _sesion_expirada(MOTIVO_BLOQUEO)
             raise _error(401, CODIGO_INVALIDO)
         usuario.totp_ultimo_paso = paso
         self._entrar(sesion, usuario)
@@ -290,8 +301,10 @@ class ServicioAutenticacion:
             raise ErrorApi(409, "TOTP_NO_INICIADO", "Primero genera el código QR.")
         paso = self._paso_valido(usuario, codigo, None)
         if paso is None:
-            self._fallo(usuario, ip, self._reloj(), sesion)
+            bloqueada = self._fallo(usuario, ip, self._reloj(), sesion)
             self._unidad.confirmar()
+            if bloqueada:
+                raise _sesion_expirada(MOTIVO_BLOQUEO)
             raise _error(
                 422, CODIGO_INVALIDO
             )  # el contrato pide 422 aquí (W-03b) y 401 en verificar
@@ -334,13 +347,18 @@ class ServicioAutenticacion:
 
     def _fallo(
         self, usuario: Usuario, ip: str | None, ahora: datetime, sesion: Sesion | None = None
-    ) -> None:
-        """+1 intento; al quinto, bloqueo de 15 min con su entrada en bitácora (RF-U12 CA 4)."""
+    ) -> bool:
+        """+1 intento; al quinto, bloqueo de 15 min con su entrada en bitácora (RF-U12 CA 4).
+
+        Devuelve True si con este quedó bloqueada.
+        """
         if self._usuarios.sumar_intento_fallido(usuario.id) >= self._reglas.intentos:
             self._usuarios.bloquear(usuario.id, ahora + self._reglas.bloqueo)
             self._publicar(AccionBitacora.CUENTA_BLOQUEADA, usuario, ip)
             if sesion is not None:
                 sesion.cerrada_en = ahora  # la sesión a medias tampoco sigue viva
+            return True
+        return False
 
     def _registrar_y_fallar(self, usuario: Usuario | None, ip: str | None, motivo: str) -> NoReturn:
         self._publicar(

@@ -12,19 +12,28 @@ from app.models import Usuario
 from app.repositories.pacientes_repository import HistorialPaciente, RepositorioPacientes
 
 
+def documento_normalizado(tipo: str, numero: str, campo_numero: str = "numero_documento") -> str:
+    """«CC:1234567890» o 422 DOCUMENTO_INVALIDO con el campo que falló (W-06e).
+
+    `campo_numero` cambia cuando lo que se valida es la confirmación del número.
+    """
+    try:
+        return normalizar(tipo, numero)
+    except DocumentoInvalido as error:
+        campo = campo_numero if error.campo == "numero_documento" else error.campo
+        raise ErrorApi(
+            422,
+            "DOCUMENTO_INVALIDO",
+            str(error),
+            [{"campo": campo, "mensaje": str(error)}],
+        ) from None  # sin encadenar: la excepción no debe arrastrar el número
+
+
 class ServicioPacientes:
     def __init__(self, pacientes: RepositorioPacientes, seudonimizador: Seudonimizador) -> None:
         self._pacientes = pacientes
         self._seudonimizador = seudonimizador
 
     def consultar(self, doctor: Usuario, tipo: str, numero: str) -> HistorialPaciente:
-        try:
-            valor = normalizar(tipo, numero)
-        except DocumentoInvalido as error:
-            raise ErrorApi(
-                422,
-                "DOCUMENTO_INVALIDO",
-                str(error),
-                [{"campo": error.campo, "mensaje": str(error)}],
-            ) from None  # sin encadenar: la excepción no debe arrastrar el número
+        valor = documento_normalizado(tipo, numero)
         return self._pacientes.historial(doctor.id, self._seudonimizador.todos(valor))

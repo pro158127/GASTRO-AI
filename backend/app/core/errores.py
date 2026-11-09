@@ -72,14 +72,19 @@ class ErrorApi(Exception):
         self.extra = extra or {}
 
 
-def nuevo_id_solicitud() -> str:
-    """req_ + ULID: 26 caracteres, ordenables por tiempo y sin datos de la petición."""
+def nuevo_ulid() -> str:
+    """ULID: 26 caracteres Crockford, ordenables por tiempo y sin datos de nadie adentro."""
     valor = (int(time.time() * 1000) << 80) | secrets.randbits(80)
     letras = []
     for _ in range(26):
         valor, resto = divmod(valor, 32)
         letras.append(_CROCKFORD[resto])
-    return "req_" + "".join(reversed(letras))
+    return "".join(reversed(letras))
+
+
+def nuevo_id_solicitud() -> str:
+    """req_ + ULID, el que va en cada respuesta de error pa buscarlo en el log."""
+    return "req_" + nuevo_ulid()
 
 
 def nuevo_codigo_interno() -> str:

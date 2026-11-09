@@ -13,6 +13,8 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
+from app.adapters.almacen import Almacen, crear_almacen
+from app.adapters.cola import Cola, ColaCelery
 from app.adapters.correo import EnviadorCorreo, crear_enviador
 from app.adapters.filtraciones import VerificadorFiltraciones, crear_verificador
 from app.core.config import Settings, get_settings
@@ -21,6 +23,7 @@ from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
+from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
@@ -30,14 +33,18 @@ from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
+from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
+from app.services.imagenes import ServicioImagenes
 from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
 from app.services.usuarios import ServicioUsuarios
+from app.services.verificadores_imagen import construir_cadena
+from app.workers.celery_app import celery_app
 
 # El nombre de la cookie lo fija la especificación de la API; el front no la lee nunca
 COOKIE_SESION = "gastro_sesion"
@@ -164,6 +171,49 @@ def get_servicio_pacientes(
 
 
 ServicioDePacientes = Annotated[ServicioPacientes, Depends(get_servicio_pacientes)]
+
+
+@lru_cache
+def _almacen_compartido() -> Almacen:
+    # Un cliente boto3 pa toda la app: es thread-safe y crearlo cuesta
+    return crear_almacen(get_settings())
+
+
+def get_almacen() -> Almacen:
+    return _almacen_compartido()
+
+
+def get_cola() -> Cola:
+    return ColaCelery(celery_app)
+
+
+def get_servicio_imagenes(
+    ajustes: Ajustes, almacen: Annotated[Almacen, Depends(get_almacen)]
+) -> ServicioImagenes:
+    return ServicioImagenes(
+        construir_cadena(),
+        almacen,
+        timedelta(minutes=ajustes.imagen_temporal_minutos),
+        _ahora,
+    )
+
+
+ServicioDeImagenes = Annotated[ServicioImagenes, Depends(get_servicio_imagenes)]
+
+
+def get_servicio_analisis(
+    db: DbSession,
+    imagenes: ServicioDeImagenes,
+    almacen: Annotated[Almacen, Depends(get_almacen)],
+    seudonimizador: Annotated[Seudonimizador, Depends(get_seudonimizador)],
+    cola: Annotated[Cola, Depends(get_cola)],
+) -> ServicioAnalisis:
+    return ServicioAnalisis(
+        RepositorioAnalisis(db), imagenes, almacen, seudonimizador, cola, UnidadTrabajo(db), _ahora
+    )
+
+
+ServicioDeAnalisis = Annotated[ServicioAnalisis, Depends(get_servicio_analisis)]
 
 
 def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:

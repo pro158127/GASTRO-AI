@@ -106,7 +106,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | Grupo | Variables |
 |---|---|
 | Base de datos y cola | `DATABASE_URL`, `REDIS_URL` |
-| MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS` |
+| MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
 | Modelo | `HF_SPACE_URL`, `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256` |
 | Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
@@ -166,12 +166,13 @@ renueva la inactividad (10 min), salvo las que lleven **`X-Actividad-Pasiva: 1`*
 - En los **5xx**, `codigo` es un `ERR-xxxx` genérico (W-31: «informe al administrador este
   código»); el mismo `ERR-xxxx` queda en el log con la traza.
 - Algunos errores traen datos propios: `motivo` en `SESION_EXPIRADA`, `etapa` en
-  `ETAPA_INVALIDA` y `requisitos` en `CONTRASENA_NO_CUMPLE_POLITICA`.
+  `ETAPA_INVALIDA`, `requisitos` en `CONTRASENA_NO_CUMPLE_POLITICA`, `permitidos` en
+  `IMAGEN_FORMATO_NO_PERMITIDO` y `max_bytes` en `IMAGEN_DEMASIADO_PESADA`.
 
 | HTTP | `codigo` | Cuándo · qué hace el frontend |
 |---|---|---|
 | 400 | `PETICION_INVALIDA` | Petición mal formada |
-| 401 | `SESION_EXPIRADA` | Sin cookie, sesión cerrada o vencida → W-01. Con `motivo: "INACTIVIDAD"` → W-01d |
+| 401 | `SESION_EXPIRADA` | Sin cookie, sesión cerrada o vencida → W-01. Con `motivo: "INACTIVIDAD"` → W-01d; con `motivo: "DEMASIADOS_INTENTOS"`, la cuenta quedó bloqueada 15 min (p. ej. al 5.º código TOTP fallido) |
 | 401 | `AUTH_CREDENCIALES_INVALIDAS` | Login: correo o contraseña incorrectos, cuenta bloqueada, inactiva o eliminada (siempre el mismo) → W-01b |
 | 401 | `TOTP_CODIGO_INVALIDO` | `/auth/totp/verificar`: código incorrecto, vencido o ya usado → W-04b |
 | 403 | `AUTH_TEMPORAL_EXPIRADA` | Login con la temporal correcta pero vencida (72 h) → W-01e |
@@ -184,7 +185,7 @@ renueva la inactividad (10 min), salvo las que lleven **`X-Actividad-Pasiva: 1`*
 | 422 | `DATOS_INVALIDOS` | Falta un campo o tiene mal formato (ver `campos`) |
 | 422 | `CONTRASENA_NO_CUMPLE_POLITICA` | W-02b: trae `campos` y `requisitos` |
 | 422 | `TOTP_CODIGO_INVALIDO` | `/auth/totp/vincular`: el primer código no corresponde → W-03b |
-| 429 | `DEMASIADOS_INTENTOS` | Límite por IP en login y códigos (10/min); trae `Retry-After` |
+| 429 | `DEMASIADOS_INTENTOS` | Límite por IP (10/min) en login, cambio de contraseña y los tres de TOTP; trae `Retry-After` |
 | 5xx | `ERR-xxxx` | W-31 con ese código |
 
 **Etapas del inicio de sesión.**
@@ -230,6 +231,10 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
 | GET | `/admin/configuracion-inferencia` | `ADMINISTRADOR` | — | `{usar_umbral_por_caracteristica, umbral_global, rango, caracteristicas, actualizado_por, actualizado_en}` |
 | PUT | `/admin/configuracion-inferencia` | `ADMINISTRADOR` | `{usar_umbral_por_caracteristica, umbral_global, umbrales: [{caracteristica_id, umbral}]}` | igual que el GET |
+| POST | `/imagenes` | `DOCTOR` | multipart, campo `archivo` | `201 {imagen_id, nombre, formato, ancho, alto, peso_bytes, sha256, expira_en}` |
+| POST | `/analisis` | `DOCTOR` | `{imagen_id, tipo_documento, numero_documento, confirmacion_documento?}` | `202 {analisis: {id, codigo, estado, solicitado_en}}` |
+| GET | `/analisis/{id}/estado` | `DOCTOR` | — | `{estado, etapas, codigo_error?, calidad?, resultado_url?}` |
+| GET | `/analisis/{id}` | `DOCTOR` | — | resultado completo (ver «Imagen y análisis») |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
 - `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
@@ -252,6 +257,50 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - La consulta solo cuenta los casos del doctor que pregunta (propios o recibidos por
   traslado): no revela si el paciente tiene análisis con otros doctores (RF-H01 CA 5).
 - nginx limita `/pacientes/consulta` por IP (30/min) para que no se use para adivinar documentos.
+
+**Imagen y análisis.**
+
+- Dos pasos: `POST /imagenes` valida y guarda la imagen en el área temporal de MinIO
+  (`tmp/`, vence a los `IMAGEN_TEMPORAL_MINUTOS`); `POST /analisis` con el `imagen_id` crea
+  el análisis y lo encola. Un `imagen_id` sirve una sola vez.
+- La imagen se valida por sus bytes, no por el nombre ni el content-type: JPEG o PNG, hasta
+  10 MB, al menos 224 × 224 px. Se le quitan EXIF, ICC y textos incrustados, y se gira según
+  la orientación EXIF. El `nombre` solo vuelve en la respuesta; no se guarda.
+- `confirmacion_documento` solo hace falta si `/pacientes/consulta` dijo
+  `tiene_historial=false`: el doctor escribe el número dos veces (RF-D01 CA 12).
+- Código del análisis: `A-AAAA-NNNNNN` (año de Colombia, secuencia que no se repite).
+- `etapas` = `[{codigo, estado}]` con `ANONIMIZAR`, `CALIDAD`, `CLASIFICAR`, `GRAD_CAM` y
+  `estado` ∈ `LISTO | EN_CURSO | PENDIENTE | ERROR`. El polling va con `X-Actividad-Pasiva: 1`.
+- Calidad (etapa `CALIDAD`): nitidez (varianza del Laplaciano) ≥ 85, brillo 50–180 y menos
+  de 5 % de píxeles saturados. Si no cumple: `FALLIDO`, `codigo_error: "ERR-1001"` y
+  `calidad = {suficiente: false, causas, nitidez, brillo, saturados_pct}`, con `causas`
+  entre `BORROSA`, `OSCURA` y `MUY_CLARA_O_REFLEJOS` → W-07b.
+- `codigo_error` de un análisis fallido: `ERR-1001` calidad insuficiente, `ERR-1002`
+  servicio de inferencia no disponible (W-07c), `ERR-1003` cola no disponible, `ERR-1004`
+  error interno.
+- `GET /analisis/{id}`: `{id, codigo, estado, solicitado_en, completado_en, codigo_error,
+  modelo: {repositorio_hf, revision_sha, revision_corta}, imagen: {url, formato, ancho, alto},
+  mapa_calor: {url} | null, calidad, caracteristicas: [{id, codigo, nombre, probabilidad,
+  umbral_aplicado, supera_umbral}], ninguna_supera_umbral, regiones: [{orden,
+  caracteristica_id, caja: {x, y, ancho, alto}, area_porcentaje, confianza, mapa_calor_url}],
+  explicacion: {estado, texto, generada_en, intentos} | null, observaciones: [{id, es_mia,
+  valoracion, texto, autor, registrada_en}], realizado_por: {nombre, apellido,
+  cuenta_eliminada, es_propio}, trasladado: {desde, cuenta_eliminada, fecha} | null, aviso}`.
+  Características ordenadas por probabilidad; URL firmadas de 5 min.
+- Solo el doctor al que está asignado el caso (propio o recibido por traslado) ve el
+  análisis; para cualquier otro es `404`. El administrador recibe `403`.
+
+| HTTP | `codigo` | Cuándo · pantalla |
+|---|---|---|
+| 404 | `NO_ENCONTRADO` | `imagen_id` de otro doctor, o análisis ajeno o inexistente |
+| 410 | `IMAGEN_EXPIRADA` | La imagen temporal venció o ya se usó → cargarla de nuevo |
+| 413 | `IMAGEN_DEMASIADO_PESADA` | Más de 10 MB; trae `max_bytes` → W-06d |
+| 415 | `IMAGEN_FORMATO_NO_PERMITIDO` | No es JPEG ni PNG (DICOM incluido); trae `permitidos` → W-06c |
+| 422 | `IMAGEN_ILEGIBLE` | Archivo dañado o imagen desmesurada |
+| 422 | `IMAGEN_RESOLUCION_INSUFICIENTE` | Menos de 224 × 224; trae `minimo` |
+| 422 | `DOCUMENTO_INVALIDO` | Tipo o número mal escrito (`campos`) → W-06e |
+| 422 | `DOCUMENTO_NO_COINCIDE` | Paciente nuevo sin confirmación o con otro número → W-06k |
+| 503 | `SERVICIO_NO_DISPONIBLE` | No hay modelo vigente o la cola no responde |
 
 **Configuración de inferencia.**
 
@@ -288,9 +337,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
-**Planeados** (detalle en la especificación del equipo): perfil, gestión de usuarios,
-traslados, pacientes y análisis (`POST /analisis` → 202), explicación, observaciones,
-historial, reportes PDF, dashboards, configuración de inferencia, bitácora y monitoreo.
+**Planeados** (detalle en la especificación del equipo): clasificación y Grad-CAM en el
+worker (Space de Hugging Face), explicación, observaciones, historial, traslados del lado
+del doctor, reportes PDF, dashboards, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
@@ -303,6 +352,12 @@ probarlas sin base de datos (RNF-19).
   comunes, las obvias, las que llevan el correo o el nombre de la app, y las filtradas.
 - `auditoria.py`: bitácora con patrón Observador. El evento rechaza en `detalle` cualquier
   dato del paciente, resultado clínico o secreto.
+- `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la
+  limpieza de metadatos.
+- `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
+- `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
+  cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
+- `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
 
 Cuando un fallo debe quedar guardado antes de responder error (intentos fallidos), el
 servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
@@ -313,6 +368,8 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
   público firma URL con el host que alcanza el navegador (5 min de vigencia).
 - `llm.py`: Gemini (`google-genai`) con salida JSON, timeout de 15 s y sin reintentos
   automáticos. Rechaza cualquier imagen o mapa de calor en lo que se le envía.
+- `cola.py`: encola en Celery por nombre de tarea; si Redis no responde en 3 s, el análisis
+  queda `FALLIDO` (`ERR-1003`) y la API responde 503.
 - `filtraciones.py`: Have I Been Pwned por k-anonimato (solo sale el inicio del SHA-1). Si
   no responde, el cambio de contraseña no se bloquea.
 
@@ -320,12 +377,14 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
 
 Celery con Redis como intermediario. Comando en compose:
 `celery -A app.workers.celery_app worker --loglevel=info` (en Windows, `--pool=solo`).
-Las tareas de inferencia y explicación llegan con el módulo de análisis.
+Tarea `gastroia.procesar_analisis` (`app/workers/tareas.py`, con `acks_late`): revisa que
+la imagen siga sin metadatos (ANONIMIZAR) y mide la calidad (CALIDAD). La clasificación y
+el Grad-CAM con el Space de Hugging Face llegan en el siguiente módulo; mientras tanto el
+análisis queda en la etapa `CLASIFICAR`.
 
 ### 3.9 Tiempo real (SSE) y seguimiento del análisis
 
-No hay WebSocket. El tiempo real será con **SSE** en `GET /api/v1/eventos` (planeado, llega
-con el módulo de análisis): los eventos llevan **solo IDs**, se publican después del commit
+No hay WebSocket. El tiempo real será con **SSE** en `GET /api/v1/eventos` (planeado): los eventos llevan **solo IDs**, se publican después del commit
 y el worker los emite por Redis pub/sub. Además, mientras el análisis está `PROCESANDO`, el
 frontend puede consultar `GET /analisis/{id}/estado` con `X-Actividad-Pasiva: 1`, que no
 renueva la sesión; así el cierre
@@ -396,6 +455,8 @@ Lo que cambia del lado del backend:
 
 | Ruta | Destino | Notas |
 |---|---|---|
+| `/api/v1/auth/login`, `contrasena/cambiar` y `totp/*` | `api:8000` | Límite 10/min por IP (ráfaga 5) |
+| `/api/v1/pacientes/consulta` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
 | `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
 | `/` | `frontend:80` | SPA compilada |
 
