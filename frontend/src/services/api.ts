@@ -1,6 +1,13 @@
 // Cliente HTTP de la API (../ARCHITECTURE.md § 3.5). La sesión viaja en la cookie HttpOnly
 // `gastro_sesion`: el frontend nunca la lee ni la guarda, y no hay header Authorization.
-import type { EtapaSesion, HealthResponse, RespuestaEtapa, RespuestaSesion } from "../types";
+import type {
+  CampoConError,
+  EtapaSesion,
+  HealthResponse,
+  RequisitoContrasena,
+  RespuestaEtapa,
+  RespuestaSesion,
+} from "../types";
 import { CodigoErrorApi } from "./codigosError";
 
 const BASE = "/api/v1";
@@ -19,6 +26,10 @@ interface DetalleError {
   motivo?: string | null;
   /** `etapa` de ETAPA_INVALIDA: la etapa actual de la sesión. */
   etapa?: EtapaSesion | null;
+  /** Campos con error (por ejemplo `contrasena_nueva` o `confirmacion`). */
+  campos?: CampoConError[];
+  /** Requisitos de la política de contraseñas (CONTRASENA_NO_CUMPLE_POLITICA). */
+  requisitos?: RequisitoContrasena[];
 }
 
 /**
@@ -36,6 +47,8 @@ export class ErrorApi extends Error {
   readonly idSolicitud: string | null;
   readonly motivo: string | null;
   readonly etapa: EtapaSesion | null;
+  readonly campos: CampoConError[];
+  readonly requisitos: RequisitoContrasena[];
 
   constructor(estado: number | null, detalle: DetalleError = {}) {
     super(detalle.codigo ?? "Error de la API");
@@ -45,6 +58,8 @@ export class ErrorApi extends Error {
     this.idSolicitud = detalle.idSolicitud ?? null;
     this.motivo = detalle.motivo ?? null;
     this.etapa = detalle.etapa ?? null;
+    this.campos = detalle.campos ?? [];
+    this.requisitos = detalle.requisitos ?? [];
   }
 
   /**
@@ -94,6 +109,20 @@ function textoONulo(valor: unknown): string | null {
   return typeof valor === "string" ? valor : null;
 }
 
+function listaDe<T>(valor: unknown, esElemento: (x: unknown) => x is T): T[] {
+  return Array.isArray(valor) ? valor.filter(esElemento) : [];
+}
+
+function esCampoConError(x: unknown): x is CampoConError {
+  const c = x as Partial<CampoConError> | null;
+  return typeof c?.campo === "string" && typeof c?.mensaje === "string";
+}
+
+function esRequisito(x: unknown): x is RequisitoContrasena {
+  const r = x as Partial<RequisitoContrasena> | null;
+  return typeof r?.codigo === "string" && typeof r?.cumple === "boolean";
+}
+
 function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
   const detalle = (cuerpo as { error?: Record<string, unknown> } | null)?.error ?? {};
   return new ErrorApi(estado, {
@@ -101,6 +130,8 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     idSolicitud: textoONulo(detalle.id_solicitud),
     motivo: textoONulo(detalle.motivo),
     etapa: esEtapaSesion(detalle.etapa) ? detalle.etapa : null,
+    campos: listaDe(detalle.campos, esCampoConError),
+    requisitos: listaDe(detalle.requisitos, esRequisito),
   });
 }
 
@@ -157,6 +188,18 @@ export function login(correo: string, contrasena: string): Promise<RespuestaEtap
  */
 export function obtenerSesion(opciones: { pasiva?: boolean } = {}): Promise<RespuestaSesion> {
   return solicitar<RespuestaSesion>("/auth/sesion", { ...opciones, global: false });
+}
+
+/**
+ * POST /auth/contrasena/cambiar (W-02). Cambio obligatorio de la contraseña temporal. Responde
+ * la etapa que sigue (`VINCULAR_TOTP` o `PENDIENTE_2FA`). 422 CONTRASENA_NO_CUMPLE_POLITICA trae
+ * `campos` y `requisitos`.
+ */
+export function cambiarContrasena(contrasenaNueva: string, confirmacion: string): Promise<RespuestaEtapa> {
+  return solicitar<RespuestaEtapa>("/auth/contrasena/cambiar", {
+    metodo: "POST",
+    cuerpo: { contrasena_nueva: contrasenaNueva, confirmacion },
+  });
 }
 
 /**

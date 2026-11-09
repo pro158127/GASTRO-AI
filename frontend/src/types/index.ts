@@ -38,6 +38,18 @@ export interface RespuestaSesion {
   inactividad: Inactividad;
 }
 
+/** Requisito de la política de contraseñas (`requisitos` de CONTRASENA_NO_CUMPLE_POLITICA). */
+export interface RequisitoContrasena {
+  codigo: string;
+  cumple: boolean;
+}
+
+/** Campo con error del cuerpo de error (`campos`): `campo` es el nombre del campo del JSON. */
+export interface CampoConError {
+  campo: string;
+  mensaje: string;
+}
+
 /** Respuesta de `GET /health`. */
 export interface HealthResponse {
   status: "ok" | "degraded";

@@ -3,14 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Alerta from "../components/Alerta";
 import type { TipoAlerta } from "../components/Alerta";
-import AvisoExperimental from "../components/AvisoExperimental";
 import Boton from "../components/Boton";
 import CampoContrasena from "../components/CampoContrasena";
 import CampoTexto from "../components/CampoTexto";
-import Logo from "../components/Logo";
+import DisposicionAcceso from "../components/DisposicionAcceso";
 import { ErrorApi, login } from "../services/api";
 import { CodigoErrorApi } from "../services/codigosError";
-import { avisoDeError } from "../utils/avisosError";
+import { AVISO_DEMASIADOS_INTENTOS, avisoDeError, esDemasiadosIntentos } from "../utils/avisosError";
 import { borrarCierrePendiente } from "../sesion/cierrePendiente";
 import { useSesion } from "../sesion/ProveedorSesion";
 import type { MotivoCierre } from "../sesion/ProveedorSesion";
@@ -38,13 +37,6 @@ const AVISOS = {
     titulo: "Su contraseña temporal venció",
     mensaje:
       "Pasaron más de 72 horas desde que se generó. Pida una nueva al administrador de la plataforma.",
-  },
-  // No está en Figma (pendiente de agregar): 429 DEMASIADOS_INTENTOS (límite de 10 por minuto
-  // por IP en login y códigos; el servidor manda Retry-After: 60).
-  demasiadosIntentos: {
-    tipo: "advertencia",
-    titulo: "",
-    mensaje: "Demasiados intentos. Espere un minuto e intente de nuevo.",
   },
   // No está en Figma (pendiente de agregar): el servidor no confirmó el cierre de sesión.
   cierreSinConfirmar: {
@@ -77,11 +69,8 @@ const AVISO_POR_MOTIVO: Record<MotivoCierre, Aviso> = {
 };
 
 function avisoDesdeError(error: unknown): Aviso {
+  if (esDemasiadosIntentos(error)) return { tipo: "advertencia", ...AVISO_DEMASIADOS_INTENTOS };
   if (error instanceof ErrorApi) {
-    // El 429 puede venir de nginx sin cuerpo JSON, por eso también se mira el estado.
-    if (error.estado === 429 || error.codigo === CodigoErrorApi.DEMASIADOS_INTENTOS) {
-      return AVISOS.demasiadosIntentos;
-    }
     if (error.codigo === CodigoErrorApi.AUTH_TEMPORAL_EXPIRADA) return AVISOS.temporalVencida;
     if (
       error.codigo === CodigoErrorApi.AUTH_CREDENCIALES_INVALIDAS ||
@@ -146,9 +135,7 @@ export default function InicioSesion() {
   }
 
   return (
-    <main className={estilos.pagina}>
-      <Logo />
-      <div className={estilos.tarjeta}>
+    <DisposicionAcceso ancho={440}>
         <p className={estilos.descripcion}>
           Plataforma académica experimental de análisis endoscópico
         </p>
@@ -189,8 +176,6 @@ export default function InicioSesion() {
         <p className={estilos.ayuda}>
           ¿Olvidó su contraseña? Solicite el restablecimiento al administrador de la plataforma.
         </p>
-      </div>
-      <AvisoExperimental />
-    </main>
+    </DisposicionAcceso>
   );
 }

@@ -1,6 +1,7 @@
 // Estado de sesión en memoria. La sesión real vive en el servidor y viaja en la cookie HttpOnly
 // `gastro_sesion`; aquí solo se guarda lo que responde GET /auth/sesion (etapa, usuario e
-// inactividad). Nada se escribe en localStorage ni en sessionStorage.
+// inactividad). Nada se escribe en localStorage ni en sessionStorage, salvo la marca booleana de
+// «cierre de sesión pendiente» (ver cierrePendiente.ts), la única excepción permitida.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -47,6 +48,12 @@ interface ValorSesion {
    * ya no hay sesión. Lanza ErrorApi si falla por red o por el servidor.
    */
   refrescarSesion: () => Promise<EtapaSesion | null>;
+  /**
+   * Avanza a la etapa que respondió el servidor (y al usuario, si llegó con el ingreso a ACTIVA).
+   * Las guardas llevan a la pantalla de esa etapa. Después refresca `inactividad` con una consulta
+   * pasiva (no renueva la sesión): la que había guardada quedó vieja.
+   */
+  avanzarEtapa: (etapa: EtapaSesion, usuario?: UsuarioActual) => void;
   /**
    * Cierra la sesión en el servidor (POST /auth/logout) y, pase lo que pase con esa llamada
    * (sin conexión, error), también la local, para que nadie quede atrapado en una sesión que
@@ -129,6 +136,19 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     };
   }, [intento]);
 
+  const avanzarEtapa = useCallback((etapa: EtapaSesion, usuario?: UsuarioActual) => {
+    setEstado((previo) =>
+      previo.fase === "con_sesion"
+        ? { ...previo, etapa, usuario: usuario ?? previo.usuario }
+        : previo
+    );
+    obtenerSesion({ pasiva: true })
+      .then((respuesta) => setEstado(estadoDesdeRespuesta(respuesta)))
+      .catch(() => {
+        // Si falla, `inactividad` queda con el valor anterior hasta la próxima consulta.
+      });
+  }, []);
+
   // Evita dobles llamadas si se pulsa «Cerrar sesión» dos veces antes de que responda.
   const cerrandoRef = useRef(false);
   const cerrarSesion = useCallback(async () => {
@@ -184,10 +204,11 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       autenticado: conSesion?.etapa === "ACTIVA",
       motivoCierre,
       refrescarSesion,
+      avanzarEtapa,
       cerrarSesion,
       consumirMotivoCierre,
     };
-  }, [estado, motivoCierre, refrescarSesion, cerrarSesion, consumirMotivoCierre]);
+  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre]);
 
   let contenido: ReactNode = children;
   if (estado.fase === "cargando" || estado.fase === "error") {

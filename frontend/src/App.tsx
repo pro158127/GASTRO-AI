@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import DisposicionInterna from "./disposicion/DisposicionInterna";
 import { pantallas, tituloDePantalla } from "./navegacion/pantallas";
 import type { Pantalla } from "./navegacion/pantallas";
+import CambioContrasena from "./pages/CambioContrasena";
 import EtapaPendiente from "./pages/EtapaPendiente";
 import InicioSesion from "./pages/InicioSesion";
 import { ProveedorSesion } from "./sesion/ProveedorSesion";
@@ -33,12 +34,12 @@ export default function App() {
               </RutaPublica>
             }
           />
-          {/* TEMPORAL: reemplazar antes de la entrega (W-02, W-03 y W-04). */}
+          {/* TEMPORAL: reemplazar antes de la entrega (W-03 y W-04). */}
           <Route
             path="/cambiar-contrasena"
             element={
               <RutaEtapa etapa="CAMBIO_CONTRASENA">
-                <EtapaPendiente codigo="W-02" titulo="Cambio obligatorio de contraseña" />
+                <CambioContrasena />
               </RutaEtapa>
             }
           />
