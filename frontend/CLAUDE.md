@@ -102,11 +102,13 @@ Léelas antes de tocar `src/services/` o `src/types/`.
 - Solo existen los endpoints de `../ARCHITECTURE.md` § 3.5, bajo la base `/api/v1`. No hay
   WebSocket: el seguimiento del análisis se hace por HTTP (§ 3.9).
 - Las consultas automáticas (las que no son una acción del usuario, como el seguimiento de un
-  análisis en proceso) llevan el header `X-Actividad: pasiva`, para que no renueven la
+  análisis en proceso) llevan el header `X-Actividad-Pasiva: 1`, para que no renueven la
   inactividad de la sesión (`pasiva: true` en `solicitar` de `src/services/api.ts`).
-- Los errores de la API tienen la forma `{error: {codigo, mensaje, id_error}}`. Los textos
-  que ve el usuario salen de Figma y se eligen por `codigo`; el `mensaje` del servidor no se
-  muestra. W-31 muestra el `id_error`.
+- Los errores de la API tienen la forma `{error: {codigo, mensaje, id_solicitud}}`. Los
+  códigos viven en `src/services/codigosError.ts` (tabla de `../ARCHITECTURE.md` § 3.5);
+  no se escriben cadenas sueltas. Los textos que ve el usuario salen de Figma y se eligen
+  por `codigo`; el `mensaje` del servidor no se muestra. En los 5xx, `codigo` es un
+  `ERR-xxxx`: es el código de referencia que W-31 le pide dictar al administrador.
 - No inventes endpoints ni formatos de respuesta. Si una pantalla necesita datos que la API
   todavía no entrega, detente y pregunta antes de continuar.
 - Todas las llamadas pasan por `src/services/`; los componentes no llaman a `fetch`.
