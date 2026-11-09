@@ -1,0 +1,63 @@
+/* W-03: QR de 168 px e instrucciones en dos columnas; en pantallas angostas se apilan. */
+.qrEInstrucciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--espacio-6);
+}
+
+.marcoQr {
+  display: flex;
+  width: 168px;
+  height: 168px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-fondo-superficie);
+  border: var(--borde-grosor) solid var(--color-borde-campo);
+  border-radius: var(--radio-md);
+  overflow: hidden;
+}
+
+.qr {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cargandoQr {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+}
+
+.indicador {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+.pasos {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  min-width: 0;
+}
+
+.paso {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.clave {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+  overflow-wrap: anywhere;
+}

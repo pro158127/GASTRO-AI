@@ -20,6 +20,14 @@ export interface RespuestaEtapa {
   etapa: EtapaSesion;
 }
 
+/** Respuesta de `POST /auth/totp/vincular` y `POST /auth/totp/verificar`: la sesión queda ACTIVA. */
+export interface RespuestaIngreso {
+  etapa: EtapaSesion;
+  usuario: UsuarioActual;
+  /** El frontend la ignora: navega por rol a `/dashboard`. */
+  ruta_inicial: string;
+}
+
 /**
  * Inactividad de la sesión: segundos contados desde `ultima_actividad_en` (fecha ISO 8601 en
  * UTC) para el aviso del minuto 9 (`aviso_en_s`: 540) y el cierre (`cierre_en_s`: 600). W-05

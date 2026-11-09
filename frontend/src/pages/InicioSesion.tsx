@@ -66,6 +66,7 @@ const AVISO_POR_MOTIVO: Record<MotivoCierre, Aviso> = {
   cierre: AVISOS.cierre,
   cierre_sin_confirmar: AVISOS.cierreSinConfirmar,
   inactividad: AVISOS.inactividad,
+  credenciales: AVISOS.credenciales,
 };
 
 function avisoDesdeError(error: unknown): Aviso {

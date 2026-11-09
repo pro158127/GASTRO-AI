@@ -19,9 +19,11 @@ import PantallaEstadoSesion from "./PantallaEstadoSesion";
 /**
  * `cierre`: el servidor confirmó el cierre (W-01f). `cierre_sin_confirmar`: el servidor no
  * respondió; la sesión local se cerró pero la del servidor puede seguir viva. `inactividad`: el
- * servidor cerró la sesión por inactividad (W-01d).
+ * servidor cerró la sesión por inactividad (W-01d). `credenciales`: la sesión terminó mientras se
+ * pedía el código del segundo factor (por ejemplo, por el bloqueo tras 5 fallos): se muestra el
+ * mensaje genérico de W-01b, que no revela si la cuenta está bloqueada (nota de W-04b).
  */
-export type MotivoCierre = "cierre" | "cierre_sin_confirmar" | "inactividad";
+export type MotivoCierre = "cierre" | "cierre_sin_confirmar" | "inactividad" | "credenciales";
 
 type EstadoSesion =
   | { fase: "cargando" }
@@ -74,9 +76,13 @@ function esSinSesion(error: unknown): boolean {
   );
 }
 
-/** `motivo: "INACTIVIDAD"` en SESION_EXPIRADA: la sesión se cerró por inactividad. */
-function motivoDeExpiracion(motivo: string | null): MotivoCierre | null {
-  return motivo === "INACTIVIDAD" ? "inactividad" : null;
+/**
+ * SESION_EXPIRADA: `motivo: "INACTIVIDAD"` es W-01d. Sin motivo, durante el segundo factor, es
+ * el bloqueo de la cuenta (u otra causa que el servidor no revela): mensaje genérico de W-01b.
+ */
+function motivoDeExpiracion(motivo: string | null, etapa: EtapaSesion | null): MotivoCierre | null {
+  if (motivo === "INACTIVIDAD") return "inactividad";
+  return etapa === "VINCULAR_TOTP" || etapa === "PENDIENTE_2FA" ? "credenciales" : null;
 }
 
 function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
@@ -93,6 +99,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<EstadoSesion>({ fase: "cargando" });
   const [motivoCierre, setMotivoCierre] = useState<MotivoCierre | null>(null);
   const [intento, setIntento] = useState(0);
+  // Etapa actual para los manejadores globales, que se registran una sola vez.
+  const etapaRef = useRef<EtapaSesion | null>(null);
+  etapaRef.current = estado.fase === "con_sesion" ? estado.etapa : null;
 
   const refrescarSesion = useCallback(async (): Promise<EtapaSesion | null> => {
     try {
@@ -101,7 +110,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       return respuesta.etapa;
     } catch (error) {
       if (esSinSesion(error)) {
-        setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo));
+        setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo, etapaRef.current));
         setEstado({ fase: "sin_sesion" });
         return null;
       }
@@ -127,7 +136,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       .catch((error: unknown) => {
         if (!vigente) return;
         if (esSinSesion(error)) {
-          setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo));
+          setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo, null));
           setEstado({ fase: "sin_sesion" });
         } else setEstado({ fase: "error", error: error instanceof ErrorApi ? error : null });
       });
@@ -178,7 +187,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(() => {
     registrarManejadoresGlobales({
       alSinSesion: (motivo) => {
-        setMotivoCierre(motivoDeExpiracion(motivo));
+        setMotivoCierre(motivoDeExpiracion(motivo, etapaRef.current));
         setEstado({ fase: "sin_sesion" });
       },
       // La sesión sigue activa; solo se informa.

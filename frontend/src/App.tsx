@@ -3,8 +3,9 @@ import DisposicionInterna from "./disposicion/DisposicionInterna";
 import { pantallas, tituloDePantalla } from "./navegacion/pantallas";
 import type { Pantalla } from "./navegacion/pantallas";
 import CambioContrasena from "./pages/CambioContrasena";
-import EtapaPendiente from "./pages/EtapaPendiente";
 import InicioSesion from "./pages/InicioSesion";
+import VerificarCodigo from "./pages/VerificarCodigo";
+import VincularAplicacion from "./pages/VincularAplicacion";
 import { ProveedorSesion } from "./sesion/ProveedorSesion";
 import RutaEtapa from "./sesion/RutaEtapa";
 import RutaPorRol from "./sesion/RutaPorRol";
@@ -34,7 +35,6 @@ export default function App() {
               </RutaPublica>
             }
           />
-          {/* TEMPORAL: reemplazar antes de la entrega (W-03 y W-04). */}
           <Route
             path="/cambiar-contrasena"
             element={
@@ -47,7 +47,7 @@ export default function App() {
             path="/vincular-aplicacion"
             element={
               <RutaEtapa etapa="VINCULAR_TOTP">
-                <EtapaPendiente codigo="W-03" titulo="Vincular app autenticadora" />
+                <VincularAplicacion />
               </RutaEtapa>
             }
           />
@@ -55,7 +55,7 @@ export default function App() {
             path="/verificar-codigo"
             element={
               <RutaEtapa etapa="PENDIENTE_2FA">
-                <EtapaPendiente codigo="W-04" titulo="Código del segundo factor" />
+                <VerificarCodigo />
               </RutaEtapa>
             }
           />

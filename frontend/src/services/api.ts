@@ -6,6 +6,7 @@ import type {
   HealthResponse,
   RequisitoContrasena,
   RespuestaEtapa,
+  RespuestaIngreso,
   RespuestaSesion,
 } from "../types";
 import { CodigoErrorApi } from "./codigosError";
@@ -200,6 +201,44 @@ export function cambiarContrasena(contrasenaNueva: string, confirmacion: string)
     metodo: "POST",
     cuerpo: { contrasena_nueva: contrasenaNueva, confirmacion },
   });
+}
+
+/** Lo que W-03 muestra para vincular la app. Es un secreto: no se guarda ni se escribe en consola. */
+export interface VinculacionTotp {
+  /** Clave en grupos de 4 para «¿No puede escanear?». */
+  secretoManual: string;
+  /** PNG en Base64, SIN el prefijo `data:`. Validar con `urlDeQrPng` antes de mostrarlo. */
+  qrPngBase64: string;
+}
+
+/**
+ * POST /auth/totp/iniciar (W-03). Genera un secreto NUEVO cada vez que se llama (mientras no esté
+ * vinculado): no se debe llamar dos veces para una misma pantalla. `otpauth_uri` también contiene
+ * el secreto, así que se descarta aquí y no sale de esta función.
+ */
+export async function iniciarVinculacionTotp(): Promise<VinculacionTotp> {
+  const respuesta = await solicitar<{ secreto_manual: string; qr_png_base64: string }>(
+    "/auth/totp/iniciar",
+    { metodo: "POST" }
+  );
+  return { secretoManual: respuesta.secreto_manual, qrPngBase64: respuesta.qr_png_base64 };
+}
+
+/**
+ * POST /auth/totp/vincular (W-03). Primer código válido: la app queda vinculada y la sesión,
+ * ACTIVA. 422 TOTP_CODIGO_INVALIDO si el código no corresponde; 409 TOTP_NO_INICIADO si no se
+ * llamó antes a /totp/iniciar.
+ */
+export function vincularTotp(codigo: string): Promise<RespuestaIngreso> {
+  return solicitar<RespuestaIngreso>("/auth/totp/vincular", { metodo: "POST", cuerpo: { codigo } });
+}
+
+/**
+ * POST /auth/totp/verificar (W-04). Código en cada ingreso de una cuenta con la app ya vinculada.
+ * 401 TOTP_CODIGO_INVALIDO si es incorrecto, vencido o ya usado.
+ */
+export function verificarTotp(codigo: string): Promise<RespuestaIngreso> {
+  return solicitar<RespuestaIngreso>("/auth/totp/verificar", { metodo: "POST", cuerpo: { codigo } });
 }
 
 /**
