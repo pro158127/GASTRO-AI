@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     hf_revision: str = ""  # SHA fijo, nunca «main»: luego cambian el modelo y nadie sabe qué pasó
     hf_sha256: str = ""  # huella de los pesos, pa que no nos den gato por liebre
     http_timeout_seconds: float = 30.0
+    # Space de mentiras pa desarrollo mientras ML publica el de verdad. Solo funciona con
+    # ENVIRONMENT=development; en cualquier otro ambiente el worker se niega a arrancar.
+    hf_simulado: bool = False
 
     # El primer admin, lo crea la carga inicial (RF-U07 CA 6). Sin él no entra ni Dios
     admin_correo: str = ""

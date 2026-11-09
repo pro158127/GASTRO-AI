@@ -108,7 +108,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | Base de datos y cola | `DATABASE_URL`, `REDIS_URL` |
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
-| Modelo | `HF_SPACE_URL`, `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256` |
+| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
 | Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
 | Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
 | Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |
@@ -337,8 +337,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
-**Planeados** (detalle en la especificación del equipo): clasificación y Grad-CAM en el
-worker (Space de Hugging Face), explicación, observaciones, historial, traslados del lado
+**Planeados** (detalle en la especificación del equipo): explicación, observaciones, historial, traslados del lado
 del doctor, reportes PDF, dashboards, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
@@ -358,6 +357,8 @@ probarlas sin base de datos (RNF-19).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
+- `clasificacion.py`: llama al Space, comprueba la revisión, sube los mapas de calor, aplica
+  la estrategia de umbral (`politica_umbral.py`) y copia el umbral en cada resultado.
 
 Cuando un fallo debe quedar guardado antes de responder error (intentos fallidos), el
 servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
@@ -368,6 +369,8 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
   público firma URL con el host que alcanza el navegador (5 min de vigencia).
 - `llm.py`: Gemini (`google-genai`) con salida JSON, timeout de 15 s y sin reintentos
   automáticos. Rechaza cualquier imagen o mapa de calor en lo que se le envía.
+- `inferencia.py`: Space privado de Hugging Face por HTTPS con token (contrato abajo) y un
+  simulador solo para desarrollo (`HF_SIMULADO=true`).
 - `cola.py`: encola en Celery por nombre de tarea; si Redis no responde en 3 s, el análisis
   queda `FALLIDO` (`ERR-1003`) y la API responde 503.
 - `filtraciones.py`: Have I Been Pwned por k-anonimato (solo sale el inicio del SHA-1). Si
@@ -377,10 +380,38 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
 
 Celery con Redis como intermediario. Comando en compose:
 `celery -A app.workers.celery_app worker --loglevel=info` (en Windows, `--pool=solo`).
-Tarea `gastroia.procesar_analisis` (`app/workers/tareas.py`, con `acks_late`): revisa que
-la imagen siga sin metadatos (ANONIMIZAR) y mide la calidad (CALIDAD). La clasificación y
-el Grad-CAM con el Space de Hugging Face llegan en el siguiente módulo; mientras tanto el
-análisis queda en la etapa `CLASIFICAR`.
+Tarea `gastroia.procesar_analisis` (`app/workers/tareas.py`, con `acks_late`), etapa por
+etapa:
+
+1. **ANONIMIZAR:** revisa que la imagen guardada siga sin metadatos.
+2. **CALIDAD:** nitidez, brillo y reflejos; si no cumple, `FALLIDO` con `ERR-1001`.
+3. **CLASIFICAR:** llama al Space (30 s). Si no responde, tarda, contesta fuera del contrato,
+   trae otra revisión del modelo (RNF-29) o no trae exactamente las características activas:
+   `FALLIDO` con `ERR-1002` (W-07c).
+4. **GRAD_CAM:** decodifica los mapas y los sube a MinIO (`mapas/{analisis}/{codigo}-{orden}.png`),
+   guarda resultados (con el umbral de ese momento) y regiones, y deja el análisis `COMPLETADO`.
+
+Cada inferencia deja un renglón en `LogInferencia` (estado `EXITO`, `ERROR` o
+`TIEMPO_AGOTADO`, latencia y el motivo técnico), sin datos clínicos (RF-M03).
+
+**Contrato con el Space de Hugging Face** (lo implementa el equipo de ML):
+
+```
+POST {HF_SPACE_URL}/clasificar
+Authorization: Bearer {HF_TOKEN}
+multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
+
+200 {"revision_sha": "<40 hex>", "latencia_ms": 1840,
+     "caracteristicas": [{"codigo": "ATROFIA", "probabilidad": 0.8734,
+       "regiones": [{"x": 0.31, "y": 0.22, "ancho": 0.18, "alto": 0.20,
+                     "area_pct": 14.2, "mapa_calor_base64": "<PNG en Base64>"}]}]}
+```
+
+- Códigos de característica iguales a los del catálogo (`ATROFIA`, `GASTRITIS`, `HPYLORI`).
+- Probabilidades y caja de 0 a 1 (caja relativa a la imagen), `area_pct` de 0 a 100,
+  hasta 10 regiones por característica, mapas en PNG.
+- `revision_sha` = el commit cargado en el Space; debe ser igual a `HF_REVISION`.
+- El Space debe ser privado y no guardar ni registrar las imágenes (RNF-30).
 
 ### 3.9 Tiempo real (SSE) y seguimiento del análisis
 

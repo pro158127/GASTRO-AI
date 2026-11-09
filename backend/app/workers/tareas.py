@@ -8,19 +8,31 @@ from uuid import UUID
 
 from app.adapters.almacen import crear_almacen
 from app.adapters.cola import TAREA_PROCESAR_ANALISIS
+from app.adapters.inferencia import crear_inferencia
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.repositories.analisis_repository import RepositorioAnalisis
+from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.unidad_trabajo import UnidadTrabajo
+from app.services.clasificacion import ServicioClasificacion
 from app.services.procesamiento import ServicioProcesamiento
 from app.workers.celery_app import celery_app
 
 
 # acks_late: si el worker se muere a la mitad, Redis le devuelve el mensaje a otro.
-# No pasa nada por repetir: procesar() ignora lo que ya no está PROCESANDO.
+# Lo que ya terminó no se toca; lo que seguía PROCESANDO se retoma desde el principio.
 @celery_app.task(name=TAREA_PROCESAR_ANALISIS, acks_late=True)
 def procesar_analisis(analisis_id: str) -> None:
+    ajustes = get_settings()
     with SessionLocal() as db:
-        ServicioProcesamiento(
-            RepositorioAnalisis(db), crear_almacen(get_settings()), UnidadTrabajo(db)
-        ).procesar(UUID(analisis_id))
+        almacen = crear_almacen(ajustes)
+        analisis, catalogo, unidad = (
+            RepositorioAnalisis(db),
+            RepositorioCatalogo(db),
+            UnidadTrabajo(db),
+        )
+        codigos = tuple(c.codigo for c in catalogo.caracteristicas_activas())
+        clasificador = ServicioClasificacion(
+            crear_inferencia(ajustes, codigos), almacen, analisis, catalogo, unidad
+        )
+        ServicioProcesamiento(analisis, almacen, unidad, clasificador).procesar(UUID(analisis_id))

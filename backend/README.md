@@ -82,6 +82,10 @@ python -c "import base64, secrets; print(base64.b64encode(secrets.token_bytes(32
   (`{"1": "...", "2": "..."}`) y se sube `HMAC_VERSION_ACTUAL`; la anterior se conserva.
 - Si se pierde `TOTP_CLAVE_CIFRADO`, todos los usuarios deben volver a vincular su app.
 - `HF_REVISION` es un commit SHA de 40 caracteres, nunca una rama (RNF-29).
+- Mientras no exista el Space de Hugging Face, `HF_SIMULADO=true` hace que el worker
+  invente resultados estables (misma imagen, mismo resultado) y un mapa de calor de prueba.
+  Solo funciona con `ENVIRONMENT=development`; sin eso y sin `HF_SPACE_URL`, los análisis
+  quedan `FALLIDO` con `ERR-1002`. Tras cambiarla: `docker compose up -d worker`.
 
 ## Estilo
 

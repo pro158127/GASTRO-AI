@@ -4,9 +4,9 @@ Cada etapa se confirma apenas empieza, así el polling de GET /analisis/{id}/est
 avance real. Si algo falla, el análisis queda FALLIDO con un código del catálogo
 (`CodigoFalla`) y la etapa donde tronó; la traza va solo al log (CWE-209).
 
-Módulo 6: ANONIMIZAR y CALIDAD. La CLASIFICACIÓN y el GRAD_CAM (Space de Hugging Face)
-llegan en el módulo 7 como `clasificador`; mientras no exista, el análisis se queda en
-CLASIFICAR esperando.
+ANONIMIZAR y CALIDAD viven aquí; CLASIFICAR y GRAD_CAM (Space de Hugging Face) los hace
+el `clasificador` que se inyecta (services/clasificacion.py). Sin clasificador, el análisis
+se queda en CLASIFICAR (así se prueban las primeras etapas solas).
 """
 
 import io
@@ -28,7 +28,7 @@ from app.services.verificadores_imagen import ImagenCandidata, VerificadorFormat
 
 log = logging.getLogger("gastroia.worker")
 
-# Recibe el análisis y la imagen limpia; guarda resultados o truena (módulo 7)
+# Recibe el análisis y la imagen limpia; guarda resultados o truena (services/clasificacion.py)
 Clasificador = Callable[[Analisis, bytes], None]
 
 
