@@ -235,6 +235,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/analisis` | `DOCTOR` | `{imagen_id, tipo_documento, numero_documento, confirmacion_documento?}` | `202 {analisis: {id, codigo, estado, solicitado_en}}` |
 | GET | `/analisis/{id}/estado` | `DOCTOR` | — | `{estado, etapas, codigo_error?, calidad?, resultado_url?}` |
 | GET | `/analisis/{id}` | `DOCTOR` | — | resultado completo (ver «Imagen y análisis») |
+| POST | `/analisis/{id}/reintento` | `DOCTOR` | — | `202 {analisis: {id, codigo, estado, solicitado_en}}` |
+| GET | `/analisis/{id}/explicacion` | `DOCTOR` | — | `{estado, texto?, generada_en?, codigo_error?, mensaje?, intentos, puede_reintentar}` |
+| POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
 - `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
@@ -301,6 +304,23 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DOCUMENTO_INVALIDO` | Tipo o número mal escrito (`campos`) → W-06e |
 | 422 | `DOCUMENTO_NO_COINCIDE` | Paciente nuevo sin confirmación o con otro número → W-06k |
 | 503 | `SERVICIO_NO_DISPONIBLE` | No hay modelo vigente o la cola no responde |
+| 409 | `NO_REINTENTABLE` | `/reintento` de un análisis que no está `FALLIDO`, o que falló por calidad (`ERR-1001`: cargar otra imagen) |
+
+**Explicación (Gemini).**
+
+- Llega después del resultado y no lo bloquea (RF-R05 CA 3): el análisis queda `COMPLETADO`
+  aunque Gemini falle. Polling de `GET /analisis/{id}/explicacion` con `X-Actividad-Pasiva: 1`
+  hasta que salga de `PENDIENTE` (máximo 15 s) → W-08c.
+- `estado` ∈ `PENDIENTE | GENERADA | FALLIDA | RECHAZADA`. `FALLIDA` (`ERR-3001`: Gemini no
+  respondió o tardó más de 15 s) y `RECHAZADA` (`ERR-3002`: el texto no pasó la validación)
+  traen `mensaje` estándar y `puede_reintentar` → W-08d.
+- A Gemini solo le llegan nombre, probabilidad y umbral en %, si lo supera, y cada región
+  descrita en palabras («zona superior izquierda») con su % del área. Nunca la imagen, los
+  mapas ni coordenadas (RF-R05 CA 2). Eso mismo queda en `ExplicacionLlm.datos_enviados`.
+- Antes de mostrarse, el texto se valida: entre 40 y 1500 caracteres, sin porcentajes que no
+  estén en los datos y sin términos como cáncer, tratamiento o biopsia.
+- Reintento: máximo 3 intentos en total. `409 EXPLICACION_NO_REINTENTABLE` si ya está
+  `GENERADA` o sigue `PENDIENTE`; `429 REINTENTOS_AGOTADOS` (trae `max_intentos`) al tercero.
 
 **Configuración de inferencia.**
 
@@ -337,7 +357,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
-**Planeados** (detalle en la especificación del equipo): explicación, observaciones, historial, traslados del lado
+**Planeados** (detalle en la especificación del equipo): observaciones, historial, traslados del lado
 del doctor, reportes PDF, dashboards, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
@@ -357,6 +377,7 @@ probarlas sin base de datos (RNF-19).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
+- `explicacion.py`: arma el resumen para Gemini, valida el texto y maneja los reintentos.
 - `clasificacion.py`: llama al Space, comprueba la revisión, sube los mapas de calor, aplica
   la estrategia de umbral (`politica_umbral.py`) y copia el umbral en cada resultado.
 
@@ -390,6 +411,8 @@ etapa:
    `FALLIDO` con `ERR-1002` (W-07c).
 4. **GRAD_CAM:** decodifica los mapas y los sube a MinIO (`mapas/{analisis}/{codigo}-{orden}.png`),
    guarda resultados (con el umbral de ese momento) y regiones, y deja el análisis `COMPLETADO`.
+5. **Explicación:** con el resultado ya guardado, pide el texto a Gemini (15 s) y lo valida.
+   Los reintentos (ANA-04) van por la tarea `gastroia.explicar_analisis`.
 
 Cada inferencia deja un renglón en `LogInferencia` (estado `EXITO`, `ERROR` o
 `TIEMPO_AGOTADO`, latencia y el motivo técnico), sin datos clínicos (RF-M03).

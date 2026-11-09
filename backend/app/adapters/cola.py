@@ -11,6 +11,7 @@ from uuid import UUID
 from celery import Celery
 
 TAREA_PROCESAR_ANALISIS = "gastroia.procesar_analisis"
+TAREA_EXPLICAR_ANALISIS = "gastroia.explicar_analisis"  # reintentos de la explicación (ANA-04)
 
 
 class ErrorCola(Exception):
@@ -20,14 +21,22 @@ class ErrorCola(Exception):
 class Cola(Protocol):
     def encolar_analisis(self, analisis_id: UUID) -> None: ...
 
+    def encolar_explicacion(self, analisis_id: UUID) -> None: ...
+
 
 class ColaCelery:
     def __init__(self, app: Celery) -> None:
         self._app = app
 
     def encolar_analisis(self, analisis_id: UUID) -> None:
+        self._enviar(TAREA_PROCESAR_ANALISIS, analisis_id)
+
+    def encolar_explicacion(self, analisis_id: UUID) -> None:
+        self._enviar(TAREA_EXPLICAR_ANALISIS, analisis_id)
+
+    def _enviar(self, tarea: str, analisis_id: UUID) -> None:
         try:
             # retry=False: si Redis está caído preferimos saberlo ya, no a los 30 s
-            self._app.send_task(TAREA_PROCESAR_ANALISIS, args=[str(analisis_id)], retry=False)
+            self._app.send_task(tarea, args=[str(analisis_id)], retry=False)
         except Exception as error:  # kombu tira de todo: OperationalError, ConnectionError…
             raise ErrorCola("No se pudo encolar el análisis.") from error

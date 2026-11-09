@@ -10,7 +10,8 @@ from fastapi import APIRouter
 
 from app.api.deps import ServicioDeAnalisis, SesionDoctor
 from app.core.config import get_settings
-from app.models import Analisis, EstadoAnalisis, EstadoUsuario
+from app.core.errores import ErrorApi
+from app.models import Analisis, EstadoAnalisis, EstadoExplicacion, EstadoUsuario
 from app.schemas.analisis import (
     AnalisisCreado,
     AnalisisResumen,
@@ -21,6 +22,8 @@ from app.schemas.analisis import (
     EstadoAnalisisSalida,
     Etapa,
     Explicacion,
+    ExplicacionEstado,
+    ExplicacionReintentada,
     ImagenAnalisis,
     MapaCalor,
     ModeloUsado,
@@ -33,6 +36,7 @@ from app.schemas.analisis import (
 from app.schemas.catalogo import Persona
 from app.schemas.errores import RespuestaError
 from app.services.analisis import DetalleAnalisis, SolicitudAnalisis, etapas_de
+from app.services.explicacion import MENSAJE_NO_DISPONIBLE
 
 router = APIRouter(prefix="/analisis", tags=["análisis"])
 
@@ -62,6 +66,10 @@ def solicitar(
             confirmacion_documento=entrada.confirmacion_documento,
         ),
     )
+    return _creado(analisis)
+
+
+def _creado(analisis: Analisis) -> AnalisisCreado:
     return AnalisisCreado(
         analisis=AnalisisResumen(
             id=analisis.id,
@@ -70,6 +78,62 @@ def solicitar(
             solicitado_en=analisis.solicitado_en,
         )
     )
+
+
+@router.post(
+    "/{analisis_id}/reintento",
+    status_code=202,
+    response_model=AnalisisCreado,
+    responses=_errores(404, 409, 503),
+)
+def reintentar(analisis_id: UUID, sesion: SesionDoctor, servicio: ServicioDeAnalisis):
+    """Botón «Reintentar» de W-07c: vuelve a encolar el análisis FALLIDO, mismo código.
+
+    409 NO_REINTENTABLE si no está FALLIDO o si falló por calidad (ERR-1001: cargar otra).
+    """
+    return _creado(servicio.reintentar(sesion.usuario.id, analisis_id))
+
+
+@router.get(
+    "/{analisis_id}/explicacion",
+    response_model=ExplicacionEstado,
+    response_model_exclude_none=True,
+    responses=_errores(404),
+)
+def explicacion(analisis_id: UUID, sesion: SesionDoctor, servicio: ServicioDeAnalisis):
+    """Polling de la explicación (W-08c) con `X-Actividad-Pasiva: 1`; parar al salir de
+    PENDIENTE o a los 15 s. FALLIDA y RECHAZADA traen `mensaje` y `puede_reintentar` (W-08d).
+    """
+    analisis, exp = servicio.explicacion(sesion.usuario.id, analisis_id)
+    if exp is None:
+        if analisis.estado is EstadoAnalisis.FALLIDO:  # sin resultado no hay qué explicar
+            raise ErrorApi(404, "NO_ENCONTRADO", "Este análisis no tiene explicación.")
+        return ExplicacionEstado(estado=EstadoExplicacion.PENDIENTE.value)
+    fallo = exp.estado in (EstadoExplicacion.FALLIDA, EstadoExplicacion.RECHAZADA)
+    return ExplicacionEstado(
+        estado=exp.estado.value,
+        texto=exp.texto,
+        generada_en=exp.generada_en,
+        codigo_error=exp.codigo_error,
+        mensaje=MENSAJE_NO_DISPONIBLE if fallo else None,
+        intentos=exp.intentos,
+        puede_reintentar=servicio.puede_reintentar_explicacion(exp),
+    )
+
+
+@router.post(
+    "/{analisis_id}/explicacion/reintentar",
+    status_code=202,
+    response_model=ExplicacionReintentada,
+    responses=_errores(404, 409, 429, 503),
+)
+def reintentar_explicacion(analisis_id: UUID, sesion: SesionDoctor, servicio: ServicioDeAnalisis):
+    """Botón «Reintentar» de W-08d. Máximo 3 intentos en total.
+
+    409 EXPLICACION_NO_REINTENTABLE (ya GENERADA o PENDIENTE) · 429 REINTENTOS_AGOTADOS.
+    """
+    exp = servicio.reintentar_explicacion(sesion.usuario.id, analisis_id)
+    return ExplicacionReintentada(estado=exp.estado.value, intentos=exp.intentos)
 
 
 def _calidad(analisis: Analisis) -> CalidadDetalle:

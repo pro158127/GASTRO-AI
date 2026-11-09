@@ -172,3 +172,20 @@ class AnalisisSalida(BaseModel):
     realizado_por: RealizadoPor
     trasladado: Trasladado | None
     aviso: Aviso = Aviso(**AVISO_EXPERIMENTAL)
+
+
+class ExplicacionEstado(BaseModel):
+    """GET /analisis/{id}/explicacion (W-08c, W-08d). Lo que no aplica no se manda."""
+
+    estado: str = Field(examples=["GENERADA"])
+    texto: str | None = None
+    generada_en: datetime | None = None
+    codigo_error: str | None = Field(default=None, examples=["ERR-3001"])
+    mensaje: str | None = None  # el estándar de indisponibilidad (RF-R05 CA 5)
+    intentos: int = 1
+    puede_reintentar: bool = False
+
+
+class ExplicacionReintentada(BaseModel):
+    estado: str = Field(examples=["PENDIENTE"])
+    intentos: int = Field(examples=[2])

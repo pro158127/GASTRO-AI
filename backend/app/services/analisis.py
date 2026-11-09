@@ -26,12 +26,14 @@ from app.models import (
     CasoPaciente,
     EstadoAnalisis,
     EtapaProceso,
+    ExplicacionLlm,
     FormatoImagen,
     Traslado,
     Usuario,
 )
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.unidad_trabajo import UnidadTrabajo
+from app.services.explicacion import ServicioExplicaciones
 from app.services.imagenes import ServicioImagenes
 from app.services.pacientes import documento_normalizado
 
@@ -138,6 +140,8 @@ class ServicioAnalisis:
         self._cola = cola
         self._unidad = unidad
         self._reloj = reloj
+        # En la API no se llama a Gemini: solo se consulta y se reabre (redactor=None)
+        self._explicaciones = ServicioExplicaciones(repositorio, None, unidad, "", reloj)
 
     def solicitar(self, doctor: Usuario, solicitud: SolicitudAnalisis) -> Analisis:
         valor = documento_normalizado(solicitud.tipo_documento, solicitud.numero_documento)
@@ -196,7 +200,10 @@ class ServicioAnalisis:
         )
         self._repo.agregar(analisis)
         self._unidad.confirmar()  # suelta el candado
+        self._encolar_o_fallar(analisis)
+        return analisis
 
+    def _encolar_o_fallar(self, analisis: Analisis) -> None:
         try:
             self._cola.encolar_analisis(analisis.id)
         except ErrorCola:
@@ -207,12 +214,7 @@ class ServicioAnalisis:
             analisis.etapa_proceso = EtapaProceso.ANONIMIZAR
             analisis.codigo_error = CodigoFalla.COLA_NO_DISPONIBLE.value
             self._unidad.confirmar()
-            raise ErrorApi(
-                503,
-                "SERVICIO_NO_DISPONIBLE",
-                "El servicio de análisis no está disponible. Intente de nuevo en unos minutos.",
-            ) from None
-        return analisis
+            raise _servicio_no_disponible() from None
 
     def obtener(self, doctor_id: UUID, analisis_id: UUID) -> DetalleAnalisis:
         analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
@@ -222,6 +224,47 @@ class ServicioAnalisis:
             else None
         )
         return DetalleAnalisis(analisis, traslado)
+
+    def reintentar(self, doctor_id: UUID, analisis_id: UUID) -> Analisis:
+        """ANA-05 (W-07c): vuelve a encolar un análisis FALLIDO con la misma imagen y código.
+
+        No aplica a la calidad insuficiente (ERR-1001): la misma imagen fallaría igual; ahí
+        el doctor carga otra. Responde 409 NO_REINTENTABLE.
+        """
+        analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
+        if (
+            analisis.estado is not EstadoAnalisis.FALLIDO
+            or analisis.codigo_error == CodigoFalla.CALIDAD_INSUFICIENTE.value
+        ):
+            raise ErrorApi(409, "NO_REINTENTABLE", "Este análisis no se puede reintentar.")
+        analisis.estado = EstadoAnalisis.PROCESANDO
+        analisis.etapa_proceso = None
+        analisis.codigo_error = None
+        self._unidad.confirmar()
+        self._encolar_o_fallar(analisis)
+        return analisis
+
+    def explicacion(
+        self, doctor_id: UUID, analisis_id: UUID
+    ) -> tuple[Analisis, ExplicacionLlm | None]:
+        analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
+        return analisis, analisis.explicacion
+
+    def reintentar_explicacion(self, doctor_id: UUID, analisis_id: UUID) -> ExplicacionLlm:
+        """ANA-04 (W-08d): reabre la explicación y la encola con los mismos datos_enviados."""
+        analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
+        explicacion = self._explicaciones.reintentar(analisis)
+        try:
+            self._cola.encolar_explicacion(analisis.id)
+        except ErrorCola:
+            log.exception("No se pudo encolar la explicación de %s", analisis.id)
+            self._explicaciones.marcar_fallida(explicacion)
+            raise _servicio_no_disponible() from None
+        return explicacion
+
+    @staticmethod
+    def puede_reintentar_explicacion(explicacion: ExplicacionLlm) -> bool:
+        return ServicioExplicaciones.puede_reintentar(explicacion)
 
     def url_firmada(self, clave: str) -> str:
         return self._almacen.url_firmada(clave)
@@ -237,6 +280,14 @@ class ServicioAnalisis:
         )
         if confirmacion != valor:
             raise _no_coincide()
+
+
+def _servicio_no_disponible() -> ErrorApi:
+    return ErrorApi(
+        503,
+        "SERVICIO_NO_DISPONIBLE",
+        "El servicio de análisis no está disponible. Intente de nuevo en unos minutos.",
+    )
 
 
 def _no_coincide() -> ErrorApi:

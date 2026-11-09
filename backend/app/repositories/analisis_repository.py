@@ -2,13 +2,17 @@
 
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, or_, select, text, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.seudonimo import Seudonimo
 from app.models import (
     Analisis,
     CasoPaciente,
+    EstadoExplicacion,
+    EstadoInferencia,
+    ExplicacionLlm,
+    LogInferencia,
     ModeloDesplegado,
     ObservacionProfesional,
     ResultadoCaracteristica,
@@ -105,3 +109,41 @@ class RepositorioAnalisis:
             .order_by(Traslado.ejecutado_en.desc())
             .limit(1)
         )
+
+    def reabrir_explicacion(self, explicacion_id: UUID, max_intentos: int) -> bool:
+        """FALLIDA/RECHAZADA → PENDIENTE con intentos + 1, en un solo UPDATE (ANA-04).
+
+        Las condiciones van en el WHERE: si dos reintentos llegan juntos, solo uno cambia la
+        fila y el otro recibe False. El objeto en memoria se refresca con lo que quedó.
+        """
+        cambiado = self.db.scalar(
+            update(ExplicacionLlm)
+            .where(
+                ExplicacionLlm.id == explicacion_id,
+                ExplicacionLlm.estado.in_([EstadoExplicacion.FALLIDA, EstadoExplicacion.RECHAZADA]),
+                ExplicacionLlm.intentos < max_intentos,
+            )
+            .values(
+                estado=EstadoExplicacion.PENDIENTE,
+                intentos=ExplicacionLlm.intentos + 1,
+                texto=None,
+                codigo_error=None,
+            )
+            .returning(ExplicacionLlm.id)
+            .execution_options(synchronize_session="fetch")
+        )
+        return cambiado is not None
+
+    def registrar_latencia_llm(self, analisis_id: UUID, latencia_ms: int) -> None:
+        """Anota cuánto tardó Gemini en el último renglón EXITO del log (RF-M03)."""
+        ultimo = self.db.scalar(
+            select(LogInferencia)
+            .where(
+                LogInferencia.analisis_id == analisis_id,
+                LogInferencia.estado == EstadoInferencia.EXITO,
+            )
+            .order_by(LogInferencia.id.desc())
+            .limit(1)
+        )
+        if ultimo is not None:
+            ultimo.latencia_llm_ms = latencia_ms
