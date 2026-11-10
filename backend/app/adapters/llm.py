@@ -7,6 +7,7 @@ persiguiendo imports por todo el proyecto.
 """
 
 import json
+import logging
 from typing import Any, Protocol
 
 from google import genai
@@ -14,6 +15,8 @@ from google.genai import types
 from pydantic import BaseModel
 
 from app.core.config import Settings
+
+log = logging.getLogger("gastroia.worker")
 
 # Lista negra: la imagen y los mapas de calor NUNCA salen pa'l LLM (RF-R05). Si alguien
 # quita algo de aquí, que se lo explique al profe, porque yo no me hago responsable.
@@ -119,10 +122,26 @@ class AdaptadorProveedorLLM:
         return texto
 
 
-def crear_adaptador_llm(settings: Settings) -> AdaptadorProveedorLLM:
+class SinProveedorLLM:
+    """Lo que se usa cuando Gemini no está configurado (sin LLM_API_KEY).
+
+    Cumple `ServicioExplicacion` pero siempre falla con el error genérico: así la explicación
+    queda FALLIDA con su mensaje estándar en vez de tumbar la tarea del worker y dejarla
+    PENDIENTE para siempre. El resultado del análisis no se toca (RF-R05 CA 3).
+    """
+
+    def explicar(self, resumen: dict[str, Any]) -> str:
+        verificar_sin_imagen(resumen)
+        raise ErrorProveedorLLM("La explicación no está disponible.")
+
+
+def crear_adaptador_llm(settings: Settings) -> ServicioExplicacion:
     """Arma el adaptador de verdad con lo que diga el .env (modelo, llave y timeout)."""
     if settings.llm_proveedor.lower() != "gemini":
         raise ValueError(f"Proveedor de LLM no soportado: {settings.llm_proveedor}")
+    if not settings.llm_api_key.get_secret_value().strip():
+        log.warning("LLM_API_KEY vacía: las explicaciones quedarán FALLIDA hasta configurarla")
+        return SinProveedorLLM()
     cliente = genai.Client(
         api_key=settings.llm_api_key.get_secret_value(),
         http_options=types.HttpOptions(
