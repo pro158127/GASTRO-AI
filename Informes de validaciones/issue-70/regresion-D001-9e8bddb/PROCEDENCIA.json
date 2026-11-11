@@ -1,0 +1,100 @@
+[
+  {
+    "archivo": "unicode.xml",
+    "origen": "unicode.xml",
+    "sha256_original": "d2e42b2186262ff575f79c0d28b07dfc120bfdaf9a9ca4cc30205a4125363ff9",
+    "sha256_entrega": "d8216bf6d487393f79d331962751eb50700a9ad475df03719f6ca74f3042c44e",
+    "tratamiento": "XML de entrega: hostname y parámetros sintéticos omitidos; resultados, orden y fechas conservados"
+  },
+  {
+    "archivo": "unicode.txt",
+    "origen": "unicode.txt",
+    "sha256_original": "e080e09adfc5cbf8d04474e7ddd1ed2f58273396936ed787a5ce193dd8ad1853",
+    "sha256_entrega": "84324400ccd9cca7297c2ce95a35a617d7e575e636069ad9cbf70dc7efb742d7",
+    "tratamiento": "Registro de entrega: rutas locales redactadas; resultados conservados"
+  },
+  {
+    "archivo": "unicode-exit.txt",
+    "origen": "unicode-exit.txt",
+    "sha256_original": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04",
+    "sha256_entrega": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "cobertura-unicode.json",
+    "origen": "cobertura-unicode.json",
+    "sha256_original": "eeb1f936a722578e0097458d929164b3cbb40e0d2b22f15dafc7a5a150d03a15",
+    "sha256_entrega": "eeb1f936a722578e0097458d929164b3cbb40e0d2b22f15dafc7a5a150d03a15",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "suite-77.xml",
+    "origen": "suite-77.xml",
+    "sha256_original": "60c26860449ceb6b79c2e3d899370a8da47aad6efbc5f3f81db20890499a2e56",
+    "sha256_entrega": "8f9281ab18483e8e80de122ecc05681fc9e7932332013614108600f4be7ee75b",
+    "tratamiento": "XML de entrega: hostname y parámetros sintéticos omitidos; resultados, orden y fechas conservados"
+  },
+  {
+    "archivo": "suite-77.txt",
+    "origen": "suite-77.txt",
+    "sha256_original": "c44fc4ac7f5ccae6de2c12f0f3867702944691843e56819429474671824cad6d",
+    "sha256_entrega": "40aa986e263b8f0a2e0f6a814b08f6821ade6d561309a68905a84ab1b5d6ce32",
+    "tratamiento": "Registro de entrega: rutas locales redactadas; resultados conservados"
+  },
+  {
+    "archivo": "suite-exit.txt",
+    "origen": "suite-exit.txt",
+    "sha256_original": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04",
+    "sha256_entrega": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "cobertura-suite.json",
+    "origen": "cobertura-suite.json",
+    "sha256_original": "58c98863ef9adc242545de127abfe230a07145b366ed9e53dad2f3ed179d68cf",
+    "sha256_entrega": "58c98863ef9adc242545de127abfe230a07145b366ed9e53dad2f3ed179d68cf",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "contexto.json",
+    "origen": "contexto.json",
+    "sha256_original": "b4ea59d65f5df2c0fe78d3128cde835ce6daca7237e1615c37360f20394b0862",
+    "sha256_entrega": "b4ea59d65f5df2c0fe78d3128cde835ce6daca7237e1615c37360f20394b0862",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "pip-check.txt",
+    "origen": "pip-check.txt",
+    "sha256_original": "672aec65a45bed50e70229c70934a7eebf0462595c459b83023027645d57cccf",
+    "sha256_entrega": "672aec65a45bed50e70229c70934a7eebf0462595c459b83023027645d57cccf",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "dependencias.txt",
+    "origen": "dependencias.txt",
+    "sha256_original": "be40d7464adabea4475a7de44cac46e27972f772fe294c69c62debd0b8ae27af",
+    "sha256_entrega": "be40d7464adabea4475a7de44cac46e27972f772fe294c69c62debd0b8ae27af",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "comparacion-8b22250/resultados-70-8b22250.xml",
+    "origen": "resultados-70-8b22250.xml",
+    "sha256_original": "09629526dc239c90fd0bbd45363da456e0ebb0687a6747d57570582eb07f56df",
+    "sha256_entrega": "8267b632e2a0915ccbcdb66277fda94291665dc172eccf69e695c3a3d52d869c",
+    "tratamiento": "XML de entrega: hostname y parámetros sintéticos omitidos; resultados, orden y fechas conservados"
+  },
+  {
+    "archivo": "comparacion-8b22250/cobertura-70-8b22250.json",
+    "origen": "cobertura-70-8b22250.json",
+    "sha256_original": "09f6e14a006f16828968a593f63b2e8425c4b2967f2c5c0292bd69eab3bab2c5",
+    "sha256_entrega": "09f6e14a006f16828968a593f63b2e8425c4b2967f2c5c0292bd69eab3bab2c5",
+    "tratamiento": "Copia exacta"
+  },
+  {
+    "archivo": "../registros-tsp/TSP_Defect_Log_Gastro-AI.xlsx",
+    "origen": "TSP_Defect_Log_Gastro-AI.xlsx",
+    "sha256_original": "1413dbb52952e76bc9cc05572e7b906f58c0c880ad374248fe372acf51f34246",
+    "sha256_entrega": "1413dbb52952e76bc9cc05572e7b906f58c0c880ad374248fe372acf51f34246",
+    "tratamiento": "Copia exacta"
+  }
+]
