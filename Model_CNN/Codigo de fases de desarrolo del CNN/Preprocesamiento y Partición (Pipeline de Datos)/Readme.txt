@@ -1,0 +1,2 @@
+GastroAI_Pipeline_Preprocesamiento_v8.ipynb / gastroai_pipeline.py: Pipeline reproducible de preparación de datos (redimensión a 240×240 px, normalización de canales y aumentación con ColorJitter y rotaciones).
+patient_splits_5fold.csv: Archivo de partición de datos estructurado en 5 pliegues por patient_id (GroupKFold), garantizando cero fuga de información (data leakage) entre pacientes de entrenamiento y validación.
