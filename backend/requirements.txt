@@ -1,14 +1,32 @@
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
-pydantic==2.10.4
-pydantic-settings==2.7.0
-celery==5.4.0
-kombu==5.5.4
-redis==5.2.1
-minio==7.2.12
-alembic==1.14.0
-bcrypt==4.2.1
-PyJWT==2.10.1
-python-multipart==0.0.20
+# API
+fastapi>=0.115
+uvicorn[standard]>=0.32        # servidor que corre la API
+python-multipart>=0.0.12       # recibir la imagen en el formulario (upload)
+pydantic-settings>=2.6         # leer la configuración del .env
+
+# Base de datos
+sqlalchemy>=2.0.36             # ORM
+alembic>=1.14                  # migraciones, incluida la de restricciones
+psycopg[binary]>=3.2           # driver de PostgreSQL
+
+# Tareas en segundo plano
+celery>=5.4
+redis>=5.2                     # cliente para el broker Redis
+packaging>=24                  # lo importa el transporte Redis de kombu sin declararlo
+
+# Seguridad
+bcrypt>=4.2                    # hash de contraseñas, 12 rondas (RNF-02)
+pyotp>=2.9                     # segundo factor TOTP (RF-U01)
+cryptography>=43               # cifrar el secreto TOTP con AES-256-GCM
+
+# Imágenes y archivos
+pillow>=11.0                   # formato real, tamaño y quitar EXIF (RF-D02)
+numpy>=2.1
+opencv-python-headless>=4.10   # nitidez (Laplaciano), brillo y reflejos (RF-P01)
+boto3>=1.35                    # subir y firmar URL en MinIO (API S3)
+reportlab>=4.2                 # reporte PDF con aviso experimental (RF-H02)
+
+# Servicios externos
+httpx>=0.27                    # llamar al Space de Hugging Face con timeout
+google-genai>=1.0              # explicación con Gemini (RF-R05)
+qrcode>=8.0                    # QR pa vincular la app autenticadora (RF-U01 CA 10)
