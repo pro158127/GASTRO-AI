@@ -104,7 +104,9 @@ def verificar_codigo_totp(
       veces (RF-U01 CA 7). Quien llama guarda el paso devuelto en Usuario.totp_ultimo_paso.
     """
     codigo = codigo.strip()
-    if len(codigo) != 6 or not codigo.isdigit():
+    # Solo 0-9 ASCII: isdigit() también acepta «１２３４５６» (ancho completo) y otros dígitos
+    # Unicode, y con esos compare_digest truena con TypeError → 500 (defecto D-001 de QA)
+    if len(codigo) != 6 or not codigo.isascii() or not codigo.isdigit():
         return None
     totp = pyotp.TOTP(secreto, interval=PASO_TOTP_SEGUNDOS)
     paso_actual = int((time.time() if ahora is None else ahora) // PASO_TOTP_SEGUNDOS)

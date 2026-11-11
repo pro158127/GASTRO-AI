@@ -14,7 +14,8 @@ from app.services.usuarios import CambiosCuenta
 Texto = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 PATRON_CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-PATRON_TELEFONO = re.compile(r"^\+?\d{7,15}$")
+# [0-9] y no \d: en Python \d también acepta «５７３…» y otros dígitos Unicode
+PATRON_TELEFONO = re.compile(r"^\+?[0-9]{7,15}$")
 
 
 def normalizar_telefono(valor: str | None) -> str | None:
