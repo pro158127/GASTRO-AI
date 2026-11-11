@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.seudonimo import Seudonimo
@@ -147,3 +148,17 @@ class RepositorioAnalisis:
         )
         if ultimo is not None:
             ultimo.latencia_llm_ms = latencia_ms
+
+    def agregar_observacion(self, observacion: ObservacionProfesional) -> bool:
+        """Guarda la observación; False si ese doctor ya tenía una en ese análisis.
+
+        La base tiene un UNIQUE (analisis_id, autor_id): si dos clics llegan juntos, el
+        segundo choca ahí. Se hace en un SAVEPOINT pa que el choque no tumbe la transacción.
+        """
+        try:
+            with self.db.begin_nested():
+                self.db.add(observacion)
+                self.db.flush()
+        except IntegrityError:
+            return False
+        return True

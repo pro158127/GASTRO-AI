@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.schemas.catalogo import Persona, Umbral
+from app.schemas.paginacion import POR_PAGINA_MAXIMO, Paginacion
 
 # RF-R04 CA 3 · especificacion_api.md §2: va en todo resultado, sin excepción
 AVISO_EXPERIMENTAL = {
@@ -189,3 +190,80 @@ class ExplicacionEstado(BaseModel):
 class ExplicacionReintentada(BaseModel):
     estado: str = Field(examples=["PENDIENTE"])
     intentos: int = Field(examples=[2])
+
+
+# ------------------------------------------------- observaciones (contrato §3.8, RF-D04)
+
+TEXTO_OBSERVACION_MAXIMO = 2000
+
+
+class ObservacionEntrada(BaseModel):
+    valoracion: Literal["COINCIDE", "NO_COINCIDE", "NO_CONCLUYENTE"]
+    texto: str | None = Field(
+        default=None,
+        max_length=TEXTO_OBSERVACION_MAXIMO,
+        examples=["Concuerda con el hallazgo endoscópico."],
+    )
+
+
+class Autor(BaseModel):
+    id: UUID
+    nombre: str
+    apellido: str
+
+
+class ObservacionGuardada(BaseModel):
+    id: UUID
+    valoracion: str
+    texto: str | None
+    autor: Autor
+    registrada_en: datetime
+
+
+class ObservacionCreada(BaseModel):
+    observacion: ObservacionGuardada
+
+
+# ------------------------------------------------------ historial (contrato §4, RF-H01)
+
+
+class RealizadoPorResumen(BaseModel):
+    nombre: str
+    apellido: str
+    cuenta_eliminada: bool
+
+
+class FilaHistorial(BaseModel):
+    id: UUID
+    codigo: str = Field(examples=["A-2026-000123"])
+    solicitado_en: datetime
+    estado: str
+    # Nombres de las que superan el umbral, de mayor a menor probabilidad
+    caracteristicas_que_superan: list[str] = Field(examples=[["Atrofia gástrica"]])
+    caracteristica_principal: str | None  # null = «Sin característica sobre el umbral»
+    probabilidad_principal: Umbral | None
+    tiene_observacion: bool  # la del doctor que consulta
+    observacion: str | None = Field(examples=["COINCIDE"])  # su valoración, si la registró
+    modelo_revision: str = Field(examples=["3e1f9c0"])  # RF-H01 CA 3, RNF-25
+    trasladado: bool  # lo hizo otro doctor y llegó por traslado (RF-A07 CA 5)
+    realizado_por: RealizadoPorResumen
+
+
+class PaginaHistorial(BaseModel):
+    items: list[FilaHistorial]
+    paginacion: Paginacion
+
+
+class BusquedaPacienteEntrada(BaseModel):
+    tipo_documento: str = Field(max_length=5, examples=["CC"])
+    numero_documento: str = Field(max_length=30, examples=["1234567890"])
+    pagina: int = Field(default=1, ge=1)
+    por_pagina: int = Field(default=20, ge=1, le=POR_PAGINA_MAXIMO)
+    estado: Literal["PROCESANDO", "COMPLETADO", "FALLIDO"] | None = None
+    # RF-H01 CA 1: orden cronológico (el más antiguo primero) salvo que se pida otro
+    orden: Literal["solicitado_en", "-solicitado_en"] = "solicitado_en"
+
+
+class PaginaHistorialPaciente(PaginaHistorial):
+    caso_id: UUID | None = None  # el caso más reciente; pa «Descargar reporte de este paciente»
+    caso_ids: list[UUID] = []  # todos, si recibió por traslado un paciente que ya tenía

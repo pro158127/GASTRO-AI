@@ -27,8 +27,10 @@ api → encola → redis → worker (Celery) → Space HF / Gemini
 api, worker → postgres (datos) + minio (archivos)
 ```
 
-> Estado actual: están la base de datos completa (20 tablas), la autenticación y la sesión
-> (sección 3.5). Los demás módulos se agregan en los siguientes pull requests.
+> Estado actual: base de datos (20 tablas), autenticación y sesión, perfil y gestión de
+> usuarios, umbrales, carga de imagen, análisis con calidad, clasificación y Grad-CAM,
+> explicación con Gemini, observaciones e historial (sección 3.5). Faltan reportes PDF,
+> casos recibidos, bitácora y monitoreo, dashboards y SSE.
 
 ---
 
@@ -238,6 +240,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/analisis/{id}/reintento` | `DOCTOR` | — | `202 {analisis: {id, codigo, estado, solicitado_en}}` |
 | GET | `/analisis/{id}/explicacion` | `DOCTOR` | — | `{estado, texto?, generada_en?, codigo_error?, mensaje?, intentos, puede_reintentar}` |
 | POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
+| POST | `/analisis/{id}/observaciones` | `DOCTOR` | `{valoracion, texto?}` | `201 {observacion: {id, valoracion, texto, autor, registrada_en}}` |
+| GET | `/analisis` | `DOCTOR` | `?pagina&por_pagina&origen&estado&codigo&caracteristica&desde&hasta&orden` | `{items, paginacion}` («Mis análisis») |
+| POST | `/pacientes/analisis/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, pagina?, por_pagina?, estado?, orden?}` | `{items, paginacion, caso_id, caso_ids}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
 - `ruta_inicial` = `/doctor/dashboard` o `/admin/dashboard`.
@@ -322,6 +327,33 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - Reintento: máximo 3 intentos en total. `409 EXPLICACION_NO_REINTENTABLE` si ya está
   `GENERADA` o sigue `PENDIENTE`; `429 REINTENTOS_AGOTADOS` (trae `max_intentos`) al tercero.
 
+**Observaciones (RF-D04).**
+
+- `valoracion` ∈ `COINCIDE | NO_COINCIDE | NO_CONCLUYENTE`; `texto` opcional, hasta 2000
+  caracteres (en blanco se guarda como `null`).
+- Una por doctor y análisis, y no se edita: `409 OBSERVACION_YA_REGISTRADA`. El doctor que
+  recibe un caso trasladado agrega la suya sin tocar la del doctor de origen (RF-A07 CA 3).
+- Solo sobre un resultado: `409 ANALISIS_NO_COMPLETADO`. Análisis ajeno: `404`.
+- Se ven en `GET /analisis/{id}` → `observaciones`, con `es_mia`.
+
+**Historial (RF-H01).**
+
+- Las dos listas muestran los análisis de los **casos asignados al doctor**: los propios y los
+  recibidos por traslado. Nunca llevan datos del paciente.
+- Fila: `{id, codigo, solicitado_en, estado, caracteristicas_que_superan, caracteristica_principal,
+  probabilidad_principal, tiene_observacion, observacion, modelo_revision, trasladado,
+  realizado_por: {nombre, apellido, cuenta_eliminada}}`. `caracteristica_principal: null` =
+  «Sin característica sobre el umbral»; `observacion` es la valoración del doctor que consulta.
+- **«Mis análisis»** (`GET /analisis`): los más recientes primero. Filtros: `origen`
+  (`todos | propios | recibidos`), `estado`, `codigo` (prefijo), `caracteristica` (código; solo
+  donde supera el umbral), `desde` y `hasta` (días de Colombia, ambos incluidos; al revés da
+  `422 RANGO_FECHAS_INVALIDO`) y `orden` (`-solicitado_en` o `solicitado_en`).
+- **«Buscar por paciente»** (`POST /pacientes/analisis/buscar`): el documento va en el cuerpo.
+  Orden cronológico (el más antiguo primero) salvo `orden: "-solicitado_en"`. Paciente ajeno o
+  inexistente: `200` con `items: []` y `caso_id: null`, sin revelar nada (RF-H01 CA 5).
+  `caso_id` es el caso más reciente (para «Descargar reporte de este paciente»); `caso_ids`, todos.
+- nginx limita la búsqueda por paciente igual que `/pacientes/consulta` (30/min por IP).
+
 **Configuración de inferencia.**
 
 - Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
@@ -357,8 +389,8 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
-**Planeados** (detalle en la especificación del equipo): observaciones, historial, traslados del lado
-del doctor, reportes PDF, dashboards, bitácora, monitoreo y SSE.
+**Planeados** (detalle en la especificación del equipo): reportes PDF, casos recibidos del lado
+del doctor, dashboards, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
@@ -376,6 +408,8 @@ probarlas sin base de datos (RNF-19).
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
+- `historial.py` (+ `repositories/historial_repository.py`): «Mis análisis» y «Buscar por
+  paciente», siempre por el caso asignado al doctor.
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
 - `explicacion.py`: arma el resumen para Gemini, valida el texto y maneja los reintentos.
 - `clasificacion.py`: llama al Space, comprueba la revisión, sube los mapas de calor, aplica
@@ -510,7 +544,7 @@ Lo que cambia del lado del backend:
 | Ruta | Destino | Notas |
 |---|---|---|
 | `/api/v1/auth/login`, `contrasena/cambiar` y `totp/*` | `api:8000` | Límite 10/min por IP (ráfaga 5) |
-| `/api/v1/pacientes/consulta` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
+| `/api/v1/pacientes/consulta` y `/pacientes/analisis/buscar` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
 | `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
 | `/` | `frontend:80` | SPA compilada |
 

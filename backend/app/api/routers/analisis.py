@@ -4,18 +4,22 @@ El administrador recibe 403 en todo esto: no ve datos clínicos (RF-U03 CA 2). U
 de otro doctor responde 404, como si no existiera (S-01).
 """
 
+from datetime import date
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
-from app.api.deps import ServicioDeAnalisis, SesionDoctor
+from app.api.deps import ServicioDeAnalisis, ServicioDeHistorial, SesionDoctor
 from app.core.config import get_settings
 from app.core.errores import ErrorApi
-from app.models import Analisis, EstadoAnalisis, EstadoExplicacion, EstadoUsuario
+from app.models import Analisis, EstadoAnalisis, EstadoExplicacion, EstadoUsuario, Valoracion
+from app.repositories.historial_repository import FiltroHistorial, Origen
 from app.schemas.analisis import (
     AnalisisCreado,
     AnalisisResumen,
     AnalisisSalida,
+    Autor,
     Caja,
     CalidadDetalle,
     CaracteristicaResultado,
@@ -24,19 +28,27 @@ from app.schemas.analisis import (
     Explicacion,
     ExplicacionEstado,
     ExplicacionReintentada,
+    FilaHistorial,
     ImagenAnalisis,
     MapaCalor,
     ModeloUsado,
     Observacion,
+    ObservacionCreada,
+    ObservacionEntrada,
+    ObservacionGuardada,
+    PaginaHistorial,
     RealizadoPor,
+    RealizadoPorResumen,
     Region,
     SolicitudAnalisisEntrada,
     Trasladado,
 )
 from app.schemas.catalogo import Persona
 from app.schemas.errores import RespuestaError
+from app.schemas.paginacion import POR_PAGINA_MAXIMO, Paginacion
 from app.services.analisis import DetalleAnalisis, SolicitudAnalisis, etapas_de
 from app.services.explicacion import MENSAJE_NO_DISPONIBLE
+from app.services.historial import limites_de_fechas
 
 router = APIRouter(prefix="/analisis", tags=["análisis"])
 
@@ -67,6 +79,108 @@ def solicitar(
         ),
     )
     return _creado(analisis)
+
+
+@router.get("", response_model=PaginaHistorial, responses=_errores(422))
+def mis_analisis(
+    sesion: SesionDoctor,
+    servicio: ServicioDeHistorial,
+    pagina: Annotated[int, Query(ge=1)] = 1,
+    por_pagina: Annotated[int, Query(ge=1, le=POR_PAGINA_MAXIMO)] = 20,
+    origen: Origen = Origen.TODOS,
+    estado: EstadoAnalisis | None = None,
+    codigo: Annotated[str | None, Query(max_length=20)] = None,
+    caracteristica: Annotated[str | None, Query(max_length=40)] = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    orden: Literal["solicitado_en", "-solicitado_en"] = "-solicitado_en",
+):
+    """«Mis análisis» (W-16): propios y recibidos por traslado, los más recientes primero.
+
+    - `origen`: `todos`, `propios` o `recibidos` (RF-A07 CA 5).
+    - `codigo`: prefijo del código («A-2026-0001»). `caracteristica`: código; solo los que
+      la superan. `desde`/`hasta`: días (hora de Colombia), ambos incluidos.
+    - Nunca lleva datos del paciente.
+    """
+    inicio, fin = limites_de_fechas(desde, hasta)
+    filtro = FiltroHistorial(
+        pagina=pagina,
+        por_pagina=por_pagina,
+        origen=origen,
+        estado=estado,
+        codigo=codigo.strip().upper() if codigo and codigo.strip() else None,
+        caracteristica=caracteristica.strip().upper()
+        if caracteristica and caracteristica.strip()
+        else None,
+        desde=inicio,
+        hasta=fin,
+        ascendente=orden == "solicitado_en",
+    )
+    yo = sesion.usuario.id
+    resultado = servicio.mis_analisis(yo, filtro)
+    return PaginaHistorial(
+        items=[fila_historial(a, yo) for a in resultado.analisis],
+        paginacion=Paginacion(pagina=pagina, por_pagina=por_pagina, total=resultado.total),
+    )
+
+
+def fila_historial(a: Analisis, yo: UUID) -> FilaHistorial:
+    """Una fila de «Mis análisis» o de «Buscar por paciente» (contrato §4, HIS-01)."""
+    superan = sorted(
+        (r for r in a.resultados if r.supera_umbral), key=lambda r: r.probabilidad, reverse=True
+    )
+    mia = next((o for o in a.observaciones if o.autor_id == yo), None)
+    ejecutor = a.doctor_ejecutor
+    return FilaHistorial(
+        id=a.id,
+        codigo=a.codigo,
+        solicitado_en=a.solicitado_en,
+        estado=a.estado.value,
+        caracteristicas_que_superan=[r.caracteristica.nombre for r in superan],
+        caracteristica_principal=superan[0].caracteristica.nombre if superan else None,
+        probabilidad_principal=superan[0].probabilidad if superan else None,
+        tiene_observacion=mia is not None,
+        observacion=mia.valoracion.value if mia else None,
+        modelo_revision=a.modelo.revision_sha[:7],
+        trasladado=a.doctor_ejecutor_id != yo,
+        realizado_por=RealizadoPorResumen(
+            nombre=ejecutor.nombre,
+            apellido=ejecutor.apellido,
+            cuenta_eliminada=ejecutor.estado is EstadoUsuario.ELIMINADO,
+        ),
+    )
+
+
+@router.post(
+    "/{analisis_id}/observaciones",
+    status_code=201,
+    response_model=ObservacionCreada,
+    responses=_errores(404, 409, 422),
+)
+def observar(
+    analisis_id: UUID,
+    entrada: ObservacionEntrada,
+    sesion: SesionDoctor,
+    servicio: ServicioDeAnalisis,
+):
+    """Valoración del doctor sobre el resultado (W-08, W-08e, W-08f, RF-D04).
+
+    `valoracion`: COINCIDE, NO_COINCIDE o NO_CONCLUYENTE; `texto` opcional (hasta 2000).
+    409 OBSERVACION_YA_REGISTRADA: ya registró la suya, no se sobrescribe.
+    409 ANALISIS_NO_COMPLETADO: todavía no hay resultado.
+    """
+    o = servicio.observar(
+        sesion.usuario, analisis_id, Valoracion(entrada.valoracion), entrada.texto
+    )
+    return ObservacionCreada(
+        observacion=ObservacionGuardada(
+            id=o.id,
+            valoracion=o.valoracion.value,
+            texto=o.texto,
+            autor=Autor(id=o.autor.id, nombre=o.autor.nombre, apellido=o.autor.apellido),
+            registrada_en=o.registrada_en,
+        )
+    )
 
 
 def _creado(analisis: Analisis) -> AnalisisCreado:

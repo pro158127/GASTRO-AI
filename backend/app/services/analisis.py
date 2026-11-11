@@ -28,8 +28,10 @@ from app.models import (
     EtapaProceso,
     ExplicacionLlm,
     FormatoImagen,
+    ObservacionProfesional,
     Traslado,
     Usuario,
+    Valoracion,
 )
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.unidad_trabajo import UnidadTrabajo
@@ -261,6 +263,42 @@ class ServicioAnalisis:
             self._explicaciones.marcar_fallida(explicacion)
             raise _servicio_no_disponible() from None
         return explicacion
+
+    def observar(
+        self, doctor: Usuario, analisis_id: UUID, valoracion: Valoracion, texto: str | None
+    ) -> ObservacionProfesional:
+        """RF-D04: la valoración del doctor sobre el resultado, con texto opcional.
+
+        - Una por doctor y análisis, y no se sobrescribe: 409 OBSERVACION_YA_REGISTRADA.
+          El doctor que recibe un caso trasladado agrega la suya sin tocar la del doctor de
+          origen (RF-A07 CA 3).
+        - Solo sobre un resultado: 409 ANALISIS_NO_COMPLETADO.
+        - No toca el modelo, que es estático (RF-D04 CA 4).
+        """
+        analisis = ProxyAccesoAnalisis(self._repo, doctor.id).obtener(analisis_id)
+        if analisis.estado is not EstadoAnalisis.COMPLETADO:
+            raise ErrorApi(409, "ANALISIS_NO_COMPLETADO", "El análisis todavía no tiene resultado.")
+        # Con ids y no con relaciones: si choca con el UNIQUE, no queda colgada en la lista
+        # de observaciones del análisis en memoria
+        observacion = ObservacionProfesional(
+            id=uuid4(),
+            analisis_id=analisis.id,
+            autor_id=doctor.id,
+            valoracion=valoracion,
+            texto=(texto or "").strip() or None,
+            registrada_en=self._reloj(),
+        )
+        if not self._repo.agregar_observacion(observacion):
+            raise ErrorApi(
+                409,
+                "OBSERVACION_YA_REGISTRADA",
+                "Ya registraste tu valoración para este análisis.",
+            )
+        # Ya guardada: ahora sí se enlaza, pa que el detalle la muestre sin recargar
+        observacion.autor = doctor
+        analisis.observaciones.append(observacion)
+        self._unidad.confirmar()
+        return observacion
 
     @staticmethod
     def puede_reintentar_explicacion(explicacion: ExplicacionLlm) -> bool:

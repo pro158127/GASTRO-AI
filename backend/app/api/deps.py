@@ -28,6 +28,7 @@ from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
 from app.repositories.health_repository import HealthRepository
+from app.repositories.historial_repository import RepositorioHistorial
 from app.repositories.pacientes_repository import RepositorioPacientes
 from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
@@ -39,6 +40,7 @@ from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
+from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
 from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
@@ -214,6 +216,15 @@ def get_servicio_analisis(
 
 
 ServicioDeAnalisis = Annotated[ServicioAnalisis, Depends(get_servicio_analisis)]
+
+
+def get_servicio_historial(
+    db: DbSession, seudonimizador: Annotated[Seudonimizador, Depends(get_seudonimizador)]
+) -> ServicioHistorial:
+    return ServicioHistorial(RepositorioHistorial(db), seudonimizador)
+
+
+ServicioDeHistorial = Annotated[ServicioHistorial, Depends(get_servicio_historial)]
 
 
 def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:
