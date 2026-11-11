@@ -1,0 +1,43 @@
+/* Botón «Mostrar contraseña»: 24 px en escritorio, 44 px en celular (objetivo táctil). */
+
+.botonMostrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tamano-objetivo-minimo);
+  height: var(--tamano-objetivo-minimo);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-sm);
+  background: transparent;
+  /* Color de los iconos (currentColor); equivale al #374151 de Figma. */
+  color: var(--color-texto-secundario);
+  cursor: pointer;
+}
+
+.botonMostrar:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.botonMostrar:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.icono {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+}
+
+@media (max-width: 767px) {
+  .botonMostrar {
+    width: var(--tamano-control-tactil);
+    height: var(--tamano-control-tactil);
+    /* El margen negativo evita que el control crezca por encima de 44 px. */
+    margin-block: calc(-1 * var(--espacio-2));
+  }
+}

@@ -1,0 +1,60 @@
+/* Estructura de las pantallas internas. Márgenes del contenido: 32 / 24 / 16 px y separación
+   entre bloques de 24 / 20 / 16 px (escritorio / tableta / celular, página 15 de Figma). */
+
+.disposicion {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-fondo-lienzo);
+}
+
+.area {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.principal {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--espacio-6);
+  padding: var(--espacio-8) var(--espacio-8) var(--espacio-6);
+}
+
+/* Sin esto, un hijo con contenido ancho (por ejemplo un campo de archivo) ensancha toda la
+   columna y a 320 px aparece desplazamiento horizontal (WCAG 1.4.10). */
+.principal > * {
+  min-width: 0;
+}
+
+/* El <main> recibe el foco por programa; el anillo se dibuja en el título, no en toda la página. */
+.principal:focus {
+  outline: none;
+}
+
+.pie {
+  display: flex;
+  justify-content: center;
+  padding: var(--espacio-3) var(--espacio-8);
+}
+
+@media (max-width: 1279px) {
+  .principal {
+    gap: var(--espacio-5);
+    padding: var(--espacio-6);
+  }
+
+  .pie {
+    padding: var(--espacio-3) var(--espacio-4);
+  }
+}
+
+@media (max-width: 767px) {
+  .principal {
+    gap: var(--espacio-4);
+    padding: var(--espacio-5) var(--espacio-4) var(--espacio-6);
+  }
+}

@@ -1,0 +1,26 @@
+/* Pantalla W-01. La tarjeta y la página son de DisposicionAcceso. */
+
+.descripcion {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h2);
+  color: var(--color-texto-primario);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-5);
+}
+
+.ayuda {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
