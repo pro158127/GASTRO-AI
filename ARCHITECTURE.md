@@ -242,6 +242,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
 | POST | `/analisis/{id}/observaciones` | `DOCTOR` | `{valoracion, texto?}` | `201 {observacion: {id, valoracion, texto, autor, registrada_en}}` |
 | GET | `/analisis` | `DOCTOR` | `?pagina&por_pagina&origen&estado&codigo&caracteristica&desde&hasta&orden` | `{items, paginacion}` («Mis análisis») |
+| GET | `/dashboard/doctor` | `DOCTOR` | — | `{primer_uso, resumen, analisis_recientes, frecuencia, concordancia, pacientes_con_seguimiento, avisos_traslado, casos_recibidos, aviso}` |
 | POST | `/pacientes/analisis/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, pagina?, por_pagina?, estado?, orden?}` | `{items, paginacion, caso_id, caso_ids}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
@@ -354,6 +355,29 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `caso_id` es el caso más reciente (para «Descargar reporte de este paciente»); `caso_ids`, todos.
 - nginx limita la búsqueda por paciente igual que `/pacientes/consulta` (30/min por IP).
 
+**Dashboard clínico (RF-DB01).**
+
+- Pantalla inicial del doctor. Todo se calcula **solo con sus propios análisis completados**
+  (los que hizo él y siguen siendo suyos). Lo que recibió por traslado se informa aparte en
+  `casos_recibidos` y `avisos_traslado`, y no cambia sus indicadores (RF-A07 CA 2).
+- `primer_uso: true` = no tiene ningún análisis → estado vacío «Realizar el primer análisis», sin
+  gráficas (RF-DB01 CA 10).
+- `resumen` = `{total_analisis, analisis_mes, ultimos_7_dias, sin_valoracion}`. El mes es el de
+  Colombia; `sin_valoracion` = completados sin su observación.
+- `analisis_recientes` = los 5 más recientes, en cualquier estado: `{id, codigo, solicitado_en,
+  estado, caracteristica_principal, caracteristicas_que_superan}`. Se identifican por el código,
+  nunca por el paciente (RF-DB01 CA 2).
+- `frecuencia` = `{rotulo, barras: [{caracteristica_id, codigo, nombre, analisis}]}`: en cuántos
+  análisis superó el umbral cada característica, con el umbral aplicado ese día. Gráfico de
+  **barras**, no circular, y con el rótulo tal cual (RF-DB01 CA 3 y 4). Las que tienen 0 también
+  vienen.
+- `concordancia` = `{porcentaje, coincide, no_coincide, no_concluyente}`; `porcentaje` = coincide /
+  (coincide + no coincide), con un decimal, o `null` si aún no valoró nada.
+- `pacientes_con_seguimiento` = casos con 2 o más análisis propios (RF-DB01 CA 6).
+- `avisos_traslado` = traslados recibidos sin abrir: `{traslado_id, tipo, cantidad_casos, origen:
+  {nombre, apellido, cuenta_eliminada}, ejecutado_en}`.
+- Siempre trae `aviso` (RF-DB01 CA 9).
+
 **Configuración de inferencia.**
 
 - Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
@@ -390,7 +414,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
 **Planeados** (detalle en la especificación del equipo): reportes PDF, casos recibidos del lado
-del doctor, dashboards, bitácora, monitoreo y SSE.
+del doctor, dashboard técnico, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
@@ -408,6 +432,7 @@ probarlas sin base de datos (RNF-19).
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
+- `dashboard.py` (+ `repositories/dashboard_repository.py`): dashboard clínico del doctor.
 - `historial.py` (+ `repositories/historial_repository.py`): «Mis análisis» y «Buscar por
   paciente», siempre por el caso asignado al doctor.
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
