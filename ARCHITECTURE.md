@@ -229,6 +229,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/admin/usuarios/{id}/reenviar-credencial` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
 | POST | `/admin/usuarios/{id}/desbloquear` | `ADMINISTRADOR` | — | `{usuario}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
+| GET | `/dashboard/doctor` | `DOCTOR` | — | `{primer_uso, resumen, analisis_recientes, frecuencia, concordancia, pacientes_con_seguimiento, avisos_traslado, casos_recibidos, aviso}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
 | GET | `/admin/configuracion-inferencia` | `ADMINISTRADOR` | — | `{usar_umbral_por_caracteristica, umbral_global, rango, caracteristicas, actualizado_por, actualizado_en}` |
@@ -242,7 +243,6 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
 | POST | `/analisis/{id}/observaciones` | `DOCTOR` | `{valoracion, texto?}` | `201 {observacion: {id, valoracion, texto, autor, registrada_en}}` |
 | GET | `/analisis` | `DOCTOR` | `?pagina&por_pagina&origen&estado&codigo&caracteristica&desde&hasta&orden` | `{items, paginacion}` («Mis análisis») |
-| GET | `/dashboard/doctor` | `DOCTOR` | — | `{primer_uso, resumen, analisis_recientes, frecuencia, concordancia, pacientes_con_seguimiento, avisos_traslado, casos_recibidos, aviso}` |
 | POST | `/pacientes/analisis/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, pagina?, por_pagina?, estado?, orden?}` | `{items, paginacion, caso_id, caso_ids}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
@@ -355,6 +355,14 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `caso_id` es el caso más reciente (para «Descargar reporte de este paciente»); `caso_ids`, todos.
 - nginx limita la búsqueda por paciente igual que `/pacientes/consulta` (30/min por IP).
 
+**Configuración de inferencia.**
+
+- Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
+  (`umbral_global`, `umbrales[i].umbral`) y `rango`.
+- En modo por característica deben venir todas las activas con su umbral, o
+  `422 UMBRALES_INCOMPLETOS`. `umbral: null` quita el umbral propio (usa el global).
+- Solo afecta análisis futuros: cada resultado guarda el umbral con que se evaluó.
+
 **Dashboard clínico (RF-DB01).**
 
 - Pantalla inicial del doctor. Todo se calcula **solo con sus propios análisis completados**
@@ -377,14 +385,6 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - `avisos_traslado` = traslados recibidos sin abrir: `{traslado_id, tipo, cantidad_casos, origen:
   {nombre, apellido, cuenta_eliminada}, ejecutado_en}`.
 - Siempre trae `aviso` (RF-DB01 CA 9).
-
-**Configuración de inferencia.**
-
-- Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
-  (`umbral_global`, `umbrales[i].umbral`) y `rango`.
-- En modo por característica deben venir todas las activas con su umbral, o
-  `422 UMBRALES_INCOMPLETOS`. `umbral: null` quita el umbral propio (usa el global).
-- Solo afecta análisis futuros: cada resultado guarda el umbral con que se evaluó.
 
 **Usuarios (administrador).**
 
@@ -414,7 +414,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
 **Planeados** (detalle en la especificación del equipo): reportes PDF, casos recibidos del lado
-del doctor, dashboard técnico, bitácora, monitoreo y SSE.
+del doctor, dashboards, bitácora, monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
@@ -432,9 +432,9 @@ probarlas sin base de datos (RNF-19).
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
-- `dashboard.py` (+ `repositories/dashboard_repository.py`): dashboard clínico del doctor.
 - `historial.py` (+ `repositories/historial_repository.py`): «Mis análisis» y «Buscar por
   paciente», siempre por el caso asignado al doctor.
+- `dashboard.py` (+ `repositories/dashboard_repository.py`): dashboard clínico del doctor.
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
 - `explicacion.py`: arma el resumen para Gemini, valida el texto y maneja los reintentos.
 - `clasificacion.py`: llama al Space, comprueba la revisión, sube los mapas de calor, aplica
