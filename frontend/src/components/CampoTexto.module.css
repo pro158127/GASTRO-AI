@@ -1,0 +1,113 @@
+/* Campo de texto (Figma 13:705). Foco: borde azul de 2 px; error: borde rojo de 2 px + icono + texto. */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-2);
+  width: 100%;
+}
+
+.etiqueta {
+  display: block;
+  font: var(--texto-etiqueta-campo);
+  color: var(--color-texto-primario);
+}
+
+.etiquetaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  min-height: var(--tamano-control);
+  padding: var(--espacio-2) var(--espacio-3);
+  background: var(--color-fondo-superficie);
+  border: var(--borde-grosor) solid var(--color-borde-campo);
+  border-radius: var(--radio-sm);
+}
+
+/* El grosor de 2 px se logra con borde de 1 px + sombra interior de 1 px, sin mover el diseño. */
+.control:focus-within {
+  border-color: var(--color-foco-anillo);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-foco-anillo);
+}
+
+.control[data-error] {
+  border-color: var(--color-estado-error-borde);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-estado-error-borde);
+}
+
+.control[data-solo-lectura] {
+  background: var(--color-fondo-superficie-sutil);
+  border-color: var(--color-borde-sutil);
+}
+
+.control[data-deshabilitado] {
+  background: var(--color-fondo-superficie-sutil);
+  border-color: var(--color-borde-sutil);
+}
+
+/* index.css define estilos globales para `input`; aquí se anulan los que no son del diseño. */
+.entrada {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-primario);
+}
+
+.entrada::placeholder {
+  color: var(--color-texto-terciario);
+}
+
+.entrada:disabled {
+  color: var(--color-texto-deshabilitado);
+  -webkit-text-fill-color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
+.ayuda {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.ayudaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+.mensajeError {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.iconoError {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-estado-error-icono);
+}
+
+.textoError {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-error-texto);
+}
+
+@media (max-width: 767px) {
+  .control {
+    min-height: var(--tamano-control-tactil);
+  }
+}

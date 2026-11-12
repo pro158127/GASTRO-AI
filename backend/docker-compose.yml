@@ -1,0 +1,119 @@
+# Todo el changarro local.
+#   Solo lo de apoyo:             docker compose up -d postgres redis minio
+#   Todo, con api y worker:       docker compose up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gastroia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gastroia_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-gastroia}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Volumen solo pa la 16: los datos de la 17 no le sirven, así que ni lo intentes
+      - postgres16_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # AOF prendido: si Redis se reinicia, las tareas en cola no se van al limbo
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    build: ./docker/minio
+    image: gastroia/minio:RELEASE.2025-10-15T17-29-55Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-gastroia}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-gastroia_dev_secret}
+    ports:
+      - "9000:9000"   # API S3, la que usa boto3
+      - "9001:9001"   # consola web, pa chismosear los archivos
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    image: gastroia/backend:dev
+    # --proxy-headers: confía en el X-Forwarded-For de nginx pa saber la IP real del usuario
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    env_file:
+      - path: .env
+        required: false
+    environment: &red_interna
+      # Dentro de Docker nadie se llama localhost: cada quien por su nombre. Esto pisa el .env
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gastroia}:${POSTGRES_PASSWORD:-gastroia_dev}@postgres:5432/${POSTGRES_DB:-gastroia}
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      # Las URL firmadas sí van con el host que ve el navegador
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      # Correo de desarrollo: Mailpit lo atrapa todo (http://localhost:8025). En producción
+      # se quita esto y manda el SMTP real de backend/.env
+      SMTP_HOST: ${SMTP_HOST_DOCKER:-mailpit}
+      SMTP_PORT: ${SMTP_PORT_DOCKER:-1025}
+      SMTP_STARTTLS: ${SMTP_STARTTLS_DOCKER:-false}
+    ports:
+      - "8000:8000"   # directo pa ver /docs en desarrollo; en producción solo se entra por nginx
+    depends_on: &dependencias
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build: .
+    image: gastroia/backend:dev
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    env_file:
+      - path: .env
+        required: false
+    environment: *red_interna
+    depends_on: *dependencias
+
+  # Solo desarrollo: servidor SMTP de mentiras con bandeja web en http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "8025:8025"   # bandeja web; el SMTP (1025) solo se usa dentro de Docker
+
+  nginx:
+    image: nginx:1.28-alpine
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres16_data:
+  redis_data:
+  minio_data:

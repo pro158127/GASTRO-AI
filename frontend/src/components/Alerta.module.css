@@ -1,0 +1,74 @@
+/* Alerta (Figma 14:548). */
+
+.alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  width: 100%;
+  padding: var(--espacio-3) var(--espacio-4);
+  border: var(--borde-grosor) solid transparent;
+  border-radius: var(--radio-md);
+}
+
+.icono {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+.contenido {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+}
+
+/* El texto usa el color «…-texto» y el icono (currentColor) el color «…-icono», como en Figma. */
+.info {
+  background: var(--color-estado-info-fondo);
+  border-color: var(--color-estado-info-borde);
+  color: var(--color-estado-info-texto);
+}
+.info .icono {
+  color: var(--color-estado-info-icono);
+}
+
+.exito {
+  background: var(--color-estado-exito-fondo);
+  border-color: var(--color-estado-exito-borde);
+  color: var(--color-estado-exito-texto);
+}
+.exito .icono {
+  color: var(--color-estado-exito-icono);
+}
+
+.advertencia {
+  background: var(--color-estado-advertencia-fondo);
+  border-color: var(--color-estado-advertencia-borde);
+  color: var(--color-estado-advertencia-texto);
+}
+.advertencia .icono {
+  color: var(--color-estado-advertencia-icono);
+}
+
+.error {
+  background: var(--color-estado-error-fondo);
+  border-color: var(--color-estado-error-borde);
+  color: var(--color-estado-error-texto);
+}
+.error .icono {
+  color: var(--color-estado-error-icono);
+}
