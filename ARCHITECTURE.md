@@ -211,9 +211,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/auth/totp/iniciar` | `VINCULAR_TOTP` | — | `{otpauth_uri, secreto_manual, qr_png_base64}` |
 | POST | `/auth/totp/vincular` | `VINCULAR_TOTP` | `{codigo}` | `{etapa: "ACTIVA", usuario, ruta_inicial}` |
 | POST | `/auth/totp/verificar` | `PENDIENTE_2FA` | `{codigo}` | `{etapa: "ACTIVA", usuario, ruta_inicial}` |
-| GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, usuario, inactividad}` |
-| POST | `/auth/sesion/continuar` | `ACTIVA` | — | `{ultima_actividad_en}` |
-| POST | `/auth/logout` | Cualquiera (o ninguna) | — | `204`, borra la cookie |
+| GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, usuario, inactividad, casos_recibidos_nuevos}` |
+| POST | `/auth/sesion/continuar` | Cualquier etapa | — | `{ultima_actividad_en}` |
+| POST | `/auth/logout` | Cualquiera (o ninguna) | `{motivo?}` | `204`, borra la cookie |
 | GET | `/perfil` | Cualquier rol | — | `{id, nombre, apellido, correo, telefono, rol: {codigo, nombre}, estado, creado_en, totp_vinculado}` |
 | PATCH | `/perfil` | Cualquier rol | `{nombre?, apellido?, telefono?}` | el perfil (correo y rol se ignoran) |
 | GET | `/admin/usuarios` | `ADMINISTRADOR` | `?q&rol&estado&excluir&pagina&por_pagina` | `{items, paginacion}` |
@@ -257,7 +257,19 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - `CONTRASENA_NO_CUMPLE_POLITICA` trae `requisitos`: `[{codigo, cumple}]` con
   `LONGITUD_MINIMA`, `LONGITUD_MAXIMA`, `NO_COMUN`, `SIN_DATOS_PROPIOS`, `NO_FILTRADA` y
   `DISTINTA_A_LA_TEMPORAL`, en ese orden. Si la `confirmacion` no coincide, `campos` lo dice.
-- `/auth/logout` responde 204 aunque la sesión ya hubiera vencido.
+- `/auth/logout` responde 204 aunque la sesión ya hubiera vencido. El cuerpo es opcional:
+  `{"motivo": "manual"}` (por defecto) o `{"motivo": "inactividad"}` cuando el front cierra por el
+  aviso del minuto 10; solo cambia lo que queda en la bitácora (`CIERRE_SESION` o
+  `CIERRE_SESION_INACTIVIDAD`).
+- `/auth/sesion/continuar` («Sigo aquí») funciona en **cualquier etapa**, también en el cambio de
+  contraseña, la vinculación del TOTP y el código, para poder avisar y ampliar el tiempo en esas
+  pantallas (WCAG 2.2.1). Solo renueva la inactividad; no salta ningún paso.
+- `casos_recibidos_nuevos` es el número del menú «Casos recibidos»: traslados que el doctor no ha
+  abierto. Solo viene con sesión `ACTIVA` y rol `DOCTOR`; en los demás casos es `null`. Como el
+  front consulta `/auth/sesion` por la inactividad, el número se actualiza solo.
+- Las respuestas llevan la cabecera HTTP `Date` (la pone el servidor). El front la usa con
+  `ultima_actividad_en` para calcular el tiempo restante sin depender del reloj del equipo; no se
+  debe quitar en nginx ni en uvicorn.
 
 **Paciente y documento.**
 

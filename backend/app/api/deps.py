@@ -108,6 +108,7 @@ def get_servicio_autenticacion(
             intentos=ajustes.bloqueo_intentos,
             bloqueo=timedelta(minutes=ajustes.bloqueo_minutos),
         ),
+        traslados=RepositorioTraslados(db),
     )
 
 
