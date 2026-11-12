@@ -72,6 +72,10 @@ muestras reales anotadas (excluyendo ceros imputados de EGID).
 Entrenamiento (Masked Loss): Train Loss `0.0727`, Val Loss `0.0314`,
 ROC-AUC enmascarado `0.9992`, F1 enmascarado `0.9774`.
 
+> **Umbrales en producción (RF-A01):** los umbrales quedan acotados al rango
+> 10%–90%. Atrofia y H. Pylori se despliegan en `0.900` (no `0.946`/`0.982`),
+> lo que prioriza sensibilidad sobre precisión respecto a la calibración F1.
+
 > Ver el reporte completo de evaluación y calibración en
 > `Documentacion/Data-documentation/reports/Reporte_Metricas_Calibracion_GastroAI.md`.
 
@@ -91,14 +95,37 @@ ROC-AUC enmascarado `0.9992`, F1 enmascarado `0.9774`.
 
 Endpoints expuestos en el Space (puerto 7860):
 
-- `GET /` → estado del servicio.
-- `POST /api/v1/analyze` → recibe una imagen (`multipart/form-data`, campo
-  `file`) y devuelve, por clase, la probabilidad, el umbral, si fue detectada
-  y el overlay Grad-CAM en base64.
+- `GET /` → estado del servicio (incluye `revision_sha`).
+- `POST /clasificar` → recibe una imagen (`multipart/form-data`, campo
+  `imagen`) y devuelve, por patología, la probabilidad, el umbral, si fue
+  detectada, el bounding-box de ROI y el mapa de calor Grad-CAM aislado en
+  PNG Base64.
+
+El endpoint requiere la cabecera `X-API-Key` (valor configurado en la
+variable de entorno `GASTROAI_API_KEY` del Space).
+
+Respuesta (3 patologías, `normal_mucosa` no se reporta):
+
+```json
+{
+  "revision_sha": "v1.0.0-masked-loss-ep07",
+  "predicciones": {
+    "GASTRITIS": {
+      "probabilidad": 0.8123,
+      "detectado": true,
+      "region_roi": {"x": 10, "y": 20, "ancho": 100, "alto": 120, "area_pct": 20.83},
+      "mapa_calor_png_b64": "<PNG base64>"
+    },
+    "ATROFIA":  {"probabilidad": 0.1000, "detectado": false, "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0}, "mapa_calor_png_b64": "<PNG base64>"},
+    "HPYLORI":  {"probabilidad": 0.0500, "detectado": false, "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0}, "mapa_calor_png_b64": "<PNG base64>"}
+  }
+}
+```
 
 ```bash
-curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/api/v1/analyze" \
-     -F "file=@imagen_endoscopia.bmp"
+curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/clasificar" \
+     -H "X-API-Key: $GASTROAI_API_KEY" \
+     -F "imagen=@imagen_endoscopia.bmp"
 ```
 
 ## Licencia
