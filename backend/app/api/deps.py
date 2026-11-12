@@ -25,6 +25,7 @@ from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
+from app.repositories.casos_recibidos_repository import RepositorioCasosRecibidos
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
 from app.repositories.health_repository import HealthRepository
@@ -37,6 +38,7 @@ from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
+from app.services.casos_recibidos import ServicioCasosRecibidos
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
@@ -225,6 +227,17 @@ def get_servicio_historial(
 
 
 ServicioDeHistorial = Annotated[ServicioHistorial, Depends(get_servicio_historial)]
+
+
+def get_servicio_casos_recibidos(
+    db: DbSession, seudonimizador: Annotated[Seudonimizador, Depends(get_seudonimizador)]
+) -> ServicioCasosRecibidos:
+    return ServicioCasosRecibidos(
+        RepositorioCasosRecibidos(db), seudonimizador, UnidadTrabajo(db), _ahora
+    )
+
+
+ServicioDeCasosRecibidos = Annotated[ServicioCasosRecibidos, Depends(get_servicio_casos_recibidos)]
 
 
 def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:
