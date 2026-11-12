@@ -63,6 +63,35 @@ export interface CampoConError {
   mensaje: string;
 }
 
+/** `rol` de `GET /perfil`: el código y el nombre que se muestra («Doctor/Gastroenterólogo»). */
+export interface RolPerfil {
+  codigo: RolUsuario;
+  nombre: string;
+}
+
+/** Respuesta de `GET /perfil` y `PATCH /perfil` (RF-U04). */
+export interface Perfil {
+  id: string;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  telefono: string | null;
+  rol: RolPerfil;
+  estado: string;
+  creado_en: string;
+  totp_vinculado: boolean;
+}
+
+/**
+ * Cuerpo de `PATCH /perfil`. Solo se editan nombre, apellido y teléfono; el correo y el rol
+ * no se envían (solo los cambia el administrador). `telefono: null` borra el teléfono.
+ */
+export interface EdicionPerfil {
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+}
+
 /** Respuesta de `GET /health`. */
 export interface HealthResponse {
   status: "ok" | "degraded";

@@ -3,6 +3,7 @@
 // Las pantallas que todavía no se construyen usan PantallaPendiente, marcada para encontrarla
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
+import MiPerfil from "../pages/MiPerfil";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import SinPermisos from "../pages/SinPermisos";
 import type { RolInterfaz } from "./menus";
@@ -48,7 +49,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/perfil",
     titulo: "Mi perfil",
     roles: AMBOS,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (Mi perfil)
+    elemento: (titulo) => <MiPerfil titulo={titulo} />, // W-18
   },
   {
     ruta: "/usuarios",

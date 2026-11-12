@@ -2,8 +2,10 @@
 // `gastro_sesion`: el frontend nunca la lee ni la guarda, y no hay header Authorization.
 import type {
   CampoConError,
+  EdicionPerfil,
   EtapaSesion,
   HealthResponse,
+  Perfil,
   RequisitoContrasena,
   RespuestaContinuar,
   RespuestaEtapa,
@@ -100,7 +102,7 @@ export function registrarManejadoresGlobales(nuevos: ManejadoresGlobales | null)
 }
 
 interface OpcionesSolicitud {
-  metodo?: "GET" | "POST";
+  metodo?: "GET" | "POST" | "PATCH";
   cuerpo?: unknown;
   /** Consulta automática: no renueva la inactividad de la sesión (header X-Actividad-Pasiva: 1). */
   pasiva?: boolean;
@@ -304,6 +306,24 @@ export function cerrarSesionEnServidor(motivo: "manual" | "inactividad" = "manua
     metodo: "POST",
     cuerpo: { motivo },
     global: false,
+  });
+}
+
+/** GET /perfil (W-18). Datos del propio usuario; cualquier rol. Contiene datos personales: no se registran. */
+export function obtenerPerfil(): Promise<Perfil> {
+  return solicitar<Perfil>("/perfil");
+}
+
+/**
+ * PATCH /perfil (W-18). Envía solo `{nombre, apellido, telefono}`; nunca el correo ni el rol.
+ * Responde el perfil con los valores normalizados (por ejemplo, el teléfono sin espacios).
+ * 422 DATOS_INVALIDOS trae `campos` (`nombre`, `apellido` o `telefono`).
+ */
+export function actualizarPerfil(edicion: EdicionPerfil): Promise<Perfil> {
+  const { nombre, apellido, telefono } = edicion;
+  return solicitar<Perfil>("/perfil", {
+    metodo: "PATCH",
+    cuerpo: { nombre, apellido, telefono },
   });
 }
 

@@ -69,6 +69,11 @@ interface ValorSesion {
   cerrarSesion: () => Promise<void>;
   /** La pantalla de inicio de sesión lo llama al montar: el aviso se muestra una sola vez. */
   consumirMotivoCierre: () => void;
+  /**
+   * Cambia el nombre y el apellido del usuario en memoria con lo que respondió PATCH /perfil
+   * (W-18), para que la barra superior y el menú los muestren sin otra consulta.
+   */
+  actualizarUsuario: (datos: Pick<UsuarioActual, "nombre" | "apellido">) => void;
 }
 
 const ContextoSesion = createContext<ValorSesion | null>(null);
@@ -254,6 +259,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
+  const actualizarUsuario = useCallback((datos: Pick<UsuarioActual, "nombre" | "apellido">) => {
+    setEstado((previo) =>
+      previo.fase === "con_sesion"
+        ? { ...previo, usuario: { ...previo.usuario, nombre: datos.nombre, apellido: datos.apellido } }
+        : previo
+    );
+  }, []);
+
   // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; el
   // aviso sale de `motivoDeExpiracion` (W-01d, W-01b o ninguno). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
   // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
@@ -292,8 +305,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       avanzarEtapa,
       cerrarSesion,
       consumirMotivoCierre,
+      actualizarUsuario,
     };
-  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre]);
+  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre, actualizarUsuario]);
 
   let contenido: ReactNode = children;
   // Mientras se confirma el cierre por inactividad no se muestra la pantalla anterior.
