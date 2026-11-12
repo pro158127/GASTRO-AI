@@ -92,6 +92,47 @@ export interface EdicionPerfil {
   telefono: string | null;
 }
 
+/** Estado de una cuenta (`estado` de los usuarios del administrador). */
+export type EstadoUsuario = "PENDIENTE" | "ACTIVO" | "INACTIVO" | "ELIMINADO";
+
+/** Solo en cuentas PENDIENTE: si la contraseña temporal sigue vigente o ya venció (RF-U06). */
+export type EstadoActivacion = "PENDIENTE" | "EXPIRADA";
+
+/**
+ * `usuario` de las rutas `/admin/usuarios` (../ARCHITECTURE.md § 3.5, «Usuarios»). `bloqueado` va
+ * aparte de `estado`: una cuenta ACTIVO puede estar bloqueada por intentos fallidos (RF-U12).
+ * Contiene datos personales: no se registran ni se guardan fuera del estado de la pantalla.
+ */
+export interface UsuarioResumen {
+  id: string;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  telefono: string | null;
+  rol: RolUsuario;
+  estado: EstadoUsuario;
+  bloqueado: boolean;
+  creado_en: string;
+  activado_en: string | null;
+  /** Solo en cuentas PENDIENTE. */
+  estado_activacion?: EstadoActivacion | null;
+  /** Solo en cuentas PENDIENTE. */
+  temporal_expira_en?: string | null;
+}
+
+/** Paginación de las listas: `?pagina&por_pagina` (máximo 100). */
+export interface Paginacion {
+  pagina: number;
+  por_pagina: number;
+  total: number;
+}
+
+/** Respuesta de `GET /admin/usuarios`. */
+export interface PaginaUsuarios {
+  items: UsuarioResumen[];
+  paginacion: Paginacion;
+}
+
 /** Respuesta de `GET /health`. */
 export interface HealthResponse {
   status: "ok" | "degraded";

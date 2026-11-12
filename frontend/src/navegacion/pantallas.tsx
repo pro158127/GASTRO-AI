@@ -3,12 +3,15 @@
 // Las pantallas que todavía no se construyen usan PantallaPendiente, marcada para encontrarla
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
+import { matchPath } from "react-router";
 import MiPerfil from "../pages/MiPerfil";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import SinPermisos from "../pages/SinPermisos";
+import Usuarios from "../pages/Usuarios";
 import type { RolInterfaz } from "./menus";
 
 export interface Pantalla {
+  /** Patrón de react-router; puede tener parámetros (`/usuarios/:id`). */
   ruta: string;
   /** Un solo título, o uno por rol (el dashboard es W-15 para el doctor y W-19 para el administrador). */
   titulo: string | Record<RolInterfaz, string>;
@@ -55,7 +58,22 @@ export const pantallas: Pantalla[] = [
     ruta: "/usuarios",
     titulo: "Usuarios",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-09)
+    elemento: (titulo) => <Usuarios titulo={titulo} />, // W-09
+  },
+  // Subrutas de Usuarios: mismos roles que /usuarios (SOLO_ADMINISTRADOR). App.tsx envuelve
+  // cada pantalla de esta lista en <RutaPorRol roles={pantalla.roles}>, así que un doctor que
+  // escriba estas rutas a mano vuelve a /dashboard (y el backend responde 403 en la API).
+  {
+    ruta: "/usuarios/nuevo",
+    titulo: "Crear usuario",
+    roles: SOLO_ADMINISTRADOR,
+    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-10)
+  },
+  {
+    ruta: "/usuarios/:id",
+    titulo: "Detalle de cuenta",
+    roles: SOLO_ADMINISTRADOR,
+    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-11)
   },
   {
     ruta: "/cuentas-pendientes",
@@ -101,8 +119,15 @@ export const pantallas: Pantalla[] = [
   },
 ];
 
+/**
+ * Pantalla de una ruta concreta (`/usuarios/3f2a…` → `/usuarios/:id`). Primero la ruta exacta,
+ * para que `/usuarios/nuevo` no se confunda con `/usuarios/:id`.
+ */
 export function buscarPantalla(ruta: string): Pantalla | undefined {
-  return pantallas.find((pantalla) => pantalla.ruta === ruta);
+  return (
+    pantallas.find((pantalla) => pantalla.ruta === ruta) ??
+    pantallas.find((pantalla) => matchPath(pantalla.ruta, ruta) !== null)
+  );
 }
 
 /** Título de la pantalla para el rol dado. */

@@ -24,7 +24,7 @@ import { ErrorApi, actualizarPerfil, obtenerPerfil } from "../services/api";
 import { CodigoErrorApi } from "../services/codigosError";
 import { useSesion } from "../sesion/ProveedorSesion";
 import type { Perfil } from "../types";
-import { avisoDeError } from "../utils/avisosError";
+import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
 import estilos from "./MiPerfil.module.css";
 
@@ -77,16 +77,6 @@ function validar(valores: ValoresFormulario): ErroresFormulario {
 
 function esCampoEditable(campo: string): campo is CampoEditable {
   return (ORDEN_CAMPOS as string[]).includes(campo);
-}
-
-/** Errores que ya atienden los manejadores globales de api.ts (W-01, W-28 o la etapa pendiente). */
-function esErrorGlobal(error: unknown): boolean {
-  return (
-    error instanceof ErrorApi &&
-    (error.codigo === CodigoErrorApi.SESION_EXPIRADA ||
-      error.codigo === CodigoErrorApi.PERMISO_DENEGADO ||
-      error.codigo === CodigoErrorApi.ETAPA_INVALIDA)
-  );
 }
 
 export default function MiPerfil({ titulo }: { titulo: string }) {

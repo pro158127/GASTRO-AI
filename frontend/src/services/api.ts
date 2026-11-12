@@ -101,7 +101,7 @@ export function registrarManejadoresGlobales(nuevos: ManejadoresGlobales | null)
   manejadores = nuevos;
 }
 
-interface OpcionesSolicitud {
+export interface OpcionesSolicitud {
   metodo?: "GET" | "POST" | "PATCH";
   cuerpo?: unknown;
   /** Consulta automática: no renueva la inactividad de la sesión (header X-Actividad-Pasiva: 1). */
@@ -201,7 +201,11 @@ async function solicitarCompleta<T>(
   return { datos, fechaServidorMs: Number.isNaN(fecha) ? null : fecha, instanteRecibido };
 }
 
-async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
+/**
+ * Llamada a la API con la cookie de sesión. La usan los demás módulos de `src/services/`; los
+ * componentes nunca la llaman directamente.
+ */
+export async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
   return (await solicitarCompleta<T>(ruta, opciones)).datos;
 }
 
