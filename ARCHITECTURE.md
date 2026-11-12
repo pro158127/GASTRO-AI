@@ -228,6 +228,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/admin/usuarios/{id}/restablecer-contrasena` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
 | POST | `/admin/usuarios/{id}/reenviar-credencial` | `ADMINISTRADOR` | — | `{usuario, credencial}` |
 | POST | `/admin/usuarios/{id}/desbloquear` | `ADMINISTRADOR` | — | `{usuario}` |
+| GET | `/admin/bitacora` | `ADMINISTRADOR` | `?accion&resultado&actor_id&actor&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
+| GET | `/admin/bitacora/filtros` | `ADMINISTRADOR` | — | `{acciones: [{codigo, texto}], usuarios: [{id, nombre, cuenta_eliminada}]}` |
+| GET | `/admin/auditoria/exportar` | `ADMINISTRADOR` | `?desde&hasta` | CSV (`text/csv`) |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
@@ -389,6 +392,24 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
+**Bitácora (RF-A02, RNF-05).**
+
+- Solo lectura y solo para el administrador: no existe ningún endpoint para editarla o borrarla,
+  y la base de datos además lo impide.
+- Entrada: `{id, ocurrido_en, actor, accion, accion_texto, resultado, objetivo, detalle, ip}`.
+  `id` va como texto. `actor` y `objetivo` = `{id, nombre, apellido, cuenta_eliminada}`;
+  `actor` es `null` en intentos sin sesión (correo inexistente) y `objetivo` es la cuenta sobre
+  la que se hizo la acción. `detalle` es un texto armado por el backend (por ejemplo «Rechazado:
+  contraseña incorrecta» o «Umbral global 0.5000 → 0.6000»); nunca trae contraseñas, secretos
+  ni datos de pacientes.
+- Filtros: `accion`, `resultado` (`EXITO | FALLO`), `actor_id` o `actor` (parte del nombre),
+  `desde` y `hasta` (días de Colombia). Lo más reciente primero; 25 por página por defecto.
+- **Exportar** (`/admin/auditoria/exportar`, RF-DB02 CA 7 y 10): CSV con `fecha_hora, usuario,
+  evento, resultado, ip` de la creación de cuentas y del segundo factor (`CUENTA_CREADA`,
+  `ENVIO_CREDENCIAL`, `VINCULACION_TOTP`, `VERIFICACION_2FA`). Período obligatorio de máximo 366
+  días (`422 PERIODO_INVALIDO`, trae `max_dias`). Va con BOM para que Excel abra bien las tildes,
+  neutraliza fórmulas en las celdas y queda registrada en la bitácora (`AUDITORIA_EXPORTADA`).
+
 **Planeados** (detalle en la especificación del equipo): reportes PDF, casos recibidos del lado
 del doctor, dashboards, bitácora, monitoreo y SSE.
 
@@ -403,6 +424,7 @@ probarlas sin base de datos (RNF-19).
   comunes, las obvias, las que llevan el correo o el nombre de la app, y las filtradas.
 - `auditoria.py`: bitácora con patrón Observador. El evento rechaza en `detalle` cualquier
   dato del paciente, resultado clínico o secreto.
+- `bitacora.py`: consulta y exportación de la bitácora, con los textos de cada acción.
 - `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la
   limpieza de metadatos.
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
