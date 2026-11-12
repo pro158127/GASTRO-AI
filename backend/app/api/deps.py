@@ -27,6 +27,7 @@ from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
+from app.repositories.dashboard_repository import RepositorioDashboard
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
 from app.repositories.pacientes_repository import RepositorioPacientes
@@ -39,6 +40,7 @@ from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
+from app.services.dashboard import ServicioDashboard
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
@@ -273,3 +275,10 @@ def requiere_rol(*roles: CodigoRol) -> Callable[..., Sesion]:
 
 SesionDoctor = Annotated[Sesion, Depends(requiere_rol(CodigoRol.DOCTOR))]
 SesionAdmin = Annotated[Sesion, Depends(requiere_rol(CodigoRol.ADMINISTRADOR))]
+
+
+def get_servicio_dashboard(db: DbSession) -> ServicioDashboard:
+    return ServicioDashboard(RepositorioDashboard(db), _ahora)
+
+
+ServicioDeDashboard = Annotated[ServicioDashboard, Depends(get_servicio_dashboard)]
