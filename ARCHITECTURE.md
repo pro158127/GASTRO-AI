@@ -29,8 +29,8 @@ api, worker → postgres (datos) + minio (archivos)
 
 > Estado actual: base de datos (20 tablas), autenticación y sesión, perfil y gestión de
 > usuarios, umbrales, carga de imagen, análisis con calidad, clasificación y Grad-CAM,
-> explicación con Gemini, observaciones e historial (sección 3.5). Faltan reportes PDF,
-> casos recibidos, bitácora y monitoreo, dashboards y SSE.
+> explicación con Gemini, observaciones, historial y casos recibidos (sección 3.5). Faltan
+> reportes PDF, bitácora y monitoreo, dashboards y SSE.
 
 ---
 
@@ -242,6 +242,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
 | POST | `/analisis/{id}/observaciones` | `DOCTOR` | `{valoracion, texto?}` | `201 {observacion: {id, valoracion, texto, autor, registrada_en}}` |
 | GET | `/analisis` | `DOCTOR` | `?pagina&por_pagina&origen&estado&codigo&caracteristica&desde&hasta&orden` | `{items, paginacion}` («Mis análisis») |
+| GET | `/casos-recibidos` | `DOCTOR` | `?origen_id&limite` | `{nuevos, total_traslados, total_casos, doctores_origen, traslados}` |
+| POST | `/casos-recibidos/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, origen_id?, limite?}` | igual + `analisis_propios_paciente` |
+| POST | `/traslados/{id}/visto` | `DOCTOR` | — | `204` |
 | POST | `/pacientes/analisis/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, pagina?, por_pagina?, estado?, orden?}` | `{items, paginacion, caso_id, caso_ids}` |
 
 - `usuario` = `{id, nombre, apellido, rol}`, con `rol` = `DOCTOR` o `ADMINISTRADOR`.
@@ -354,6 +357,25 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `caso_id` es el caso más reciente (para «Descargar reporte de este paciente»); `caso_ids`, todos.
 - nginx limita la búsqueda por paciente igual que `/pacientes/consulta` (30/min por IP).
 
+**Casos recibidos (RF-A07).**
+
+- Bandeja del doctor con los casos que le trasladaron (al desactivar, eliminar o reasignar a otro
+  doctor). Un bloque por traslado, el más reciente primero:
+  `{id, tipo, ejecutado_en, nuevo, origen: {nombre, apellido, cuenta_eliminada}, casos: [{caso_id,
+  total_analisis, ultimo_analisis_en}], analisis_total, analisis}`.
+- `analisis` = filas `{id, codigo, solicitado_en, estado, caracteristica_principal,
+  probabilidad_principal, originalmente_de}`, las más recientes primero; `?limite=5` por defecto y
+  `limite=0` las trae todas («Ver los N casos»). `originalmente_de` aparece cuando el análisis lo
+  hizo alguien distinto del doctor de origen (caso trasladado dos veces).
+- `nuevo` = el doctor no ha abierto ese traslado; `POST /traslados/{id}/visto` lo marca (204,
+  repetirlo no cambia nada; traslado ajeno → 404). `nuevos` = cuántos faltan por abrir.
+- `doctores_origen` alimenta el filtro «Doctor de origen» (`?origen_id=`).
+- Solo aparece lo que sigue siendo del doctor: si un caso recibido se trasladó otra vez, sale de
+  su bandeja. Nunca se muestra el seudónimo ni qué administrador hizo el traslado.
+- La búsqueda por documento filtra los mismos bloques por paciente y agrega
+  `analisis_propios_paciente` (aviso «Este paciente también tiene N análisis suyos»). Sin
+  coincidencias: `traslados: []`, sin revelar nada. Mismo límite por IP que la consulta de paciente.
+
 **Configuración de inferencia.**
 
 - Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
@@ -389,8 +411,8 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | 422 | `DESTINO_INVALIDO` | El destino no es otro doctor ACTIVO |
 | 422 | `CASOS_INVALIDOS` | Algún `caso_id` no es un caso activo de ese doctor |
 
-**Planeados** (detalle en la especificación del equipo): reportes PDF, casos recibidos del lado
-del doctor, dashboards, bitácora, monitoreo y SSE.
+**Planeados** (detalle en la especificación del equipo): reportes PDF, dashboards, bitácora,
+monitoreo y SSE.
 
 ### 3.6 Capa de servicios (`app/services/`)
 
@@ -408,6 +430,8 @@ probarlas sin base de datos (RNF-19).
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
 - `analisis.py`: fachada `ServicioAnalisis` (documento → seudónimo → caso → análisis →
   cola, con candado por paciente) y proxy `ProxyAccesoAnalisis` (solo el doctor del caso).
+- `casos_recibidos.py` (+ `repositories/casos_recibidos_repository.py`): bandeja de casos
+  recibidos por traslado.
 - `historial.py` (+ `repositories/historial_repository.py`): «Mis análisis» y «Buscar por
   paciente», siempre por el caso asignado al doctor.
 - `calidad_imagen.py` y `procesamiento.py`: lo que corre el worker, etapa por etapa.
@@ -544,7 +568,7 @@ Lo que cambia del lado del backend:
 | Ruta | Destino | Notas |
 |---|---|---|
 | `/api/v1/auth/login`, `contrasena/cambiar` y `totp/*` | `api:8000` | Límite 10/min por IP (ráfaga 5) |
-| `/api/v1/pacientes/consulta` y `/pacientes/analisis/buscar` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
+| `/api/v1/pacientes/consulta`, `/pacientes/analisis/buscar` y `/casos-recibidos/buscar` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
 | `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
 | `/` | `frontend:80` | SPA compilada |
 
