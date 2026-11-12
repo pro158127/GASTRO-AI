@@ -5,7 +5,7 @@ Todas dejan bitácora y devuelven la cuenta actualizada.
 """
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
@@ -92,6 +92,12 @@ def traslado(resultado: ResultadoTraslado | None) -> TrasladoResumen | None:
 # ------------------------------------------------------------------------ rutas
 
 
+# U-15: las columnas ordenables de W-09
+OrdenUsuarios = Literal[
+    "nombre", "-nombre", "correo", "-correo", "rol", "-rol", "estado", "-estado"
+]
+
+
 @router.get("", response_model=PaginaUsuarios, responses=ERRORES)
 def listar(
     sesion: SesionAdmin,
@@ -103,8 +109,12 @@ def listar(
     excluir: UUID | None = None,
     pagina: Annotated[int, Query(ge=1)] = 1,
     por_pagina: Annotated[int, Query(ge=1, le=POR_PAGINA_MAXIMO)] = 20,
+    orden: OrdenUsuarios = "nombre",
 ):
     """Cuentas con filtros. `estado=PENDIENTE` = pendientes de activación (RF-U06).
+
+    `orden`: `nombre` (apellido y nombre), `correo`, `rol` o `estado` (la prioridad de la
+    insignia: bloqueada, pendiente, inactiva, activa); con `-` delante, descendente.
 
     Las eliminadas no salen salvo `estado=ELIMINADO`. Pa elegir el doctor de destino de
     un traslado: `?rol=DOCTOR&estado=ACTIVO&excluir={id}`.
@@ -116,6 +126,7 @@ def listar(
         excluir=excluir,
         pagina=pagina,
         por_pagina=por_pagina,
+        orden=orden,
     )
     filas, total = servicio.listar(filtro)
     envios = extras.ultimos_envios(filas)
