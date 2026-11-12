@@ -34,10 +34,10 @@ from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
+from app.services import bitacora as servicio_bitacora
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
-from app.services.bitacora import ServicioBitacora
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
 from app.services.health_service import HealthService
@@ -154,11 +154,15 @@ ServicioConfiguracion = Annotated[
 ]
 
 
-def get_servicio_bitacora(db: DbSession, publicador: Publicador) -> ServicioBitacora:
-    return ServicioBitacora(RepositorioBitacora(db), publicador, UnidadTrabajo(db), _ahora)
+def get_servicio_bitacora(
+    db: DbSession, publicador: Publicador
+) -> servicio_bitacora.ServicioBitacora:
+    return servicio_bitacora.ServicioBitacora(
+        RepositorioBitacora(db), publicador, UnidadTrabajo(db), _ahora
+    )
 
 
-ServicioDeBitacora = Annotated[ServicioBitacora, Depends(get_servicio_bitacora)]
+ServicioDeBitacora = Annotated[servicio_bitacora.ServicioBitacora, Depends(get_servicio_bitacora)]
 
 
 def get_catalogo(db: DbSession) -> RepositorioCatalogo:
