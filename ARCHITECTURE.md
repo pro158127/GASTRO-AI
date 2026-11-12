@@ -216,9 +216,10 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/auth/logout` | Cualquiera (o ninguna) | — | `204`, borra la cookie |
 | GET | `/perfil` | Cualquier rol | — | `{id, nombre, apellido, correo, telefono, rol: {codigo, nombre}, estado, creado_en, totp_vinculado}` |
 | PATCH | `/perfil` | Cualquier rol | `{nombre?, apellido?, telefono?}` | el perfil (correo y rol se ignoran) |
-| GET | `/admin/usuarios` | `ADMINISTRADOR` | `?q&rol&estado&excluir&pagina&por_pagina` | `{items, paginacion}` |
+| GET | `/admin/usuarios` | `ADMINISTRADOR` | `?q&rol&estado&excluir&orden&pagina&por_pagina` | `{items, paginacion, conteos}` |
 | POST | `/admin/usuarios` | `ADMINISTRADOR` | `{nombre, apellido, correo, telefono?, rol}` | `201 {usuario, credencial}` |
-| GET | `/admin/usuarios/{id}` | `ADMINISTRADOR` | — | usuario + `casos_activos, totp_vinculado, intentos_fallidos, bloqueado_hasta, envios_credencial` |
+| GET | `/admin/usuarios/{id}` | `ADMINISTRADOR` | — | usuario + `casos_activos, totp_vinculado, intentos_fallidos, bloqueado_hasta, bloqueado_en, desactivado_en, ultimo_traslado, envios_credencial` |
+| GET | `/admin/usuarios/{id}/casos-activos` | `ADMINISTRADOR` | — | `{total_casos, total_analisis, casos: [{caso_id, analisis: [{id, codigo, solicitado_en}]}]}` |
 | PATCH | `/admin/usuarios/{id}` | `ADMINISTRADOR` | `{nombre?, apellido?, telefono?, correo?}` | `{usuario, credencial?}` |
 | POST | `/admin/usuarios/{id}/rol` | `ADMINISTRADOR` | `{rol}` | `{usuario}` |
 | POST | `/admin/usuarios/{id}/activar` | `ADMINISTRADOR` | — | `{usuario}` |
@@ -385,9 +386,24 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 
 **Usuarios (administrador).**
 
-- `usuario` = `{id, nombre, apellido, correo, telefono, rol, estado, bloqueado, creado_en,
-  activado_en, estado_activacion, temporal_expira_en}`. Los dos últimos solo vienen en las
-  cuentas `PENDIENTE` (`estado_activacion` = `PENDIENTE` o `EXPIRADA`, RF-U06).
+- `usuario` = `{id, nombre, apellido, correo, telefono, rol, rol_nombre, estado, bloqueado,
+  creado_en, activado_en, estado_activacion, temporal_expira_en, ultimo_envio}`.
+  `estado_activacion` y `temporal_expira_en` solo vienen en las cuentas `PENDIENTE`
+  (`estado_activacion` = `PENDIENTE` o `EXPIRADA`, RF-U06). `rol_nombre` es el nombre
+  visible del rol (p. ej. «Doctor/Gastroenterólogo»). `ultimo_envio` es la `credencial`
+  más reciente o `null`: con `estado: "FALLIDO"` la fila muestra «Correo no enviado».
+- `orden` = `nombre` (por defecto: apellido y nombre), `correo`, `rol` (nombre visible) o
+  `estado` (prioridad de la insignia: bloqueada, pendiente, inactiva, activa); con `-` delante,
+  descendente (`?orden=-correo`). Siempre se desempata por apellido, nombre e `id`, así que el
+  orden es fijo entre páginas. Otro valor → 422.
+- La lista trae `conteos` = `{activos, pendientes, expiradas, inactivos, bloqueadas,
+  eliminadas}` de **todas** las cuentas, sin importar los filtros (resumen de la pantalla).
+- En el detalle: `bloqueado_en` (solo con un bloqueo en curso) y `desactivado_en` (solo si
+  está `INACTIVO`) salen de la bitácora; la IP del bloqueo **no** viene aquí, se consulta en
+  la bitácora filtrando por el usuario. `ultimo_traslado` = `{tipo, cantidad_casos,
+  ejecutado_en, destino: {nombre, apellido, cuenta_eliminada}}` o `null`.
+- `casos-activos`: los casos de un doctor para elegir qué reasignar, con solo el código y la
+  fecha de cada análisis (nada clínico ni del paciente, RF-A06 CA 2). 404 si la cuenta no existe.
 - `credencial` = `{motivo, estado, intentado_en, codigo_error}`; con el correo caído:
   `estado: "FALLIDO"`, `codigo_error: "CORREO_NO_ENVIADO"` → la UI ofrece reenviar. **La
   contraseña temporal nunca viaja en la respuesta**, solo por correo.
@@ -572,6 +588,9 @@ Lo que cambia del lado del backend:
 
 `client_max_body_size 12m` (la API rechaza por encima de 10 MB con su propio 413 en JSON).
 `resolver 127.0.0.11` evita los 502 al recrear contenedores.
+El registro de accesos usa el formato `sin_consulta`: guarda la ruta **sin la query string**,
+para que búsquedas como `GET /admin/usuarios?q=…` no dejen nombres ni correos en los logs.
+Por lo mismo, uvicorn corre con `--no-access-log` (el registro de accesos es solo el de nginx).
 
 ---
 
