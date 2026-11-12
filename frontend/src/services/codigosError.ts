@@ -3,7 +3,10 @@
 // sueltas. En los 5xx el `codigo` no está aquí: es un `ERR-xxxx` genérico (ver `ErrorApi.idError`).
 export const CodigoErrorApi = {
   PETICION_INVALIDA: "PETICION_INVALIDA",
-  /** 401 · Sin cookie, sesión cerrada o vencida. Con `motivo: "INACTIVIDAD"` → W-01d. */
+  /**
+   * 401 · Sin cookie, sesión cerrada o vencida. Puede traer `motivo` (ver `MotivoSesionExpirada`):
+   * `INACTIVIDAD` → W-01d; `DEMASIADOS_INTENTOS` → W-01b genérico.
+   */
   SESION_EXPIRADA: "SESION_EXPIRADA",
   /** 401 · Login: correo o contraseña incorrectos, cuenta bloqueada, inactiva o eliminada. */
   AUTH_CREDENCIALES_INVALIDAS: "AUTH_CREDENCIALES_INVALIDAS",
@@ -28,3 +31,19 @@ export const CodigoErrorApi = {
 } as const;
 
 export type CodigoErrorApi = (typeof CodigoErrorApi)[keyof typeof CodigoErrorApi];
+
+/**
+ * Valores de `motivo` en 401 SESION_EXPIRADA (tabla de errores de ../ARCHITECTURE.md § 3.5). No son
+ * códigos de error: `DEMASIADOS_INTENTOS` aquí no es el 429 por IP de `CodigoErrorApi`.
+ */
+export const MotivoSesionExpirada = {
+  /** La sesión venció por inactividad → W-01d. */
+  INACTIVIDAD: "INACTIVIDAD",
+  /**
+   * Cuenta bloqueada tras 5 códigos TOTP fallidos (RF-U12); el servidor lo repite mientras dura el
+   * bloqueo → W-01b genérico (nota de W-04b en Figma).
+   */
+  DEMASIADOS_INTENTOS: "DEMASIADOS_INTENTOS",
+} as const;
+
+export type MotivoSesionExpirada = (typeof MotivoSesionExpirada)[keyof typeof MotivoSesionExpirada];
