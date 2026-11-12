@@ -1,0 +1,16 @@
+{
+  "Worktree": "C:\\Users\\KELLY ESC0BAR\\Desktop\\Gastroaiprueba\\GASTRO-AI-validacion-8b22250",
+  "Rama": "test/70-validacion-backend-8b22250",
+  "Integracion": "a6838af50ae74db755270164529630b9866d27ca",
+  "Frontend": "428b7fbdac9dde25a40c9796adae1a35eb91b59d",
+  "Backend": "8b222500f41fcaff96893666179f44d71d1cf04c",
+  "Node": "v24.19.0",
+  "Pnpm": "9.15.4",
+  "Instalacion": "APROBADA, salida 0; frozen-lockfile",
+  "Build": "APROBADO, salida 0: tsc --noEmit && vite build",
+  "Lint": "NO CONFIGURADO",
+  "PruebasUnitariasFrontend": "NO CONFIGURADAS; no ejecutadas",
+  "IntegracionFuncional": "NO EJECUTADA; falta preparar servicios y configuracion",
+  "IncidenciaInicial": "Descarga pnpm bloqueada por ENOTFOUND en entorno restringido; resuelta con acceso de red autorizado",
+  "Hashes": "Fuentes frontend, lockfile, siete pruebas y evidencias backend sin cambios"
+}
