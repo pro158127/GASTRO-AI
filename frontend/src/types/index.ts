@@ -30,8 +30,8 @@ export interface RespuestaIngreso {
 
 /**
  * Inactividad de la sesión: segundos contados desde `ultima_actividad_en` (fecha ISO 8601 en
- * UTC) para el aviso del minuto 9 (`aviso_en_s`: 540) y el cierre (`cierre_en_s`: 600). W-05
- * la usará para el aviso de inactividad.
+ * UTC) para el aviso (`aviso_en_s`) y el cierre (`cierre_en_s`). La usa el aviso de W-05
+ * (ver `sesion/relojInactividad.ts`); los valores salen siempre del servidor.
  */
 export interface Inactividad {
   aviso_en_s: number;
@@ -44,6 +44,11 @@ export interface RespuestaSesion {
   etapa: EtapaSesion;
   usuario: UsuarioActual;
   inactividad: Inactividad;
+}
+
+/** Respuesta de `POST /auth/sesion/continuar` (W-05, «Seguir conectado»). */
+export interface RespuestaContinuar {
+  ultima_actividad_en: string;
 }
 
 /** Requisito de la política de contraseñas (`requisitos` de CONTRASENA_NO_CUMPLE_POLITICA). */
