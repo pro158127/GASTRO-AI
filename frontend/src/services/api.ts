@@ -24,7 +24,7 @@ function esEtapaSesion(valor: unknown): valor is EtapaSesion {
 interface DetalleError {
   codigo?: string | null;
   idSolicitud?: string | null;
-  /** `motivo` de SESION_EXPIRADA (por ejemplo `INACTIVIDAD`). */
+  /** `motivo` de SESION_EXPIRADA (`INACTIVIDAD` o `DEMASIADOS_INTENTOS`, ver `MotivoSesionExpirada`). */
   motivo?: string | null;
   /** `etapa` de ETAPA_INVALIDA: la etapa actual de la sesión. */
   etapa?: EtapaSesion | null;
@@ -76,7 +76,10 @@ export class ErrorApi extends Error {
 
 /** Reacciones globales a los errores que no dependen de la pantalla que hizo la llamada. */
 export interface ManejadoresGlobales {
-  /** 401 SESION_EXPIRADA. Trae el `motivo` (`INACTIVIDAD` si fue por inactividad), si vino. */
+  /**
+   * 401 SESION_EXPIRADA. Trae el `motivo`, si vino (`INACTIVIDAD` o `DEMASIADOS_INTENTOS`, ver
+   * `MotivoSesionExpirada`).
+   */
   alSinSesion?: (motivo: string | null) => void;
   /** 403 PERMISO_DENEGADO. */
   alSinPermiso?: () => void;

@@ -14,7 +14,7 @@ import {
   obtenerSesion,
   registrarManejadoresGlobales,
 } from "../services/api";
-import { CodigoErrorApi } from "../services/codigosError";
+import { CodigoErrorApi, MotivoSesionExpirada } from "../services/codigosError";
 import type { EtapaSesion, Inactividad, RespuestaSesion, UsuarioActual } from "../types";
 import AvisoInactividad from "./AvisoInactividad";
 import { borrarCierrePendiente, hayCierrePendiente, marcarCierrePendiente } from "./cierrePendiente";
@@ -82,11 +82,14 @@ function esSinSesion(error: unknown): boolean {
 }
 
 /**
- * SESION_EXPIRADA: `motivo: "INACTIVIDAD"` es W-01d. Sin motivo, durante el segundo factor, es
- * el bloqueo de la cuenta (u otra causa que el servidor no revela): mensaje genérico de W-01b.
+ * SESION_EXPIRADA: `motivo: INACTIVIDAD` es W-01d. `motivo: DEMASIADOS_INTENTOS` (cuenta bloqueada,
+ * RF-U12) es el mensaje genérico de W-01b en cualquier etapa, también al recargar durante el
+ * bloqueo, cuando la etapa local ya es `null` (nota de W-04b). Sin motivo, durante el segundo
+ * factor, es otra causa que el servidor no revela: también W-01b. En los demás casos, sin aviso.
  */
 function motivoDeExpiracion(motivo: string | null, etapa: EtapaSesion | null): MotivoCierre | null {
-  if (motivo === "INACTIVIDAD") return "inactividad";
+  if (motivo === MotivoSesionExpirada.INACTIVIDAD) return "inactividad";
+  if (motivo === MotivoSesionExpirada.DEMASIADOS_INTENTOS) return "credenciales";
   return etapa === "VINCULAR_TOTP" || etapa === "PENDIENTE_2FA" ? "credenciales" : null;
 }
 
@@ -251,8 +254,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
-  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; con
-  // `motivo: INACTIVIDAD` se marca el motivo para mostrar W-01d, y si no, sin mensaje. 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
+  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; el
+  // aviso sale de `motivoDeExpiracion` (W-01d, W-01b o ninguno). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
   // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
   // las guardas llevan a la pantalla de esa etapa. Toda respuesta 2xx no pasiva reinicia el
   // contador de inactividad.
