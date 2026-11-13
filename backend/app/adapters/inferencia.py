@@ -20,6 +20,7 @@ import base64
 import binascii
 import hashlib
 import io
+import warnings
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Annotated, Protocol
@@ -35,6 +36,7 @@ from app.models import FormatoImagen
 
 FIRMA_PNG = b"\x89PNG\r\n\x1a\n"
 MAPA_MAXIMO_BYTES = 5 * 1024 * 1024  # un Grad-CAM de 224 px pesa KB; 5 MB ya es sospechoso
+MAPA_LADO_MAXIMO = 2048  # el Space los manda de 240 px; más de esto no es un mapa de calor
 
 
 class ErrorInferencia(Exception):
@@ -115,12 +117,32 @@ def _decimal(valor: float, decimales: str) -> Decimal:
 
 
 def _mapa(texto: str) -> bytes:
+    """Base64 → bytes de un PNG que de verdad se puede abrir.
+
+    No basta con la firma: un PNG cortado o dañado la trae igual y terminaría guardado en
+    MinIO como un mapa de calor vacío (defecto D-002, issue #240). Se revisan los bloques
+    (verify) y se decodifican los píxeles (load); el tamaño queda acotado pa que un mapa
+    inflado no se coma la memoria del worker.
+    """
     try:
         datos = base64.b64decode(texto, validate=True)
     except (binascii.Error, ValueError):
         raise ErrorInferencia("RESPUESTA_INVALIDA") from None
     if not datos.startswith(FIRMA_PNG):
         raise ErrorInferencia("RESPUESTA_INVALIDA")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(datos)) as imagen:
+                if imagen.format != "PNG" or max(imagen.size) > MAPA_LADO_MAXIMO:
+                    raise ErrorInferencia("RESPUESTA_INVALIDA")
+                imagen.verify()  # bloques y CRC
+            with Image.open(io.BytesIO(datos)) as imagen:
+                imagen.load()  # píxeles completos: un archivo truncado falla aquí
+    except ErrorInferencia:
+        raise
+    except Exception:  # OSError, SyntaxError, bomba de descompresión…: todo es un mapa inválido
+        raise ErrorInferencia("RESPUESTA_INVALIDA") from None
     return datos
 
 

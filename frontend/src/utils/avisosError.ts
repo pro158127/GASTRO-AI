@@ -42,6 +42,19 @@ export function avisoInesperado(idError: string | null): AvisoError {
   };
 }
 
+/**
+ * Errores que ya atienden los manejadores globales de api.ts (W-01, W-28 o la etapa pendiente):
+ * la pantalla no muestra nada más.
+ */
+export function esErrorGlobal(error: unknown): boolean {
+  return (
+    error instanceof ErrorApi &&
+    (error.codigo === CodigoErrorApi.SESION_EXPIRADA ||
+      error.codigo === CodigoErrorApi.PERMISO_DENEGADO ||
+      error.codigo === CodigoErrorApi.ETAPA_INVALIDA)
+  );
+}
+
 /** Aviso para un fallo sin tratamiento propio: red caída (W-30) o cualquier otro (W-31). */
 export function avisoDeError(error: unknown): AvisoError {
   if (error instanceof ErrorApi) {

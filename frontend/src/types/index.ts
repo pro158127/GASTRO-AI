@@ -30,8 +30,8 @@ export interface RespuestaIngreso {
 
 /**
  * Inactividad de la sesión: segundos contados desde `ultima_actividad_en` (fecha ISO 8601 en
- * UTC) para el aviso del minuto 9 (`aviso_en_s`: 540) y el cierre (`cierre_en_s`: 600). W-05
- * la usará para el aviso de inactividad.
+ * UTC) para el aviso (`aviso_en_s`) y el cierre (`cierre_en_s`). La usa el aviso de W-05
+ * (ver `sesion/relojInactividad.ts`); los valores salen siempre del servidor.
  */
 export interface Inactividad {
   aviso_en_s: number;
@@ -46,6 +46,11 @@ export interface RespuestaSesion {
   inactividad: Inactividad;
 }
 
+/** Respuesta de `POST /auth/sesion/continuar` (W-05, «Seguir conectado»). */
+export interface RespuestaContinuar {
+  ultima_actividad_en: string;
+}
+
 /** Requisito de la política de contraseñas (`requisitos` de CONTRASENA_NO_CUMPLE_POLITICA). */
 export interface RequisitoContrasena {
   codigo: string;
@@ -56,6 +61,76 @@ export interface RequisitoContrasena {
 export interface CampoConError {
   campo: string;
   mensaje: string;
+}
+
+/** `rol` de `GET /perfil`: el código y el nombre que se muestra («Doctor/Gastroenterólogo»). */
+export interface RolPerfil {
+  codigo: RolUsuario;
+  nombre: string;
+}
+
+/** Respuesta de `GET /perfil` y `PATCH /perfil` (RF-U04). */
+export interface Perfil {
+  id: string;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  telefono: string | null;
+  rol: RolPerfil;
+  estado: string;
+  creado_en: string;
+  totp_vinculado: boolean;
+}
+
+/**
+ * Cuerpo de `PATCH /perfil`. Solo se editan nombre, apellido y teléfono; el correo y el rol
+ * no se envían (solo los cambia el administrador). `telefono: null` borra el teléfono.
+ */
+export interface EdicionPerfil {
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+}
+
+/** Estado de una cuenta (`estado` de los usuarios del administrador). */
+export type EstadoUsuario = "PENDIENTE" | "ACTIVO" | "INACTIVO" | "ELIMINADO";
+
+/** Solo en cuentas PENDIENTE: si la contraseña temporal sigue vigente o ya venció (RF-U06). */
+export type EstadoActivacion = "PENDIENTE" | "EXPIRADA";
+
+/**
+ * `usuario` de las rutas `/admin/usuarios` (../ARCHITECTURE.md § 3.5, «Usuarios»). `bloqueado` va
+ * aparte de `estado`: una cuenta ACTIVO puede estar bloqueada por intentos fallidos (RF-U12).
+ * Contiene datos personales: no se registran ni se guardan fuera del estado de la pantalla.
+ */
+export interface UsuarioResumen {
+  id: string;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  telefono: string | null;
+  rol: RolUsuario;
+  estado: EstadoUsuario;
+  bloqueado: boolean;
+  creado_en: string;
+  activado_en: string | null;
+  /** Solo en cuentas PENDIENTE. */
+  estado_activacion?: EstadoActivacion | null;
+  /** Solo en cuentas PENDIENTE. */
+  temporal_expira_en?: string | null;
+}
+
+/** Paginación de las listas: `?pagina&por_pagina` (máximo 100). */
+export interface Paginacion {
+  pagina: number;
+  por_pagina: number;
+  total: number;
+}
+
+/** Respuesta de `GET /admin/usuarios`. */
+export interface PaginaUsuarios {
+  items: UsuarioResumen[];
+  paginacion: Paginacion;
 }
 
 /** Respuesta de `GET /health`. */

@@ -9,13 +9,19 @@ interface PropiedadesEstadoVacio {
   mensaje: string;
   /** Acción (botón o enlace-botón). */
   children?: ReactNode;
+  /**
+   * Nivel del título: `h1` cuando el estado vacío es toda la pantalla (W-28); `h2` cuando va
+   * dentro de una pantalla que ya tiene su h1 (por ejemplo W-09b y W-09c). El aspecto no cambia.
+   */
+  nivelTitulo?: "h1" | "h2";
 }
 
-export default function EstadoVacio({ titulo, mensaje, children }: PropiedadesEstadoVacio) {
+export default function EstadoVacio({ titulo, mensaje, children, nivelTitulo = "h1" }: PropiedadesEstadoVacio) {
+  const Titulo = nivelTitulo;
   return (
     <div className={estilos.estado}>
       <img src={mascota} alt="" className={estilos.mascota} />
-      <h1 className={estilos.titulo}>{titulo}</h1>
+      <Titulo className={estilos.titulo}>{titulo}</Titulo>
       <p className={estilos.mensaje}>{mensaje}</p>
       {children}
     </div>

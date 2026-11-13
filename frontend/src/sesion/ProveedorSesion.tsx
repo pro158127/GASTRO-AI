@@ -2,24 +2,29 @@
 // `gastro_sesion`; aquí solo se guarda lo que responde GET /auth/sesion (etapa, usuario e
 // inactividad). Nada se escribe en localStorage ni en sessionStorage, salvo la marca booleana de
 // «cierre de sesión pendiente» (ver cierrePendiente.ts), la única excepción permitida.
+//
+// También vigila la inactividad (useVigilanciaInactividad) y muestra el aviso W-05.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
   ErrorApi,
   cerrarSesionEnServidor,
+  continuarSesion,
   obtenerSesion,
   registrarManejadoresGlobales,
 } from "../services/api";
-import { CodigoErrorApi } from "../services/codigosError";
+import { CodigoErrorApi, MotivoSesionExpirada } from "../services/codigosError";
 import type { EtapaSesion, Inactividad, RespuestaSesion, UsuarioActual } from "../types";
+import AvisoInactividad from "./AvisoInactividad";
 import { borrarCierrePendiente, hayCierrePendiente, marcarCierrePendiente } from "./cierrePendiente";
 import PantallaEstadoSesion from "./PantallaEstadoSesion";
+import { useVigilanciaInactividad } from "./useVigilanciaInactividad";
 
 /**
  * `cierre`: el servidor confirmó el cierre (W-01f). `cierre_sin_confirmar`: el servidor no
- * respondió; la sesión local se cerró pero la del servidor puede seguir viva. `inactividad`: el
- * servidor cerró la sesión por inactividad (W-01d). `credenciales`: la sesión terminó mientras se
+ * respondió; la sesión local se cerró pero la del servidor puede seguir viva. `inactividad`: la
+ * sesión se cerró por inactividad (W-01d). `credenciales`: la sesión terminó mientras se
  * pedía el código del segundo factor (por ejemplo, por el bloqueo tras 5 fallos): se muestra el
  * mensaje genérico de W-01b, que no revela si la cuenta está bloqueada (nota de W-04b).
  */
@@ -64,6 +69,11 @@ interface ValorSesion {
   cerrarSesion: () => Promise<void>;
   /** La pantalla de inicio de sesión lo llama al montar: el aviso se muestra una sola vez. */
   consumirMotivoCierre: () => void;
+  /**
+   * Cambia el nombre y el apellido del usuario en memoria con lo que respondió PATCH /perfil
+   * (W-18), para que la barra superior y el menú los muestren sin otra consulta.
+   */
+  actualizarUsuario: (datos: Pick<UsuarioActual, "nombre" | "apellido">) => void;
 }
 
 const ContextoSesion = createContext<ValorSesion | null>(null);
@@ -77,11 +87,14 @@ function esSinSesion(error: unknown): boolean {
 }
 
 /**
- * SESION_EXPIRADA: `motivo: "INACTIVIDAD"` es W-01d. Sin motivo, durante el segundo factor, es
- * el bloqueo de la cuenta (u otra causa que el servidor no revela): mensaje genérico de W-01b.
+ * SESION_EXPIRADA: `motivo: INACTIVIDAD` es W-01d. `motivo: DEMASIADOS_INTENTOS` (cuenta bloqueada,
+ * RF-U12) es el mensaje genérico de W-01b en cualquier etapa, también al recargar durante el
+ * bloqueo, cuando la etapa local ya es `null` (nota de W-04b). Sin motivo, durante el segundo
+ * factor, es otra causa que el servidor no revela: también W-01b. En los demás casos, sin aviso.
  */
 function motivoDeExpiracion(motivo: string | null, etapa: EtapaSesion | null): MotivoCierre | null {
-  if (motivo === "INACTIVIDAD") return "inactividad";
+  if (motivo === MotivoSesionExpirada.INACTIVIDAD) return "inactividad";
+  if (motivo === MotivoSesionExpirada.DEMASIADOS_INTENTOS) return "credenciales";
   return etapa === "VINCULAR_TOTP" || etapa === "PENDIENTE_2FA" ? "credenciales" : null;
 }
 
@@ -99,24 +112,50 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<EstadoSesion>({ fase: "cargando" });
   const [motivoCierre, setMotivoCierre] = useState<MotivoCierre | null>(null);
   const [intento, setIntento] = useState(0);
+  const [continuando, setContinuando] = useState(false);
   // Etapa actual para los manejadores globales, que se registran una sola vez.
   const etapaRef = useRef<EtapaSesion | null>(null);
   etapaRef.current = estado.fase === "con_sesion" ? estado.etapa : null;
 
-  const refrescarSesion = useCallback(async (): Promise<EtapaSesion | null> => {
-    try {
-      const respuesta = await obtenerSesion();
-      setEstado(estadoDesdeRespuesta(respuesta));
-      return respuesta.etapa;
-    } catch (error) {
-      if (esSinSesion(error)) {
-        setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo, etapaRef.current));
-        setEstado({ fase: "sin_sesion" });
-        return null;
+  // Las funciones del vigilante son estables; las opciones se leen en cada llamada.
+  const consultarPasivaRef = useRef<() => Promise<boolean>>(async () => false);
+  const cerrarPorInactividadRef = useRef<() => void>(() => undefined);
+  const vigilancia = useVigilanciaInactividad({
+    activo: etapaRef.current !== null,
+    conAviso: etapaRef.current === "ACTIVA",
+    consultarPasiva: () => consultarPasivaRef.current(),
+    cerrarPorInactividad: () => cerrarPorInactividadRef.current(),
+  });
+  const { registrarConsulta, registrarRenovacion, detener } = vigilancia;
+
+  /**
+   * GET /auth/sesion. Actualiza el estado y la referencia de inactividad. Devuelve la sesión, o
+   * `null` si el servidor respondió 401 (la sesión local queda cerrada). Lanza en otro error.
+   */
+  const consultarSesion = useCallback(
+    async (pasiva: boolean): Promise<RespuestaSesion | null> => {
+      try {
+        const consulta = await obtenerSesion({ pasiva });
+        registrarConsulta(consulta);
+        setEstado(estadoDesdeRespuesta(consulta.sesion));
+        return consulta.sesion;
+      } catch (error) {
+        if (esSinSesion(error)) {
+          setMotivoCierre(motivoDeExpiracion((error as ErrorApi).motivo, etapaRef.current));
+          setEstado({ fase: "sin_sesion" });
+          return null;
+        }
+        throw error;
       }
-      throw error;
-    }
-  }, []);
+    },
+    [registrarConsulta]
+  );
+  consultarPasivaRef.current = async () => (await consultarSesion(true)) !== null;
+
+  const refrescarSesion = useCallback(
+    async (): Promise<EtapaSesion | null> => (await consultarSesion(false))?.etapa ?? null,
+    [consultarSesion]
+  );
 
   // Al cargar (o recargar) la página se pregunta al servidor quién es el usuario.
   useEffect(() => {
@@ -130,8 +169,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       : Promise.resolve();
     reintentoCierre
       .then(() => obtenerSesion())
-      .then((respuesta) => {
-        if (vigente) setEstado(estadoDesdeRespuesta(respuesta));
+      .then((consulta) => {
+        if (!vigente) return;
+        registrarConsulta(consulta);
+        setEstado(estadoDesdeRespuesta(consulta.sesion));
       })
       .catch((error: unknown) => {
         if (!vigente) return;
@@ -143,26 +184,29 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return () => {
       vigente = false;
     };
-  }, [intento]);
+  }, [intento, registrarConsulta]);
 
-  const avanzarEtapa = useCallback((etapa: EtapaSesion, usuario?: UsuarioActual) => {
-    setEstado((previo) =>
-      previo.fase === "con_sesion"
-        ? { ...previo, etapa, usuario: usuario ?? previo.usuario }
-        : previo
-    );
-    obtenerSesion({ pasiva: true })
-      .then((respuesta) => setEstado(estadoDesdeRespuesta(respuesta)))
-      .catch(() => {
+  const avanzarEtapa = useCallback(
+    (etapa: EtapaSesion, usuario?: UsuarioActual) => {
+      setEstado((previo) =>
+        previo.fase === "con_sesion"
+          ? { ...previo, etapa, usuario: usuario ?? previo.usuario }
+          : previo
+      );
+      consultarSesion(true).catch(() => {
         // Si falla, `inactividad` queda con el valor anterior hasta la próxima consulta.
       });
-  }, []);
+    },
+    [consultarSesion]
+  );
 
   // Evita dobles llamadas si se pulsa «Cerrar sesión» dos veces antes de que responda.
   const cerrandoRef = useRef(false);
   const cerrarSesion = useCallback(async () => {
     if (cerrandoRef.current) return;
     cerrandoRef.current = true;
+    // El 2xx del logout no debe contar como actividad.
+    detener();
     let confirmado = true;
     try {
       await cerrarSesionEnServidor();
@@ -176,14 +220,58 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     cerrandoRef.current = false;
     setMotivoCierre(confirmado ? "cierre" : "cierre_sin_confirmar");
     setEstado({ fase: "sin_sesion" });
+  }, [detener]);
+
+  // Cierre por inactividad desde el frontend: el servidor no confirmó el cierre tras los
+  // reintentos, o no hay red al vencer. Lleva a W-01d en cualquier caso.
+  cerrarPorInactividadRef.current = async () => {
+    if (cerrandoRef.current) return;
+    cerrandoRef.current = true;
+    detener();
+    try {
+      await cerrarSesionEnServidor("inactividad");
+      borrarCierrePendiente();
+    } catch {
+      marcarCierrePendiente();
+    }
+    cerrandoRef.current = false;
+    setMotivoCierre("inactividad");
+    setEstado({ fase: "sin_sesion" });
+  };
+
+  // «Seguir conectado» (y Esc) de W-05. Si responde 2xx, `alActividadRenovada` reinicia el
+  // contador y el aviso se cierra. Un 401 lleva a W-01d por el manejador global. Sin red o con
+  // un 5xx el aviso sigue abierto y la cuenta continúa (Figma no dibuja ese error).
+  const continuandoRef = useRef(false);
+  const seguirConectado = useCallback(() => {
+    if (continuandoRef.current) return;
+    continuandoRef.current = true;
+    setContinuando(true);
+    continuarSesion()
+      .catch(() => {
+        // Ver el comentario de arriba: no hay estado de error dibujado.
+      })
+      .finally(() => {
+        continuandoRef.current = false;
+        setContinuando(false);
+      });
   }, []);
 
   const consumirMotivoCierre = useCallback(() => setMotivoCierre(null), []);
 
-  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; con
-  // `motivo: INACTIVIDAD` se marca el motivo para mostrar W-01d, y si no, sin mensaje. 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
+  const actualizarUsuario = useCallback((datos: Pick<UsuarioActual, "nombre" | "apellido">) => {
+    setEstado((previo) =>
+      previo.fase === "con_sesion"
+        ? { ...previo, usuario: { ...previo.usuario, nombre: datos.nombre, apellido: datos.apellido } }
+        : previo
+    );
+  }, []);
+
+  // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; el
+  // aviso sale de `motivoDeExpiracion` (W-01d, W-01b o ninguno). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
   // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
-  // las guardas llevan a la pantalla de esa etapa.
+  // las guardas llevan a la pantalla de esa etapa. Toda respuesta 2xx no pasiva reinicia el
+  // contador de inactividad.
   useEffect(() => {
     registrarManejadoresGlobales({
       alSinSesion: (motivo) => {
@@ -201,9 +289,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           // Si la consulta falla, la siguiente acción del usuario volverá a intentarlo.
         });
       },
+      alActividadRenovada: registrarRenovacion,
     });
     return () => registrarManejadoresGlobales(null);
-  }, [refrescarSesion, navigate]);
+  }, [refrescarSesion, navigate, registrarRenovacion]);
 
   const valor = useMemo<ValorSesion>(() => {
     const conSesion = estado.fase === "con_sesion" ? estado : null;
@@ -216,11 +305,13 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       avanzarEtapa,
       cerrarSesion,
       consumirMotivoCierre,
+      actualizarUsuario,
     };
-  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre]);
+  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre, actualizarUsuario]);
 
   let contenido: ReactNode = children;
-  if (estado.fase === "cargando" || estado.fase === "error") {
+  // Mientras se confirma el cierre por inactividad no se muestra la pantalla anterior.
+  if (estado.fase === "cargando" || estado.fase === "error" || vigilancia.verificandoCierre) {
     contenido = (
       <PantallaEstadoSesion
         error={estado.fase === "error" ? { causa: estado.error } : null}
@@ -228,8 +319,25 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       />
     );
   }
+  const mostrarAviso =
+    estado.fase === "con_sesion" &&
+    estado.etapa === "ACTIVA" &&
+    !vigilancia.verificandoCierre &&
+    vigilancia.segundosAviso !== null;
 
-  return <ContextoSesion.Provider value={valor}>{contenido}</ContextoSesion.Provider>;
+  return (
+    <ContextoSesion.Provider value={valor}>
+      {contenido}
+      {mostrarAviso && (
+        <AvisoInactividad
+          segundos={vigilancia.segundosAviso ?? 0}
+          continuando={continuando}
+          onSeguirConectado={seguirConectado}
+          onCerrarSesion={cerrarSesion}
+        />
+      )}
+    </ContextoSesion.Provider>
+  );
 }
 
 export function useSesion(): ValorSesion {
