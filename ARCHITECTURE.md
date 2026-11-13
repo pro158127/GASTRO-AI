@@ -231,6 +231,10 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/admin/bitacora` | `ADMINISTRADOR` | `?accion&resultado&actor_id&actor&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
 | GET | `/admin/bitacora/filtros` | `ADMINISTRADOR` | — | `{acciones: [{codigo, texto}], usuarios: [{id, nombre, cuenta_eliminada}]}` |
 | GET | `/admin/auditoria/exportar` | `ADMINISTRADOR` | `?desde&hasta` | CSV (`text/csv`) |
+| GET | `/admin/estado-operativo` | `ADMINISTRADOR` | — | `{verificado_en, alerta, servicios, modelo_desplegado}` |
+| POST | `/admin/estado-operativo/verificar` | `ADMINISTRADOR` | — | igual que el GET (mide de nuevo) |
+| GET | `/admin/modelo/metricas` | `ADMINISTRADOR` | — | `{disponible, modelo, rotulo, conjunto_prueba, fecha_reporte, contiene_datos_clinicos, model_card_url, macro, por_caracteristica}` |
+| GET | `/admin/logs-inferencia` | `ADMINISTRADOR` | `?estado&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
@@ -375,6 +379,41 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `caso_id` es el caso más reciente (para «Descargar reporte de este paciente»); `caso_ids`, todos.
 - nginx limita la búsqueda por paciente igual que `/pacientes/consulta` (30/min por IP).
 
+**Salud del sistema (RF-A04, RF-A05, RF-M03).**
+
+- Estado operativo: `servicios` = `[{codigo, nombre, estado, tiempo_respuesta_ms, ultima_verificacion}]`
+  con `codigo` ∈ `APP_WEB | INFERENCIA_VISION | EXPLICACION_LLM | BASE_DATOS | CORREO |
+  ALMACENAMIENTO` y `estado` ∈ `OPERATIVO | LENTO | SIN_RESPUESTA` (`LENTO` = más de 2 s;
+  `tiempo_respuesta_ms` es `null` si no respondió).
+  - Se mide en vivo y en paralelo, con un máximo de `MONITOREO_TIMEOUT_SECONDS` (3 s) por
+    servicio. La medición se reutiliza 30 s; `verificar` fuerza una nueva si la última tiene
+    más de 10 s.
+  - Cómo se revisa cada uno: la app web con un GET a `MONITOREO_APP_WEB_URL`; el Space con un
+    GET a su raíz con el token; Gemini pidiendo los datos del modelo (sin gastar tokens); la
+    base con `SELECT 1`; el SMTP conectando y entrando sin mandar nada; MinIO con el bucket.
+  - `modelo_desplegado` = `{repositorio_hf, revision_sha, huella_pesos_sha256, desplegado_en,
+    model_card_url, coincide_con_configuracion, revision_space}` o `null`.
+    `coincide_con_configuracion` compara con `HF_REVISION` (RNF-29); `revision_space` es la que
+    informa el Space en `GET /`, si la manda.
+  - `alerta` = `{nivel: "ERROR" | "ADVERTENCIA", mensaje}` o `null`. Es `ERROR` si un servicio
+    no responde, si no hay modelo vigente o si la revisión no coincide; `ADVERTENCIA` si solo
+    hay servicios lentos.
+- Métricas: las del reporte de evaluación (RM-06) del modelo vigente, rotuladas siempre como
+  «Evaluación del modelo desplegado sobre el conjunto de prueba» (no son desempeño en
+  producción).
+  - `macro` y cada fila de `por_caracteristica` (`{caracteristica: {id, nombre}, ...}`) traen
+    `SENSIBILIDAD, ESPECIFICIDAD, F1, ROC_AUC, PR_AUC, BRIER, ECE`, con `null` en la que falte.
+  - Si hay varios reportes, solo cuenta el más reciente.
+  - Sin reporte: `{"disponible": false}` (más `modelo` si hay uno vigente), sin cifras
+    provisionales.
+- Logs: `items` = `[{id: "L-000984", ocurrido_en, revision_modelo, latencia_vision_ms,
+  latencia_llm_ms, estado, codigo_error}]`, del más reciente al más viejo.
+  - `estado` ∈ `EXITO | ERROR | TIEMPO_AGOTADO`; `latencia_llm_ms` es `null` si no hubo
+    llamada al LLM.
+  - `desde` y `hasta` son días de Colombia, ambos incluidos; si `desde` es posterior →
+    `422 RANGO_FECHAS_INVALIDO`.
+  - **Nunca** sale el `analisis_id` ni nada clínico (RF-M03 CA 2).
+
 **Configuración de inferencia.**
 
 - Todo umbral va de 0.10 a 0.90; fuera de rango: `422 UMBRAL_FUERA_DE_RANGO` con `campos`
@@ -425,6 +464,9 @@ probarlas sin base de datos (RNF-19).
 - `auditoria.py`: bitácora con patrón Observador. El evento rechaza en `detalle` cualquier
   dato del paciente, resultado clínico o secreto.
 - `bitacora.py`: consulta y exportación de la bitácora, con los textos de cada acción.
+- `estado_operativo.py`: panel de supervisión; corre en paralelo los chequeos de
+  `adapters/salud.py` y compara el modelo vigente con la revisión configurada.
+- `monitoreo.py`: métricas del reporte de evaluación y logs técnicos de inferencia.
 - `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la
   limpieza de metadatos.
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).

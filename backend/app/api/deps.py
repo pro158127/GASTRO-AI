@@ -17,6 +17,7 @@ from app.adapters.almacen import Almacen, crear_almacen
 from app.adapters.cola import Cola, ColaCelery
 from app.adapters.correo import EnviadorCorreo, crear_enviador
 from app.adapters.filtraciones import VerificadorFiltraciones, crear_verificador
+from app.adapters.salud import armar_chequeos
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.core.errores import ErrorApi
@@ -29,6 +30,7 @@ from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
+from app.repositories.monitoreo_repository import RepositorioMonitoreo
 from app.repositories.pacientes_repository import RepositorioPacientes
 from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
@@ -40,9 +42,11 @@ from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
+from app.services.estado_operativo import MemoriaEstado, ServicioEstadoOperativo
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
+from app.services.monitoreo import ServicioMonitoreo
 from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
 from app.services.usuarios import ServicioUsuarios
@@ -199,6 +203,40 @@ def get_almacen() -> Almacen:
 
 def get_cola() -> Cola:
     return ColaCelery(celery_app)
+
+
+@lru_cache
+def _memoria_estado() -> MemoriaEstado:
+    # La última verificación se comparte entre peticiones (y entre los admins)
+    return MemoriaEstado()
+
+
+def get_servicio_estado_operativo(
+    db: DbSession,
+    ajustes: Ajustes,
+    enviador: Annotated[EnviadorCorreo, Depends(get_enviador_correo)],
+    almacen: Annotated[Almacen, Depends(get_almacen)],
+) -> ServicioEstadoOperativo:
+    return ServicioEstadoOperativo(
+        armar_chequeos(ajustes, almacen, enviador),
+        RepositorioMonitoreo(db),
+        _memoria_estado(),
+        ajustes.hf_revision,
+        _ahora,
+        ajustes.monitoreo_timeout_seconds,
+    )
+
+
+ServicioDeEstadoOperativo = Annotated[
+    ServicioEstadoOperativo, Depends(get_servicio_estado_operativo)
+]
+
+
+def get_servicio_monitoreo(db: DbSession) -> ServicioMonitoreo:
+    return ServicioMonitoreo(RepositorioMonitoreo(db))
+
+
+ServicioDeMonitoreo = Annotated[ServicioMonitoreo, Depends(get_servicio_monitoreo)]
 
 
 def get_servicio_imagenes(

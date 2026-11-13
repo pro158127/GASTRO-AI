@@ -222,6 +222,34 @@ class AdaptadorHuggingFace:
             raise ErrorInferencia("RESPUESTA_INVALIDA") from None
         return traducir(datos)
 
+    def salud(self, timeout: float = 3.0) -> str | None:
+        """Pa el panel de supervisión (RF-A04): GET a la raíz del Space, con el token.
+
+        Si contesta 200 está vivo. Devuelve la revisión que informe el Space (`revision_sha`)
+        o None si no la manda. No responde → ErrorInferencia, igual que `clasificar`.
+        """
+        if not self._url.startswith("https://") or not self._token:
+            raise ErrorInferencia("SIN_CONFIGURAR")
+        try:
+            with httpx.Client(
+                timeout=timeout, follow_redirects=False, transport=self._transporte
+            ) as cliente:
+                respuesta = cliente.get(
+                    f"{self._url}/", headers={"Authorization": f"Bearer {self._token}"}
+                )
+        except httpx.TimeoutException:
+            raise ErrorInferencia("TIEMPO_AGOTADO") from None
+        except httpx.HTTPError:
+            raise ErrorInferencia("NO_DISPONIBLE") from None
+        if respuesta.status_code != 200:
+            raise ErrorInferencia("NO_DISPONIBLE")
+        try:
+            datos = respuesta.json()
+        except ValueError:
+            return None
+        revision = datos.get("revision_sha") if isinstance(datos, dict) else None
+        return revision.lower() if isinstance(revision, str) and revision else None
+
 
 class InferenciaSimulada:
     """Un Space de cartón SOLO pa desarrollo, mientras ML publica el de verdad.
@@ -259,6 +287,9 @@ class InferenciaSimulada:
                 )
             caracteristicas.append(CaracteristicaDetectada(codigo, probabilidad, regiones))
         return SalidaModelo(self._revision, 0, caracteristicas)
+
+    def salud(self, timeout: float = 3.0) -> str | None:
+        return self._revision  # el de cartón siempre está vivo
 
 
 def _mapa_falso(cx: float, cy: float, lado: int = 224) -> bytes:
