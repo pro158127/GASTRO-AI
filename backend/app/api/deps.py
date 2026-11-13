@@ -37,12 +37,12 @@ from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import bitacora as servicio_bitacora
+from app.services import estado_operativo as servicio_estado
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
-from app.services.estado_operativo import MemoriaEstado, ServicioEstadoOperativo
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
@@ -206,9 +206,9 @@ def get_cola() -> Cola:
 
 
 @lru_cache
-def _memoria_estado() -> MemoriaEstado:
+def _memoria_estado() -> servicio_estado.MemoriaEstado:
     # La última verificación se comparte entre peticiones (y entre los admins)
-    return MemoriaEstado()
+    return servicio_estado.MemoriaEstado()
 
 
 def get_servicio_estado_operativo(
@@ -216,8 +216,8 @@ def get_servicio_estado_operativo(
     ajustes: Ajustes,
     enviador: Annotated[EnviadorCorreo, Depends(get_enviador_correo)],
     almacen: Annotated[Almacen, Depends(get_almacen)],
-) -> ServicioEstadoOperativo:
-    return ServicioEstadoOperativo(
+) -> servicio_estado.ServicioEstadoOperativo:
+    return servicio_estado.ServicioEstadoOperativo(
         armar_chequeos(ajustes, almacen, enviador),
         RepositorioMonitoreo(db),
         _memoria_estado(),
@@ -228,7 +228,7 @@ def get_servicio_estado_operativo(
 
 
 ServicioDeEstadoOperativo = Annotated[
-    ServicioEstadoOperativo, Depends(get_servicio_estado_operativo)
+    servicio_estado.ServicioEstadoOperativo, Depends(get_servicio_estado_operativo)
 ]
 
 
