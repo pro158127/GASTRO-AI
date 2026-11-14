@@ -231,6 +231,11 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/admin/bitacora` | `ADMINISTRADOR` | `?accion&resultado&actor_id&actor&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
 | GET | `/admin/bitacora/filtros` | `ADMINISTRADOR` | — | `{acciones: [{codigo, texto}], usuarios: [{id, nombre, cuenta_eliminada}]}` |
 | GET | `/admin/auditoria/exportar` | `ADMINISTRADOR` | `?desde&hasta` | CSV (`text/csv`) |
+| GET | `/admin/estado-operativo` | `ADMINISTRADOR` | — | `{verificado_en, alerta, servicios, modelo_desplegado}` |
+| POST | `/admin/estado-operativo/verificar` | `ADMINISTRADOR` | — | igual que el GET (mide de nuevo) |
+| GET | `/admin/modelo/metricas` | `ADMINISTRADOR` | — | `{disponible, modelo, rotulo, conjunto_prueba, fecha_reporte, contiene_datos_clinicos, model_card_url, macro, por_caracteristica}` |
+| GET | `/admin/logs-inferencia` | `ADMINISTRADOR` | `?estado&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
+| GET | `/admin/dashboard` | `ADMINISTRADOR` | — | `{usuarios, seguridad, analisis, latencia_7d, servicios, alerta, modelo_vigente, envios_credencial_fallidos, verificado_en}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
@@ -286,6 +291,62 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   `ENVIO_CREDENCIAL`, `VINCULACION_TOTP`, `VERIFICACION_2FA`). Período obligatorio de máximo 366
   días (`422 PERIODO_INVALIDO`, trae `max_dias`). Va con BOM para que Excel abra bien las tildes,
   neutraliza fórmulas en las celdas y queda registrada en la bitácora (`AUDITORIA_EXPORTADA`).
+
+**Salud del sistema (RF-A04, RF-A05, RF-M03).**
+
+- Estado operativo: `servicios` = `[{codigo, nombre, estado, tiempo_respuesta_ms, ultima_verificacion}]`
+  con `codigo` ∈ `APP_WEB | INFERENCIA_VISION | EXPLICACION_LLM | BASE_DATOS | CORREO |
+  ALMACENAMIENTO` y `estado` ∈ `OPERATIVO | LENTO | SIN_RESPUESTA` (`LENTO` = más de 2 s;
+  `tiempo_respuesta_ms` es `null` si no respondió).
+  - Se mide en vivo y en paralelo, con un máximo de `MONITOREO_TIMEOUT_SECONDS` (3 s) por
+    servicio. La medición se reutiliza 30 s; `verificar` fuerza una nueva si la última tiene
+    más de 10 s.
+  - Cómo se revisa cada uno: la app web con un GET a `MONITOREO_APP_WEB_URL`; el Space con un
+    GET a su raíz con el token; Gemini pidiendo los datos del modelo (sin gastar tokens); la
+    base con `SELECT 1`; el SMTP conectando y entrando sin mandar nada; MinIO con el bucket.
+  - `modelo_desplegado` = `{repositorio_hf, revision_sha, huella_pesos_sha256, desplegado_en,
+    model_card_url, coincide_con_configuracion, revision_space}` o `null`.
+    `coincide_con_configuracion` compara con `HF_REVISION` (RNF-29); `revision_space` es la que
+    informa el Space en `GET /`, si la manda.
+  - `alerta` = `{nivel: "ERROR" | "ADVERTENCIA", mensaje}` o `null`. Es `ERROR` si un servicio
+    no responde, si no hay modelo vigente o si la revisión no coincide; `ADVERTENCIA` si solo
+    hay servicios lentos.
+- Métricas: las del reporte de evaluación (RM-06) del modelo vigente, rotuladas siempre como
+  «Evaluación del modelo desplegado sobre el conjunto de prueba» (no son desempeño en
+  producción).
+  - `macro` y cada fila de `por_caracteristica` (`{caracteristica: {id, nombre}, ...}`) traen
+    `SENSIBILIDAD, ESPECIFICIDAD, F1, ROC_AUC, PR_AUC, BRIER, ECE`, con `null` en la que falte.
+  - Si hay varios reportes, solo cuenta el más reciente.
+  - Sin reporte: `{"disponible": false}` (más `modelo` si hay uno vigente), sin cifras
+    provisionales.
+- Logs: `items` = `[{id: "L-000984", ocurrido_en, revision_modelo, latencia_vision_ms,
+  latencia_llm_ms, estado, codigo_error}]`, del más reciente al más viejo.
+  - `estado` ∈ `EXITO | ERROR | TIEMPO_AGOTADO`; `latencia_llm_ms` es `null` si no hubo
+    llamada al LLM.
+  - `desde` y `hasta` son días de Colombia, ambos incluidos; si `desde` es posterior →
+    `422 RANGO_FECHAS_INVALIDO`.
+  - **Nunca** sale el `analisis_id` ni nada clínico (RF-M03 CA 2).
+
+**Dashboard técnico (RF-DB02).** `GET /admin/dashboard`, pantalla inicial del administrador
+(W-19). Solo conteos: ningún campo identifica un caso, un paciente o un análisis (CA 8).
+
+- `usuarios` = `{por_estado: {PENDIENTE, ACTIVO, INACTIVO}, por_rol: {DOCTOR, ADMINISTRADOR},
+  pendientes_expiradas}`. Las cuentas eliminadas no cuentan (CA 1).
+- `seguridad` = `{accesos_fallidos_24h, cuentas_bloqueadas}`: inicios de sesión y
+  verificaciones TOTP fallidas de las últimas 24 h según la bitácora, y cuentas con bloqueo
+  temporal en curso (CA 4).
+- `analisis` = `{hoy, ultimos_7_dias, con_error_7_dias, calidad_insuficiente_7_dias}`. «Hoy»
+  empieza a las 00:00 de Colombia; los 7 días son las últimas 168 h. Un fallido por calidad
+  de imagen no cuenta como error.
+- `latencia_7d` = `{vision_p95_ms, llm_p95_ms, inferencias, errores}`: percentil 95 calculado
+  en PostgreSQL sobre `LogInferencia`, separado por modelo (CA 6); `null` si no hubo datos.
+- `servicios` (`[{codigo, nombre, estado}]`), `alerta`, `modelo_vigente` (`{repositorio_hf,
+  revision_corta, desplegado_en, coincide_con_configuracion}`) y `verificado_en` salen de la
+  misma medición del estado operativo (memoria de 30 s), así que entrar al dashboard no mide
+  dos veces (CA 2 y 3).
+- `envios_credencial_fallidos`: cuentas cuyo último envío de la contraseña temporal falló.
+- Las métricas del modelo (CA 5 y 9) se piden a `/admin/modelo/metricas`, que ya maneja el
+  estado vacío. La exportación de auditoría (CA 7 y 10) es `/admin/auditoria/exportar`.
 
 **Imagen y análisis.**
 
@@ -425,6 +486,11 @@ probarlas sin base de datos (RNF-19).
 - `auditoria.py`: bitácora con patrón Observador. El evento rechaza en `detalle` cualquier
   dato del paciente, resultado clínico o secreto.
 - `bitacora.py`: consulta y exportación de la bitácora, con los textos de cada acción.
+- `estado_operativo.py`: panel de supervisión; corre en paralelo los chequeos de
+  `adapters/salud.py` y compara el modelo vigente con la revisión configurada.
+- `monitoreo.py`: métricas del reporte de evaluación y logs técnicos de inferencia.
+- `dashboard_tecnico.py`: pantalla inicial del administrador; conteos sin datos clínicos y
+  la medición compartida del estado operativo.
 - `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la
   limpieza de metadatos.
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).
