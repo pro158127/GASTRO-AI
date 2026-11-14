@@ -235,6 +235,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/admin/estado-operativo/verificar` | `ADMINISTRADOR` | — | igual que el GET (mide de nuevo) |
 | GET | `/admin/modelo/metricas` | `ADMINISTRADOR` | — | `{disponible, modelo, rotulo, conjunto_prueba, fecha_reporte, contiene_datos_clinicos, model_card_url, macro, por_caracteristica}` |
 | GET | `/admin/logs-inferencia` | `ADMINISTRADOR` | `?estado&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
+| GET | `/admin/dashboard` | `ADMINISTRADOR` | — | `{usuarios, seguridad, analisis, latencia_7d, servicios, alerta, modelo_vigente, envios_credencial_fallidos, verificado_en}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
@@ -325,6 +326,27 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   - `desde` y `hasta` son días de Colombia, ambos incluidos; si `desde` es posterior →
     `422 RANGO_FECHAS_INVALIDO`.
   - **Nunca** sale el `analisis_id` ni nada clínico (RF-M03 CA 2).
+
+**Dashboard técnico (RF-DB02).** `GET /admin/dashboard`, pantalla inicial del administrador
+(W-19). Solo conteos: ningún campo identifica un caso, un paciente o un análisis (CA 8).
+
+- `usuarios` = `{por_estado: {PENDIENTE, ACTIVO, INACTIVO}, por_rol: {DOCTOR, ADMINISTRADOR},
+  pendientes_expiradas}`. Las cuentas eliminadas no cuentan (CA 1).
+- `seguridad` = `{accesos_fallidos_24h, cuentas_bloqueadas}`: inicios de sesión y
+  verificaciones TOTP fallidas de las últimas 24 h según la bitácora, y cuentas con bloqueo
+  temporal en curso (CA 4).
+- `analisis` = `{hoy, ultimos_7_dias, con_error_7_dias, calidad_insuficiente_7_dias}`. «Hoy»
+  empieza a las 00:00 de Colombia; los 7 días son las últimas 168 h. Un fallido por calidad
+  de imagen no cuenta como error.
+- `latencia_7d` = `{vision_p95_ms, llm_p95_ms, inferencias, errores}`: percentil 95 calculado
+  en PostgreSQL sobre `LogInferencia`, separado por modelo (CA 6); `null` si no hubo datos.
+- `servicios` (`[{codigo, nombre, estado}]`), `alerta`, `modelo_vigente` (`{repositorio_hf,
+  revision_corta, desplegado_en, coincide_con_configuracion}`) y `verificado_en` salen de la
+  misma medición del estado operativo (memoria de 30 s), así que entrar al dashboard no mide
+  dos veces (CA 2 y 3).
+- `envios_credencial_fallidos`: cuentas cuyo último envío de la contraseña temporal falló.
+- Las métricas del modelo (CA 5 y 9) se piden a `/admin/modelo/metricas`, que ya maneja el
+  estado vacío. La exportación de auditoría (CA 7 y 10) es `/admin/auditoria/exportar`.
 
 **Imagen y análisis.**
 
@@ -467,6 +489,8 @@ probarlas sin base de datos (RNF-19).
 - `estado_operativo.py`: panel de supervisión; corre en paralelo los chequeos de
   `adapters/salud.py` y compara el modelo vigente con la revisión configurada.
 - `monitoreo.py`: métricas del reporte de evaluación y logs técnicos de inferencia.
+- `dashboard_tecnico.py`: pantalla inicial del administrador; conteos sin datos clínicos y
+  la medición compartida del estado operativo.
 - `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la
   limpieza de metadatos.
 - `imagenes.py`: área temporal de las imágenes cargadas (dueño y vencimiento).

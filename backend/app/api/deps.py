@@ -28,6 +28,7 @@ from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
+from app.repositories.dashboard_tecnico_repository import RepositorioDashboardTecnico
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
 from app.repositories.monitoreo_repository import RepositorioMonitoreo
@@ -43,6 +44,7 @@ from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
+from app.services.dashboard_tecnico import ServicioDashboardTecnico
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
@@ -237,6 +239,17 @@ def get_servicio_monitoreo(db: DbSession) -> ServicioMonitoreo:
 
 
 ServicioDeMonitoreo = Annotated[ServicioMonitoreo, Depends(get_servicio_monitoreo)]
+
+
+def get_servicio_dashboard_tecnico(
+    db: DbSession, estado: ServicioDeEstadoOperativo
+) -> ServicioDashboardTecnico:
+    return ServicioDashboardTecnico(RepositorioDashboardTecnico(db), estado, _ahora)
+
+
+ServicioDeDashboardTecnico = Annotated[
+    ServicioDashboardTecnico, Depends(get_servicio_dashboard_tecnico)
+]
 
 
 def get_servicio_imagenes(
