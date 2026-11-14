@@ -11,3 +11,4 @@
 * [SUMMARY](summary.md)
 * [seguridad](seguridad.md)
 * [tecnologias](tecnologias.md)
+* [ANALISIS\_Y\_GUIA\_TECNICA](analisis_y_guia_tecnica.md)
