@@ -51,9 +51,18 @@ class Almacen(Protocol):
     def url_firmada(self, clave: str) -> str: ...
 
 
+def _codigo(error: ClientError) -> str:
+    return str(error.response.get("Error", {}).get("Code", ""))
+
+
 def _no_existe(error: ClientError) -> bool:
-    codigo = str(error.response.get("Error", {}).get("Code", ""))
-    return codigo in {"404", "NoSuchKey", "NoSuchBucket", "NotFound"}
+    """El objeto no existe (head_object / get_object)."""
+    return _codigo(error) in {"404", "NoSuchKey", "NotFound"}
+
+
+def _bucket_no_existe(error: ClientError) -> bool:
+    """El bucket no existe. Solo estos códigos autorizan crearlo; NoSuchKey es de objetos."""
+    return _codigo(error) in {"404", "NoSuchBucket", "NotFound"}
 
 
 def _cliente(endpoint: str, settings: Settings) -> BaseClient:
@@ -160,7 +169,7 @@ class AlmacenS3:
             self._interno.head_bucket(Bucket=self._bucket)
             return False
         except ClientError as error:
-            if not _no_existe(error):
+            if not _bucket_no_existe(error):
                 raise ErrorAlmacen("No se pudo consultar el bucket.") from error
         except BotoCoreError as error:
             raise ErrorAlmacen("No se pudo consultar el bucket.") from error
