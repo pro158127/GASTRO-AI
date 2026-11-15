@@ -1,0 +1,102 @@
+name: QA pruebas y cobertura global
+'on':
+  pull_request:
+    branches:
+    - testing/qa-branch
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - ready_for_review
+permissions:
+  contents: read
+concurrency:
+  group: qa-unitarias-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    name: Backend pruebas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: 'backend/requirements.txt
+
+          backend/requirements-dev.txt
+
+          '
+    - name: Instalar dependencias
+      run: 'python -m pip install -r requirements.txt -r requirements-dev.txt
+
+        python -m pip check
+
+        '
+    - name: Pruebas con medicion diagnostica; umbral en check separado
+      run: "mkdir -p reports\nshopt -s nullglob\nrutas=()\nif [ -d tests ]; then rutas+=(tests); fi\nrutas+=(test_*.py)\n\
+        if [ ${#rutas[@]} -eq 0 ]; then\n  echo '::error::No hay archivos de pruebas backend versionados.'\n  exit 1\nfi\n\
+        python -m pytest \"${rutas[@]}\" --cov=app --cov-fail-under=0 --cov-report=term-missing --cov-report=xml:reports/cobertura.xml\
+        \ --cov-report=json:reports/cobertura.json --junitxml=reports/resultados.xml"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: backend-resultados-${{ github.run_id }}-${{ github.run_attempt }}
+        path: backend/reports/
+        if-no-files-found: warn
+        retention-days: 30
+    env:
+      COVERAGE_FILE: reports/coverage.dat
+  frontend-build:
+    name: Frontend TypeScript y compilacion
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+        shell: bash
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - run: 'corepack enable
+
+        corepack prepare pnpm@9.15.4 --activate
+
+        pnpm install --frozen-lockfile
+
+        pnpm build
+
+        '
+  cobertura-global:
+    name: Backend cobertura global >=70%
+    needs: backend
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+    - uses: actions/download-artifact@v4
+      with:
+        name: backend-resultados-${{ github.run_id }}-${{ github.run_attempt }}
+        path: reports
+    - name: Exigir 70 por ciento sin redondear
+      shell: bash
+      run: "python - <<'PY'\nimport json\nfrom pathlib import Path\nr = json.loads(Path(\"reports/cobertura.json\").read_text())\n\
+        t = r[\"totals\"]\ncubiertas, total = t[\"covered_lines\"], t[\"num_statements\"]\nif total <= 0:\n    raise SystemExit(\"\
+        Cobertura sin lineas ejecutables: no se puede aprobar\")\nporcentaje = 100 * cubiertas / total\nprint(f\"Cobertura\
+        \ global: {porcentaje:.6f}% ({cubiertas}/{total}); minimo 70%\")\nif cubiertas * 100 < total * 70:\n    raise SystemExit(\"\
+        No cumple el umbral GLOBAL del 70%\")\nPY"
