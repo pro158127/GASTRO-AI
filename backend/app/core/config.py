@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_seconds: float = 15.0  # RF-R05 CA 4: si pasa de 15 s, lo soltamos
 
+    # Panel de supervisión (RF-A04): cada servicio tiene este tiempo pa contestar. La
+    # «Aplicación web» se revisa en esta URL (por defecto, nginx dentro de Docker).
+    monitoreo_timeout_seconds: float = 3.0
+    monitoreo_app_web_url: str = "http://nginx/"
+
     # Sesión y bloqueo (RF-U10, RF-U12, RNF-03). Los valores salen de los requisitos;
     # se dejan aquí pa las pruebas, no pa que alguien los afloje en producción.
     sesion_inactividad_minutos: int = 10
