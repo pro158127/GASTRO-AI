@@ -23,7 +23,7 @@ jobs:
         working-directory: backend
         shell: bash
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - uses: actions/setup-python@v6
@@ -46,7 +46,7 @@ jobs:
         if [ ${#rutas[@]} -eq 0 ]; then\n  echo '::error::No hay archivos de pruebas backend versionados.'\n  exit 1\nfi\n\
         python -m pytest \"${rutas[@]}\" --cov=app --cov-fail-under=0 --cov-report=term-missing --cov-report=xml:reports/cobertura.xml\
         \ --cov-report=json:reports/cobertura.json --junitxml=reports/resultados.xml"
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       if: always()
       with:
         name: backend-resultados-${{ github.run_id }}-${{ github.run_attempt }}
@@ -64,10 +64,10 @@ jobs:
         working-directory: frontend
         shell: bash
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: '20'
     - run: 'corepack enable
@@ -89,7 +89,7 @@ jobs:
     - uses: actions/setup-python@v6
       with:
         python-version: '3.11'
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v6
       with:
         name: backend-resultados-${{ github.run_id }}-${{ github.run_attempt }}
         path: reports
