@@ -6,9 +6,11 @@ LA MISMA sesión de base (FastAPI la cachea), así la acción y su bitácora van
 """
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
@@ -18,8 +20,9 @@ from app.adapters.cola import Cola, ColaCelery
 from app.adapters.correo import EnviadorCorreo, crear_enviador
 from app.adapters.filtraciones import VerificadorFiltraciones, crear_verificador
 from app.adapters.salud import armar_chequeos
+from app.adapters.tiempo_real import Broker
 from app.core.config import Settings, get_settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
@@ -43,6 +46,7 @@ from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import bitacora as servicio_bitacora
 from app.services import dashboard_tecnico as servicio_tecnico
 from app.services import estado_operativo as servicio_estado
+from app.services import eventos as servicio_eventos
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
@@ -370,3 +374,53 @@ def get_servicio_dashboard(db: DbSession) -> ServicioDashboard:
 
 
 ServicioDeDashboard = Annotated[ServicioDashboard, Depends(get_servicio_dashboard)]
+
+
+# ------------------------------------------------------------------ tiempo real (SSE)
+
+
+@lru_cache
+def get_broker() -> Broker:
+    # Uno por proceso: un solo suscriptor de Redis reparte a todas las conexiones
+    return Broker(get_settings().redis_url)
+
+
+BrokerEventos = Annotated[Broker, Depends(get_broker)]
+
+
+def get_fabrica_sesiones() -> Callable[[], AbstractContextManager[Session]]:
+    """Sesiones cortas pa el stream: abrirlo no deja una conexión de la base tomada."""
+    return SessionLocal
+
+
+class VerificadorStream:
+    """Valida la sesión del stream sin renovar la inactividad (RF-U10)."""
+
+    def __init__(self, fabrica, ajustes: Settings, verificador: VerificadorFiltraciones) -> None:
+        self._fabrica = fabrica
+        self._ajustes = ajustes
+        self._verificador = verificador
+
+    def _servicio(self, db: Session) -> ServicioAutenticacion:
+        return get_servicio_autenticacion(db, get_publicador(db), self._ajustes, self._verificador)
+
+    def abrir(self, token: str | None) -> UUID:
+        """Al conectar: 401/403 igual que cualquier endpoint protegido."""
+        with self._fabrica() as db:
+            etapas = (EtapaSesion.ACTIVA,)
+            return self._servicio(db).validar_sesion(token, etapas, pasiva=True).usuario_id
+
+    def comprobar(self, token: str | None) -> servicio_eventos.Comprobacion:
+        with self._fabrica() as db:
+            return servicio_eventos.comprobar_sesion(self._servicio(db), token)
+
+
+def get_verificador_stream(
+    ajustes: Ajustes,
+    verificador: Annotated[VerificadorFiltraciones, Depends(get_verificador_filtraciones)],
+    fabrica: Annotated[Callable, Depends(get_fabrica_sesiones)],
+) -> VerificadorStream:
+    return VerificadorStream(fabrica, ajustes, verificador)
+
+
+VerificadorDelStream = Annotated[VerificadorStream, Depends(get_verificador_stream)]
