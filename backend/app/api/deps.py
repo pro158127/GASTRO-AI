@@ -24,6 +24,7 @@ from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
+from app.repositories import dashboard_tecnico_repository as repo_tecnico
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.casos_recibidos_repository import RepositorioCasosRecibidos
@@ -40,6 +41,7 @@ from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import bitacora as servicio_bitacora
+from app.services import dashboard_tecnico as servicio_tecnico
 from app.services import estado_operativo as servicio_estado
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
@@ -251,6 +253,19 @@ def get_servicio_monitoreo(db: DbSession) -> ServicioMonitoreo:
 
 
 ServicioDeMonitoreo = Annotated[ServicioMonitoreo, Depends(get_servicio_monitoreo)]
+
+
+def get_servicio_dashboard_tecnico(
+    db: DbSession, estado: ServicioDeEstadoOperativo
+) -> servicio_tecnico.ServicioDashboardTecnico:
+    return servicio_tecnico.ServicioDashboardTecnico(
+        repo_tecnico.RepositorioDashboardTecnico(db), estado, _ahora
+    )
+
+
+ServicioDeDashboardTecnico = Annotated[
+    servicio_tecnico.ServicioDashboardTecnico, Depends(get_servicio_dashboard_tecnico)
+]
 
 
 def get_servicio_imagenes(
