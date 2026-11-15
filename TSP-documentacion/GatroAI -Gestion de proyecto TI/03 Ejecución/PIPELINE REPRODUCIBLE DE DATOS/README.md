@@ -1,6 +1,6 @@
 # Pipeline reproducible de preparación de datos
 
-Entregable EDT 1.3.3.5 (issue #67), para preparar las muestras del modelo Gastro-AI.
+Entregable EDT 1.3.3.5 (issue #67), para preparar las muestras del modelo Gastro-AI. El [repositorio oficial del proyecto](https://github.com/pro158127/GASTRO-AI) constituye la evidencia pública del entregable EDT 1.3.3.2 (issue #63).
 
 ## Artefactos fuente
 
