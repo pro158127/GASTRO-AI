@@ -49,6 +49,7 @@ from app.models import (
     Usuario,
 )
 from app.repositories.sesiones_repository import RepositorioSesiones
+from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services.auditoria import EventoAuditoria, PublicadorEventos
@@ -113,6 +114,7 @@ class ServicioAutenticacion:
         verificador: VerificadorFiltraciones,
         reglas: ReglasSesion = REGLAS_POR_DEFECTO,
         reloj: Callable[[], datetime] = lambda: datetime.now(UTC),
+        traslados: RepositorioTraslados | None = None,
     ) -> None:
         self._usuarios = usuarios
         self._sesiones = sesiones
@@ -122,6 +124,7 @@ class ServicioAutenticacion:
         self._verificador = verificador
         self._reglas = reglas
         self._reloj = reloj
+        self._traslados = traslados
 
     # ------------------------------------------------------------------ AUTH-01
 
@@ -330,6 +333,16 @@ class ServicioAutenticacion:
         )
         self._publicar(accion, sesion.usuario, ip)
         self._unidad.confirmar()
+
+    def casos_recibidos_nuevos(self, sesion: Sesion) -> int | None:
+        """Traslados que el doctor no ha abierto (el número del menú). None si no aplica."""
+        if (
+            self._traslados is None
+            or sesion.etapa is not EtapaSesion.ACTIVA
+            or sesion.usuario.rol.codigo is not CodigoRol.DOCTOR
+        ):
+            return None
+        return self._traslados.sin_ver(sesion.usuario.id)
 
     # --------------------------------------------------------------- piezas internas
 
