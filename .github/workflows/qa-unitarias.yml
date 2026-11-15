@@ -1,5 +1,8 @@
 name: QA pruebas y cobertura global
 'on':
+  push:
+    branches:
+    - testing/qa-branch
   pull_request:
     branches:
     - testing/qa-branch
