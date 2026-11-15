@@ -32,6 +32,7 @@ from app.repositories.dashboard_repository import RepositorioDashboard
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
 from app.repositories.pacientes_repository import RepositorioPacientes
+from app.repositories.resumen_cuentas_repository import RepositorioResumenCuentas
 from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
@@ -49,6 +50,7 @@ from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
 from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
+from app.services.resumen_cuentas import ServicioResumenCuentas
 from app.services.usuarios import ServicioUsuarios
 from app.services.verificadores_imagen import construir_cadena
 from app.workers.celery_app import celery_app
@@ -146,6 +148,13 @@ def get_servicio_usuarios(
 
 
 ServicioCuentas = Annotated[ServicioUsuarios, Depends(get_servicio_usuarios)]
+
+
+def get_servicio_resumen_cuentas(db: DbSession) -> ServicioResumenCuentas:
+    return ServicioResumenCuentas(RepositorioResumenCuentas(db), _ahora)
+
+
+ServicioDeResumenCuentas = Annotated[ServicioResumenCuentas, Depends(get_servicio_resumen_cuentas)]
 
 
 def get_servicio_configuracion(
