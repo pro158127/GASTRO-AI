@@ -8,6 +8,7 @@ from app.api.routers import (
     admin_usuarios,
     analisis,
     auth,
+    casos_recibidos,
     catalogos,
     configuracion,
     health,
@@ -45,4 +46,5 @@ app.include_router(catalogos.router, prefix=settings.api_prefix)
 app.include_router(pacientes.router, prefix=settings.api_prefix)
 app.include_router(imagenes.router, prefix=settings.api_prefix)
 app.include_router(analisis.router, prefix=settings.api_prefix)
+app.include_router(casos_recibidos.router, prefix=settings.api_prefix)
 app.include_router(configuracion.router, prefix=settings.api_prefix)

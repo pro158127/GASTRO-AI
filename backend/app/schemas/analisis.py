@@ -267,3 +267,60 @@ class BusquedaPacienteEntrada(BaseModel):
 class PaginaHistorialPaciente(PaginaHistorial):
     caso_id: UUID | None = None  # el caso más reciente; pa «Descargar reporte de este paciente»
     caso_ids: list[UUID] = []  # todos, si recibió por traslado un paciente que ya tenía
+
+
+# ------------------------------------------- casos recibidos (contrato §5, RF-A07)
+
+
+class PersonaOrigen(BaseModel):
+    nombre: str
+    apellido: str
+    cuenta_eliminada: bool  # «(cuenta eliminada)» (RF-A07 CA 4)
+
+
+class DoctorOrigen(PersonaOrigen):
+    id: UUID
+
+
+class CasoRecibido(BaseModel):
+    caso_id: UUID
+    total_analisis: int
+    ultimo_analisis_en: datetime | None
+
+
+class AnalisisRecibido(BaseModel):
+    id: UUID
+    codigo: str
+    solicitado_en: datetime
+    estado: str
+    caracteristica_principal: str | None
+    probabilidad_principal: Umbral | None
+    # Quien hizo el análisis, si no es el doctor de origen del traslado (caso trasladado dos veces)
+    originalmente_de: PersonaOrigen | None
+
+
+class TrasladoRecibido(BaseModel):
+    id: UUID
+    tipo: str = Field(examples=["DESACTIVACION"])
+    ejecutado_en: datetime
+    nuevo: bool
+    origen: PersonaOrigen
+    casos: list[CasoRecibido]
+    analisis_total: int
+    analisis: list[AnalisisRecibido]  # los primeros `limite`; limite=0 los trae todos
+
+
+class BandejaRecibidos(BaseModel):
+    nuevos: int
+    total_traslados: int
+    total_casos: int
+    doctores_origen: list[DoctorOrigen]
+    traslados: list[TrasladoRecibido]
+    analisis_propios_paciente: int | None = None  # solo en la búsqueda por paciente
+
+
+class BusquedaRecibidosEntrada(BaseModel):
+    tipo_documento: str = Field(max_length=5, examples=["CC"])
+    numero_documento: str = Field(max_length=30, examples=["1234567890"])
+    origen_id: UUID | None = None
+    limite: int = Field(default=5, ge=0, le=POR_PAGINA_MAXIMO)
