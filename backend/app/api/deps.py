@@ -24,11 +24,11 @@ from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
+from app.repositories import dashboard_tecnico_repository as repo_tecnico
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
-from app.repositories.dashboard_tecnico_repository import RepositorioDashboardTecnico
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
 from app.repositories.monitoreo_repository import RepositorioMonitoreo
@@ -38,13 +38,13 @@ from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import bitacora as servicio_bitacora
+from app.services import dashboard_tecnico as servicio_tecnico
 from app.services import estado_operativo as servicio_estado
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
-from app.services.dashboard_tecnico import ServicioDashboardTecnico
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
@@ -243,12 +243,14 @@ ServicioDeMonitoreo = Annotated[ServicioMonitoreo, Depends(get_servicio_monitore
 
 def get_servicio_dashboard_tecnico(
     db: DbSession, estado: ServicioDeEstadoOperativo
-) -> ServicioDashboardTecnico:
-    return ServicioDashboardTecnico(RepositorioDashboardTecnico(db), estado, _ahora)
+) -> servicio_tecnico.ServicioDashboardTecnico:
+    return servicio_tecnico.ServicioDashboardTecnico(
+        repo_tecnico.RepositorioDashboardTecnico(db), estado, _ahora
+    )
 
 
 ServicioDeDashboardTecnico = Annotated[
-    ServicioDashboardTecnico, Depends(get_servicio_dashboard_tecnico)
+    servicio_tecnico.ServicioDashboardTecnico, Depends(get_servicio_dashboard_tecnico)
 ]
 
 
