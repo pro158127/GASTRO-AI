@@ -118,6 +118,7 @@ backend/
 ├── docker/minio/            # MinIO compilado desde el código oficial
 ├── docker/nginx/nginx.conf  # puerta de entrada (la usan los dos compose)
 ├── scripts/init_storage.py  # crea el bucket
+├── scripts/cargar_metricas.py  # carga el reporte de evaluación del modelo (RM-06)
 └── app/
     ├── main.py              # FastAPI, manejadores de error y routers
     ├── seed.py              # carga inicial (python -m app.seed)
@@ -369,6 +370,8 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   - Si hay varios reportes, solo cuenta el más reciente.
   - Sin reporte: `{"disponible": false}` (más `modelo` si hay uno vigente), sin cifras
     provisionales.
+  - Las cifras se cargan con `scripts/cargar_metricas` (ver «Cargar el reporte de
+    evaluación» en §3.10).
 - Logs: `items` = `[{id: "L-000984", ocurrido_en, revision_modelo, latencia_vision_ms,
   latencia_llm_ms, estado, codigo_error}]`, del más reciente al más viejo.
   - `estado` ∈ `EXITO | ERROR | TIEMPO_AGOTADO`; `latencia_llm_ms` es `null` si no hubo
@@ -718,6 +721,29 @@ alembic revision --autogenerate -m "descripcion"   # cuando cambie un modelo
 
 Nunca `create_all`. Un modelo nuevo se importa en `app/models/__init__.py` para que Alembic
 lo vea.
+
+**Cargar el reporte de evaluación (RM-06).** Lo entrega el equipo de ML como JSON; el formato
+está en `app/schemas/reporte_evaluacion.py`:
+
+```json
+{"repositorio_hf": "ragnartech/gastro-ai", "revision_sha": "<40 hex del modelo desplegado>",
+ "fecha_reporte": "2026-11-10", "conjunto_prueba": "GastroHUN + EGID, prueba por paciente",
+ "macro": {"SENSIBILIDAD": 0.81, "ESPECIFICIDAD": 0.88, "F1": 0.79, "ROC_AUC": 0.90,
+           "PR_AUC": 0.85, "BRIER": 0.12, "ECE": 0.05},
+ "por_caracteristica": {"ATROFIA": {"SENSIBILIDAD": 0.83}, "GASTRITIS": {}, "HPYLORI": {}}}
+```
+
+```bash
+python -m scripts.cargar_metricas reporte.json --revisar            # solo valida
+docker compose exec -T api python -m scripts.cargar_metricas - < reporte.json
+```
+
+- Métricas de `NombreMetrica`, de 0 a 1, con 4 decimales; la que no venga queda vacía.
+- El modelo (repositorio + revisión) debe estar registrado, las características deben estar
+  en el catálogo y la fecha no puede ser futura. Si algo no cuadra no se guarda nada y se
+  listan todos los problemas.
+- Un reporte por modelo y conjunto de prueba: volver a cargarlo lo reemplaza.
+- Solo números agregados: el formato no acepta campos de más.
 
 ### 3.11 Cómo añadir una funcionalidad nueva (backend)
 
