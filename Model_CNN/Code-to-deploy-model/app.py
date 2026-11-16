@@ -3,6 +3,8 @@ import os
 import sys
 import base64
 import hashlib
+import re
+import time
 import cv2
 import numpy as np
 import torch
@@ -11,7 +13,7 @@ from torchvision import transforms
 from torchvision.models import efficientnet_b1
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Security
-from fastapi.security import APIKeyHeader
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 
 # ==============================================================================
@@ -22,11 +24,17 @@ EXPECTED_SHA256 = os.getenv(
     "d4b264bf0a954cad5b2c26f834ec8a02eb07eeac41eed14b6e65e4f46b41fc76"
 )
 WEIGHTS_PATH = "best_gastroai_masked_loss.pth"
-REVISION_SHA = os.getenv("GASTROAI_REVISION_SHA", "v1.0.0-masked-loss-ep07")
-API_KEY_NAME = "X-API-Key"
+REVISION_SHA = os.getenv("GASTROAI_REVISION_SHA") or os.getenv("SPACE_COMMIT_HASH", "")
+if not re.fullmatch(r"[0-9a-fA-F]{40}", REVISION_SHA):
+    raise RuntimeError(
+        "GASTROAI_REVISION_SHA debe ser el SHA de 40 caracteres del commit desplegado en Hugging Face."
+    )
+REVISION_SHA = REVISION_SHA.lower()
 EXPECTED_API_KEY = os.getenv("GASTROAI_API_KEY")
+if not EXPECTED_API_KEY:
+    raise RuntimeError("Falta configurar GASTROAI_API_KEY en los secretos del Space.")
 
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 def verify_file_integrity(file_path: str, expected_hash: str):
     """Verifica la huella SHA-256 del archivo de pesos antes de cargar."""
@@ -60,7 +68,7 @@ class GastroAI_EfficientNetB1(nn.Module):
     def __init__(self, num_classes=4):
         super(GastroAI_EfficientNetB1, self).__init__()
         self.backbone = efficientnet_b1(weights=None)
-        in_features = self.backbone.classifier.in_features
+        in_features = self.backbone.classifier[1].in_features
         self.backbone.classifier = nn.Sequential(
             nn.Dropout(p=0.3, inplace=True),
             nn.Linear(in_features, num_classes)
@@ -161,21 +169,34 @@ def extract_roi_box_and_png(cam, threshold=0.5):
 # ==============================================================================
 app = FastAPI(title="Gastro-AI Service", version="1.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("GASTROAI_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    if EXPECTED_API_KEY and api_key != EXPECTED_API_KEY:
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+):
+    invalid_credentials = (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or credentials.credentials != EXPECTED_API_KEY
+    )
+    if invalid_credentials:
         raise HTTPException(
             status_code=401,
-            detail="Acceso Denegado: API Key inválida o no proporcionada."
+            detail="Acceso denegado."
         )
-    return api_key
+    return credentials.credentials
 
 @app.get("/")
 def status_check():
@@ -183,6 +204,7 @@ def status_check():
 
 @app.post("/clasificar", dependencies=[Depends(verify_api_key)])
 async def clasificar_imagen(imagen: UploadFile = File(...)):
+    started_at = time.perf_counter()
     contents = await imagen.read()
     try:
         raw_pil = Image.open(io.BytesIO(contents)).convert('RGB')
@@ -195,7 +217,6 @@ async def clasificar_imagen(imagen: UploadFile = File(...)):
     # Procesar únicamente las 3 patologías de RF-M01
     for class_idx, info in CLASS_MAPPING.items():
         c_name = info["name"]
-        thresh = info["threshold"]
 
         cam, probs = gradcam.generate_heatmap(input_tensor, class_idx)
         prob_val = float(probs[0, class_idx])
@@ -203,14 +224,21 @@ async def clasificar_imagen(imagen: UploadFile = File(...)):
         roi_box, heatmap_png = extract_roi_box_and_png(cam, threshold=0.5)
 
         resultados_clases[c_name] = {
+            "codigo": c_name,
             "probabilidad": round(prob_val, 4),
-            "detectado": bool(prob_val >= thresh),
-            "region_roi": roi_box,
-            "mapa_calor_png_b64": heatmap_png
+            "regiones": [{
+                "x": round(roi_box["x"] / 240, 4),
+                "y": round(roi_box["y"] / 240, 4),
+                "ancho": round(roi_box["ancho"] / 240, 4),
+                "alto": round(roi_box["alto"] / 240, 4),
+                "area_pct": roi_box["area_pct"],
+                "mapa_calor_base64": heatmap_png,
+            }],
         }
 
     # RNF-30: Cero impresión de logs de archivos o predicciones
     return {
         "revision_sha": REVISION_SHA,
-        "predicciones": resultados_clases
+        "latencia_ms": round((time.perf_counter() - started_at) * 1000),
+        "caracteristicas": list(resultados_clases.values()),
     }

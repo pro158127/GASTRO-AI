@@ -46,8 +46,9 @@ Correa (progresión gástrica), prediciendo **cuatro clases simultáneas**
 
 ## Datos de origen
 
-Entrenado sobre tres datasets públicos de imágenes endoscópicas, todos
-licenciados (CC BY 4.0 / uso académico):
+Entrenado sobre tres datasets públicos de imágenes endoscópicas. Cada dataset
+mantiene sus propios términos de uso; ver las fuentes originales antes de
+redistribuir sus imágenes:
 
 - **EGID** (Endoscopic Gastric Image Dataset) — anotaciones de H. pylori y
   atrofia gástrica.
@@ -101,37 +102,45 @@ Endpoints expuestos en el Space (puerto 7860):
   detectada, el bounding-box de ROI y el mapa de calor Grad-CAM aislado en
   PNG Base64.
 
-El endpoint requiere la cabecera `X-API-Key` (valor configurado en la
-variable de entorno `GASTROAI_API_KEY` del Space).
+El endpoint requiere `Authorization: Bearer <token>`. Configura
+`GASTROAI_API_KEY` como secreto del Space y `HF_TOKEN` con el mismo valor en
+el backend. El backend envía esta cabecera.
+
+`GASTROAI_REVISION_SHA` debe ser el SHA hexadecimal de 40 caracteres del
+commit del Space desplegado. Hugging Face proporciona `SPACE_COMMIT_HASH`; la
+app lo usa si no se define explícitamente `GASTROAI_REVISION_SHA`. Configura
+el mismo SHA en `HF_REVISION` del backend. Para CORS, el Space no permite
+orígenes por defecto; si se necesita acceso desde navegador, define
+`GASTROAI_ALLOWED_ORIGINS` con una lista separada por comas de orígenes
+exactos.
 
 Respuesta (3 patologías, `normal_mucosa` no se reporta):
 
 ```json
 {
-  "revision_sha": "v1.0.0-masked-loss-ep07",
-  "predicciones": {
-    "GASTRITIS": {
-      "probabilidad": 0.8123,
-      "detectado": true,
-      "region_roi": {"x": 10, "y": 20, "ancho": 100, "alto": 120, "area_pct": 20.83},
-      "mapa_calor_png_b64": "<PNG base64>"
-    },
-    "ATROFIA":  {"probabilidad": 0.1000, "detectado": false, "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0}, "mapa_calor_png_b64": "<PNG base64>"},
-    "HPYLORI":  {"probabilidad": 0.0500, "detectado": false, "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0}, "mapa_calor_png_b64": "<PNG base64>"}
-  }
+  "revision_sha": "<40-character commit SHA>",
+  "latencia_ms": 1840,
+  "caracteristicas": [
+    {"codigo": "GASTRITIS", "probabilidad": 0.8123, "regiones": [
+      {"x": 0.0417, "y": 0.0833, "ancho": 0.4167, "alto": 0.5,
+       "area_pct": 20.83, "mapa_calor_base64": "<PNG base64>"}
+    ]}
+  ]
 }
 ```
 
 ```bash
 curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/clasificar" \
-     -H "X-API-Key: $GASTROAI_API_KEY" \
+     -H "Authorization: Bearer $GASTROAI_API_KEY" \
      -F "imagen=@imagen_endoscopia.bmp"
 ```
 
 ## Licencia
 
-Código y pesos bajo **CC BY-NC 4.0** (uso no comercial). Los datasets de
-origen mantienen sus propias licencias (CC BY 4.0 / académica). Ver `LICENSE`.
+Código y pesos bajo **CC BY-NC 4.0** (uso no comercial). Las imágenes de
+origen mantienen las licencias de sus autores; las atribuciones de los
+subconjuntos EGID y GastroHUN incluidos en las imágenes de verificación están
+en `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/CREDITOS.md`.
 
 ## Reproducibilidad
 
