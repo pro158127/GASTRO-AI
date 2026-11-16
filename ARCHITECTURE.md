@@ -44,7 +44,7 @@ docker compose up -d --build           # construir y arrancar todo
 docker compose ps
 docker compose logs -f api
 docker compose logs -f worker
-docker compose restart nginx           # tras cambiar backend/docker/nginx/nginx.conf
+docker compose restart nginx           # tras cambiar backend/docker/nginx/*.conf
 docker compose down                    # agregar -v borra los volúmenes
 ```
 
@@ -71,6 +71,32 @@ Todas salen de `backend/.env` (plantilla `backend/.env.example`):
 | Primer administrador | `ADMIN_CORREO` / `ADMIN_TEMPORAL` (temporal: se cambia en el primer ingreso) |
 | PostgreSQL | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
 | MinIO | `S3_ACCESS_KEY` / `S3_SECRET_KEY` |
+
+### 2.4 Producción (servidor)
+
+```bash
+cp .env.example .env                   # en la raíz; llenar las variables de producción
+cp backend/.env.example backend/.env   # claves HMAC, TOTP, HF, LLM, SMTP_USUARIO/CONTRASENA…
+# Certificado: fullchain.pem y privkey.pem en backend/docker/nginx/certs/ (fuera de git)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+`docker-compose.prod.yml` va encima del de desarrollo y solo cambia esto:
+
+- **HTTPS (RNF-02):** nginx usa `nginx.prod.conf`. El 80 redirige a https, el 443 sirve la
+  SPA y la API (HTTP/2, HSTS, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`) y el 9000
+  sirve MinIO por https solo para abrir las URL firmadas. Sin https la app no funciona: la
+  cookie de sesión es `Secure`.
+- **Puertos:** solo nginx publica (80, 443 y 9000). Postgres, Redis, MinIO, su consola y la
+  API quedan dentro de la red de Docker.
+- **Sin valores de desarrollo:** `POSTGRES_PASSWORD`, `S3_SECRET_KEY`,
+  `S3_PUBLIC_ENDPOINT_URL` (`https://<dominio>:9000`) y `SMTP_HOST` son obligatorias; si
+  falta una, compose no arranca y dice cuál.
+- **Correo real:** sin Mailpit; `SMTP_STARTTLS=true` y puerto 587 por defecto.
+- **Reinicio:** todos los servicios con `restart: unless-stopped`.
+
+Las rutas de nginx son las mismas en los dos ambientes (`backend/docker/nginx/rutas.conf`);
+`nginx.conf` (desarrollo) y `nginx.prod.conf` (producción) solo cambian lo de alrededor.
 
 ---
 
@@ -736,7 +762,10 @@ Lo que cambia del lado del backend:
 
 - Solo interno (`redis:6379`), con AOF para no perder tareas en cola.
 
-### 5.4 nginx (`backend/docker/nginx/nginx.conf`)
+### 5.4 nginx (`backend/docker/nginx/`)
+
+Rutas en `rutas.conf`, compartidas por `nginx.conf` (desarrollo, puerto 80) y
+`nginx.prod.conf` (producción, https; ver §2.4).
 
 | Ruta | Destino | Notas |
 |---|---|---|
