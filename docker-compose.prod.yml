@@ -1,0 +1,65 @@
+# Producción: se pone ENCIMA de docker-compose.yml y cambia solo lo necesario.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Qué cambia frente a desarrollo:
+# - HTTPS en nginx (nginx.prod.conf): 80 redirige, 443 sirve la app, 9000 sirve MinIO pa
+#   las URL firmadas. Es lo único que queda publicado en el servidor.
+# - Postgres, Redis, MinIO (y su consola) y la API ya no publican puertos: solo se ven
+#   dentro de la red de Docker.
+# - Sin Mailpit: el correo sale por el SMTP real.
+# - Sin contraseñas de desarrollo: si falta una variable obligatoria, compose no arranca
+#   y dice cuál (lista en .env.example).
+# - Todo se reinicia solo si el servidor o el contenedor se caen.
+
+services:
+  postgres:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en el .env de la raíz}
+
+  redis:
+    restart: unless-stopped
+
+  minio:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?Falta S3_SECRET_KEY en el .env de la raíz}
+
+  preparar:
+    environment: &produccion
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gastroia}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gastroia}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Falta S3_SECRET_KEY}
+      # Con el dominio y el puerto 9000 de nginx (https), no localhost
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:?Falta S3_PUBLIC_ENDPOINT_URL (https://<dominio>:9000)}
+      # El SMTP real; usuario y clave siguen saliendo de backend/.env
+      SMTP_HOST: ${SMTP_HOST:?Falta SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_STARTTLS: "true"
+
+  api:
+    restart: unless-stopped
+    environment: *produccion
+
+  worker:
+    restart: unless-stopped
+    environment: *produccion
+
+  # Mailpit queda solo pa desarrollo: con este archivo no arranca
+  mailpit:
+    profiles: ["desarrollo"]
+
+  frontend:
+    restart: unless-stopped
+
+  nginx:
+    restart: unless-stopped
+    volumes:
+      - ./backend/docker/nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${NGINX_CERTIFICADOS:-./backend/docker/nginx/certs}:/etc/nginx/certs:ro
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "9000:9000"
