@@ -30,6 +30,9 @@ services:
 
   preparar:
     environment: &produccion
+      # Con esto el backend exige todas las claves al arrancar y nunca usa el Space
+      # simulado, aunque se cuele HF_SIMULADO=true en backend/.env
+      ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gastroia}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gastroia}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?Falta S3_SECRET_KEY}
       # Con el dominio y el puerto 9000 de nginx (https), no localhost

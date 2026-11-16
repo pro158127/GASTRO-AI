@@ -4,16 +4,35 @@ Si algo no arranca, primero revisa que la variable exista; después ya puedes ll
 Variable nueva = va aquí Y en .env.example, o el siguiente que clone el repo te odia.
 """
 
+import base64
+import binascii
+import re
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PRODUCCION = "production"
+S3_SECRETO_DESARROLLO = "gastroia_dev_secret"
+_SHA = re.compile(r"[0-9a-f]{40}")
+
+
+def _llave_aes(clave: SecretStr) -> bool:
+    """¿Es una llave AES-256 en Base64 (32 bytes)?"""
+    try:
+        return len(base64.b64decode(clave.get_secret_value(), validate=True)) == 32
+    except (binascii.Error, ValueError):
+        return False
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # hide_input_in_errors: si algo no valida, el error no copia los valores (ahí van claves)
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
+    )
 
     app_name: str = "Gastro-AI API"
+    # development | production. En production se exigen las claves (ver al final)
     environment: str = "development"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -32,7 +51,7 @@ class Settings(BaseSettings):
     # Truco copiado del repo del equipo: sin esto las URL salen con minio:9000 y no abren.
     s3_public_endpoint_url: str = ""
     s3_access_key: str = "gastroia"
-    s3_secret_key: str = "gastroia_dev_secret"
+    s3_secret_key: str = S3_SECRETO_DESARROLLO
     s3_bucket: str = "gastroia-imagenes"
     s3_url_firmada_segundos: int = 300  # 5 min y la URL se vuelve calabaza
     # Cuánto aguanta la imagen en el área temporal (tmp/) entre POST /imagenes y POST /analisis.
@@ -101,6 +120,43 @@ class Settings(BaseSettings):
     contrasenas_filtradas_activo: bool = True
     contrasenas_filtradas_url: str = "https://api.pwnedpasswords.com/range/"
     contrasenas_filtradas_timeout_seconds: float = 3.0
+
+    @model_validator(mode="after")
+    def _produccion_completa(self) -> "Settings":
+        """Con ENVIRONMENT=production no se arranca a medias.
+
+        Sin esto la API arranca «sana» y revienta con 500 en el primer login o análisis, o
+        peor: con HF_SIMULADO le muestra resultados inventados a un doctor. Solo se nombran
+        las variables, nunca sus valores.
+        """
+        if self.environment != PRODUCCION:
+            return self
+        faltan = [nombre for nombre, falla in self._revision_produccion() if falla]
+        if faltan:
+            raise ValueError(
+                "ENVIRONMENT=production pero estas variables faltan o tienen un valor de "
+                "desarrollo: " + ", ".join(faltan)
+            )
+        return self
+
+    def _revision_produccion(self) -> list[tuple[str, bool]]:
+        return [
+            (
+                "HMAC_CLAVES (con HMAC_VERSION_ACTUAL)",
+                self.hmac_version_actual not in self.hmac_claves,
+            ),
+            ("TOTP_CLAVE_CIFRADO (32 bytes en Base64)", not _llave_aes(self.totp_clave_cifrado)),
+            ("HF_SIMULADO (debe ser false)", self.hf_simulado),
+            ("HF_SPACE_URL (https)", not self.hf_space_url.startswith("https://")),
+            ("HF_TOKEN", not self.hf_token.get_secret_value()),
+            ("HF_REVISION (SHA de 40 caracteres)", not _SHA.fullmatch(self.hf_revision)),
+            ("S3_SECRET_KEY", self.s3_secret_key in ("", S3_SECRETO_DESARROLLO)),
+            (
+                "S3_PUBLIC_ENDPOINT_URL (https)",
+                not self.s3_public_endpoint_url.startswith("https://"),
+            ),
+            ("DATABASE_URL (contraseña de desarrollo)", ":gastroia_dev@" in self.database_url),
+        ]
 
 
 @lru_cache
