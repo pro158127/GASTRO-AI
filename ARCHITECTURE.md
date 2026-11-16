@@ -94,6 +94,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
   falta una, compose no arranca y dice cuál.
 - **Correo real:** sin Mailpit; `SMTP_STARTTLS=true` y puerto 587 por defecto.
 - **Reinicio:** todos los servicios con `restart: unless-stopped`.
+- **`ENVIRONMENT=production`:** el backend (API, worker y `preparar`) no arranca si falta
+  o queda con valor de desarrollo alguna de: `HMAC_CLAVES` (con la versión actual),
+  `TOTP_CLAVE_CIFRADO` (32 bytes en Base64), `HF_SPACE_URL` (https), `HF_TOKEN`,
+  `HF_REVISION` (SHA de 40), `S3_SECRET_KEY`, `S3_PUBLIC_ENDPOINT_URL` (https) y la
+  contraseña de `DATABASE_URL`. Tampoco con `HF_SIMULADO=true`. El error nombra las
+  variables, nunca sus valores.
 
 Las rutas de nginx son las mismas en los dos ambientes (`backend/docker/nginx/rutas.conf`);
 `nginx.conf` (desarrollo) y `nginx.prod.conf` (producción) solo cambian lo de alrededor.
@@ -771,7 +777,7 @@ Rutas en `rutas.conf`, compartidas por `nginx.conf` (desarrollo, puerto 80) y
 |---|---|---|
 | `/api/v1/auth/login`, `contrasena/cambiar` y `totp/*` | `api:8000` | Límite 10/min por IP (ráfaga 5) |
 | `/api/v1/pacientes/consulta`, `/pacientes/analisis/buscar` y `/casos-recibidos/buscar` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
-| `/api/v1/eventos` | `api:8000` | SSE: sin buffering y `proxy_read_timeout 1h` |
+| `/api/v1/eventos` | `api:8000` | SSE: sin buffering, `proxy_read_timeout 1h` y máximo 20 streams por IP (429) |
 | `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
 | `/` | `frontend:80` | SPA compilada |
 
