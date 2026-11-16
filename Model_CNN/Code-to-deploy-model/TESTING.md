@@ -1,124 +1,41 @@
-# Pruebas locales del servicio Gastro-AI (antes de publicar en Hugging Face)
+# Pruebas locales del servicio Gastro-AI
 
-Este documento describe cómo levantar el servicio de inferencia en local y
-probarlo con el conjunto de imágenes reales incluido en
-`imagenes_reales-20261112T211804Z-1-001/imagenes_reales/`.
+Esta guía describe una prueba técnica local del servicio de inferencia. No equivale a una evaluación clínica ni a un reporte RM-06. La carpeta `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/` contiene 50 imágenes para comprobaciones de entrada y salida.
 
-> **Importante:** las imágenes de prueba y este documento **no** se incluyen en
-> la imagen Docker del Space (ver `.dockerignore`). Solo sirven para validar
-> localmente antes de publicar.
+## Preparar e iniciar
 
-## 1. Levantar el servicio en local
-
-### Opción A — Docker
+Se requiere Python 3.11 y las dependencias de `requirements.txt`. Define una clave sintética para el test local y una revisión SHA de 40 caracteres. El valor de revisión de ejemplo es solo local; nunca lo uses como la revisión publicada en Hugging Face.
 
 ```bash
 cd Model_CNN/Code-to-deploy-model
-docker build -t gastroai-hf .
-docker run --rm -p 7860:7860 gastroai-hf
-```
-
-### Opción B — uvicorn directo
-
-```bash
-cd Model_CNN/Code-to-deploy-model
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 7860
+export GASTROAI_API_KEY=clave-sintetica-local
+export GASTROAI_REVISION_SHA=0123456789abcdef0123456789abcdef01234567
+export HF_SHA256=d4b264bf0a954cad5b2c26f834ec8a02eb07eeac41eed14b6e65e4f46b41fc76
+uvicorn app:app --host 127.0.0.1 --port 7860
 ```
 
-El servicio falla al arrancar (fail-fast) si los pesos
-`best_gastroai_masked_loss.pth` no existen o su SHA-256 no coincide con el
-esperado. Si arranca, el chequeo de integridad ha pasado.
+La app falla al iniciar si falta `GASTROAI_API_KEY`, si la revisión no contiene 40 caracteres hexadecimales o si los pesos no están presentes o no coinciden con su SHA-256. En Hugging Face usa el `SPACE_COMMIT_HASH` real (o define `GASTROAI_REVISION_SHA`) y configura el mismo SHA como `HF_REVISION` en el backend.
 
-## 2. Verificar el estado
+## Pruebas de API
+
+`GET /` debe responder `status=ready` y un `revision_sha` hexadecimal de 40 caracteres. `POST /clasificar` requiere `Authorization: Bearer <GASTROAI_API_KEY>` y un archivo `imagen`.
 
 ```bash
-curl http://localhost:7860/
-# {"status": "ready", "revision_sha": "v1.0.0-masked-loss-ep07"}
+curl http://127.0.0.1:7860/
+curl -X POST http://127.0.0.1:7860/clasificar \
+  -H "Authorization: Bearer $GASTROAI_API_KEY" \
+  -F "imagen=@imagenes_reales-20261112T211804Z-1-001/imagenes_reales/sample_001.bmp"
 ```
 
-## 3. Clasificar una imagen
+Una respuesta correcta tiene `revision_sha`, `latencia_ms` y `caracteristicas` con códigos `GASTRITIS`, `ATROFIA` y `HPYLORI`. Cada característica contiene una probabilidad entre 0 y 1 y `regiones`; sus coordenadas son fracciones entre 0 y 1 y `mapa_calor_base64` debe decodificar a PNG. Una solicitud sin bearer debe responder 401 y una imagen inválida, 400.
 
-Endpoint `POST /clasificar`, `multipart/form-data`, campo `imagen`.
+## Alcance de las 50 imágenes
 
-```bash
-curl -X POST http://localhost:7860/clasificar \
-     -F "imagen=@imagenes_reales-20261112T211804Z-1-001/imagenes_reales/egid_val_04_009(21).bmp"
-```
+El índice conserva el nombre neutro, el dataset de origen, las etiquetas disponibles y `clases_con_anotacion_verificable`. Las celdas vacías significan **sin etiqueta verificable**, no clase negativa. Para el subconjunto EGID solo se marca la clase cuyo directorio fuente aporta etiqueta: `HPYLORI` o `ATROFIA`. Las imágenes de GastroHUN e HyperKvasir de esta carpeta no aportan etiquetas de las patologías que predice este modelo.
 
-No se requiere cabecera `X-API-Key` si la variable de entorno
-`GASTROAI_API_KEY` está vacía.
+No calcules sensibilidad, especificidad, F1, AUC, Brier o ECE con este conjunto. Es una selección local y no acredita una partición de prueba independiente por paciente. Para RM-06 se necesita un reporte reproducible sobre el cohort de prueba acordado, con la revisión real de HF y métricas válidas por clase. Las atribuciones y licencias están en `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/CREDITOS.md`.
 
-## 4. Respuesta esperada
-
-```json
-{
-  "revision_sha": "v1.0.0-masked-loss-ep07",
-  "predicciones": {
-    "GASTRITIS": {
-      "probabilidad": 0.8123,
-      "detectado": true,
-      "region_roi": {"x": 10, "y": 20, "ancho": 100, "alto": 120, "area_pct": 20.83},
-      "mapa_calor_png_b64": "<PNG base64>"
-    },
-    "ATROFIA": {
-      "probabilidad": 0.1000,
-      "detectado": false,
-      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
-      "mapa_calor_png_b64": "<PNG base64>"
-    },
-    "HPYLORI": {
-      "probabilidad": 0.0500,
-      "detectado": false,
-      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
-      "mapa_calor_png_b64": "<PNG base64>"
-    }
-  }
-}
-```
-
-## 5. Conjunto de imágenes reales
-
-La carpeta `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/` contiene
-50 imágenes (23 `.bmp` de EGID, 27 `.jpg` de GastroHUN/HyperKvasir) y un
-`index_imagenes_reales.csv` con el ground-truth por imagen.
-
-Columnas del CSV:
-
-| Columna | Significado |
-|---|---|
-| `nombre_archivo_test` | Nombre del archivo en la carpeta |
-| `patient_id` | Identificador de paciente |
-| `mucosa_normal` | 1 = mucosa normal |
-| `gastritis_eritematosa` | 1 = gastritis eritematosa |
-| `astrofia_gastrica` *(typo)* | 1 = atrofia gástrica |
-| `h_pylori` | 1 = signos de H. pylori |
-| `ruta_original` | Ruta de origen en el dataset |
-
-### Matiz masked-loss (importante al validar)
-
-El modelo usa pérdida enmascarada porque algunos datasets no anotan todas las
-clases. En EGID:
-
-- Carpeta `1.H_pylori_infection_status`: el label real de H. pylori está en el
-  subdirectorio (`1.positive`=1, `2.negative`=0); la columna `h_pylori` del CSV
-  marca `1` para toda la carpeta. La atrofia **no** está anotada aquí.
-- Carpeta `2.Presence_of_atrophy`: el label real de atrofia está en el
-  subdirectorio (`1.atrophic`=1, `2.non-atrophic`=0); la columna
-  `astrofia_gastrica` marca `1` para toda la carpeta. Gastritis y H. pylori
-  **no** están anotados aquí.
-
-Para validar con precisión, deriva el ground-truth de `ruta_original`
-(subdirectorios `1.positive`/`2.negative` y `1.atrophic`/`2.non-atrophic`) y
-aplica la máscara de evaluación por clase.
-
-## 6. Subir las 50 imágenes en lote
-
-```bash
-cd "Model_CNN/Code-to-deploy-model/imagenes_reales-20261112T211804Z-1-001/imagenes_reales"
-mkdir -p ../../respuestas_endpoint
-for f in *.bmp *.jpg; do
-  curl -s -X POST http://localhost:7860/clasificar \
-       -F "imagen=@$f" -o "../../respuestas_endpoint/${f%.*}.json"
-done
-```
+Las imágenes no se copian a la imagen Docker del Space (`.dockerignore`); se usan únicamente en validación local.
