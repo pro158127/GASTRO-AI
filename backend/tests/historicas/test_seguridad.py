@@ -19,7 +19,7 @@ def test_hash_ausente_o_corrupto_rechaza_acceso(guardado):
 
 
 def test_totp_valido_no_se_puede_reutilizar():
-    secreto = "JBSWY3DPEHPK3PXP"  # Dato público de prueba; ninguna cuenta real.
+    secreto = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"  # Dato público de prueba; ninguna cuenta real.
     ahora = 1800000000
     codigo = pyotp.TOTP(secreto).at(ahora)
     paso = verificar_codigo_totp(secreto, codigo, None, ahora=ahora)
