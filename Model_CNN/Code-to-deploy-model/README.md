@@ -98,9 +98,10 @@ Endpoints expuestos en el Space (puerto 7860):
 
 - `GET /` → estado del servicio (incluye `revision_sha`).
 - `POST /clasificar` → recibe una imagen (`multipart/form-data`, campo
-  `imagen`) y devuelve, por patología, la probabilidad, el umbral, si fue
-  detectada, el bounding-box de ROI y el mapa de calor Grad-CAM aislado en
-  PNG Base64.
+  `imagen`) y devuelve `revision_sha`, `latencia_ms` y tres `caracteristicas`
+  con `codigo`, `probabilidad` y `regiones`. Cada región incluye coordenadas
+  normalizadas del ROI, `area_pct` y el mapa de calor Grad-CAM en PNG Base64.
+  La respuesta no incluye el umbral ni un indicador booleano de detección.
 
 El endpoint requiere `Authorization: Bearer <token>`. Configura
 `GASTROAI_API_KEY` como secreto del Space y `HF_TOKEN` con el mismo valor en
