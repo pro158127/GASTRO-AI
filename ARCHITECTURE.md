@@ -107,7 +107,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 
 | Grupo | Variables |
 |---|---|
-| Base de datos y cola | `DATABASE_URL`, `REDIS_URL` |
+| Base de datos y cola | `DATABASE_URL`, `REDIS_URL`, `EVENTOS_INTERVALO_SEGUNDOS` (15) |
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
 | Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
@@ -236,6 +236,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | POST | `/admin/estado-operativo/verificar` | `ADMINISTRADOR` | — | igual que el GET (mide de nuevo) |
 | GET | `/admin/modelo/metricas` | `ADMINISTRADOR` | — | `{disponible, modelo, rotulo, conjunto_prueba, fecha_reporte, contiene_datos_clinicos, model_card_url, macro, por_caracteristica}` |
 | GET | `/admin/logs-inferencia` | `ADMINISTRADOR` | `?estado&desde&hasta&pagina&por_pagina` | `{items, paginacion}` |
+| GET | `/eventos` | `ACTIVA` (cualquier rol) | — | `text/event-stream` (§3.9) |
 | GET | `/admin/dashboard` | `ADMINISTRADOR` | — | `{usuarios, seguridad, analisis, latencia_7d, servicios, alerta, modelo_vigente, envios_credencial_fallidos, verificado_en}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
 | GET | `/dashboard/doctor` | `DOCTOR` | — | `{primer_uso, resumen, analisis_recientes, frecuencia, concordancia, pacientes_con_seguimiento, avisos_traslado, casos_recibidos, aviso}` |
@@ -595,6 +596,8 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
   queda `FALLIDO` (`ERR-1003`) y la API responde 503.
 - `filtraciones.py`: Have I Been Pwned por k-anonimato (solo sale el inicio del SHA-1). Si
   no responde, el cambio de contraseña no se bloquea.
+- `tiempo_real.py`: avisos SSE por Redis pub/sub (`PublicadorRedis`) y el `Broker` que los
+  reparte a las conexiones de cada proceso (§3.9).
 
 ### 3.8 Worker (`app/workers/celery_app.py`)
 
@@ -637,11 +640,40 @@ multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
 
 ### 3.9 Tiempo real (SSE) y seguimiento del análisis
 
-No hay WebSocket. El tiempo real será con **SSE** en `GET /api/v1/eventos` (planeado): los eventos llevan **solo IDs**, se publican después del commit
-y el worker los emite por Redis pub/sub. Además, mientras el análisis está `PROCESANDO`, el
-frontend puede consultar `GET /analisis/{id}/estado` con `X-Actividad-Pasiva: 1`, que no
-renueva la sesión; así el cierre
-por inactividad sigue funcionando aunque la pantalla esté esperando.
+No hay WebSocket: el servidor avisa por **SSE** en `GET /api/v1/eventos`
+(`text/event-stream`, guía en `docs/sse_tiempo_real.md`). Los avisos llevan **solo IDs**: el
+front vuelve a pedir el dato al endpoint REST de siempre, que es donde está la autorización.
+
+| Evento | Datos | A quién | Cuándo |
+|---|---|---|---|
+| `conectado` | `{}` | quien se conecta | al abrir y al reconectar (el front hace refetch) |
+| `analisis.estado` | `{analisis_id}` | doctor que lo pidió | análisis nuevo, cambio de etapa, terminó o falló |
+| `analisis.explicacion` | `{analisis_id}` | doctor que lo pidió | explicación `GENERADA`, `FALLIDA` o `RECHAZADA` |
+| `traslado.nuevo` | `{traslado_id}` | doctor destino | desactivar, eliminar o reasignar casos |
+| `cuenta.rol_cambiado` | `{}` | esa cuenta | el admin le cambió el rol |
+| `sesion.cerrada` | `{motivo}` | dueño de la sesión | su sesión ya no vale; el stream termina |
+
+Cada `data:` es `{"tipo": "<evento>", ...datos}`. `motivo` ∈ `INACTIVIDAD |
+CUENTA_DESACTIVADA | DEMASIADOS_INTENTOS | CERRADA` (`CERRADA` = cerró sesión en otra pestaña
+o el admin le restableció la contraseña).
+
+- **Quién publica:** nadie a mano. `repositories/avisos_tiempo_real.py` escucha la `Session`
+  de SQLAlchemy: en cada flush anota qué cambió y **publica después del commit** (si hay
+  rollback, se descartan). Así sirve igual en la API y en el worker, que lo activan al
+  arrancar (`lifespan` y la señal `worker_init` de Celery).
+- **Cómo llega:** `PublicadorRedis` publica en el canal `usuario:<id>`; en cada proceso de la
+  API un solo `Broker` escucha `usuario:*` y reparte a las conexiones abiertas (máximo 100
+  avisos en cola por conexión). Si Redis no responde, el aviso se pierde sin tumbar la
+  petición; el front recupera con el refetch de `conectado`.
+- **La sesión:** abrir el stream exige sesión `ACTIVA` (401/403 como cualquier endpoint).
+  Cada `EVENTOS_INTERVALO_SEGUNDOS` (15) y cada vez que llega un `sesion.cerrada`, revisa que
+  **su** sesión siga valiendo (el aviso puede ser de otra sesión del mismo usuario). Nunca
+  renueva la inactividad (RF-U10) y no deja una conexión de la base tomada mientras está
+  abierto.
+- sse-starlette manda `: ping` cada 15 s; la respuesta lleva `X-Accel-Buffering: no`.
+
+Además, mientras el análisis está `PROCESANDO`, el frontend puede consultar
+`GET /analisis/{id}/estado` con `X-Actividad-Pasiva: 1`, que no renueva la sesión.
 
 ### 3.10 Migraciones y carga inicial
 
@@ -710,6 +742,7 @@ Lo que cambia del lado del backend:
 |---|---|---|
 | `/api/v1/auth/login`, `contrasena/cambiar` y `totp/*` | `api:8000` | Límite 10/min por IP (ráfaga 5) |
 | `/api/v1/pacientes/consulta`, `/pacientes/analisis/buscar` y `/casos-recibidos/buscar` | `api:8000` | Límite 30/min por IP (ráfaga 10) |
+| `/api/v1/eventos` | `api:8000` | SSE: sin buffering y `proxy_read_timeout 1h` |
 | `/api/` | `api:8000` | `X-Forwarded-For` para la IP de la bitácora |
 | `/` | `frontend:80` | SPA compilada |
 

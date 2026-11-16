@@ -1,8 +1,12 @@
 """Por aquí arranca todo. uvicorn app.main:app y a rezar."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.adapters.tiempo_real import PublicadorRedis
+from app.api.deps import get_broker
 from app.api.routers import (
     admin_bitacora,
     admin_dashboard,
@@ -14,6 +18,7 @@ from app.api.routers import (
     catalogos,
     configuracion,
     dashboard,
+    eventos,
     health,
     imagenes,
     pacientes,
@@ -21,13 +26,24 @@ from app.api.routers import (
 )
 from app.core.config import get_settings
 from app.core.errores import registrar_manejadores
+from app.repositories import avisos_tiempo_real
 from app.schemas.errores import RespuestaError
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def ciclo_de_vida(_app: FastAPI):
+    # Los cambios que se confirman en la base salen como avisos por Redis (SSE)
+    avisos_tiempo_real.instalar(PublicadorRedis(settings.redis_url))
+    yield
+    await get_broker().detener()
+
+
 # Todos los endpoints documentan el mismo error genérico; cada uno agrega los suyos
 app = FastAPI(
     title=settings.app_name,
+    lifespan=ciclo_de_vida,
     responses={500: {"model": RespuestaError, "description": "Error interno sin detalles"}},
 )
 registrar_manejadores(app)
@@ -54,3 +70,4 @@ app.include_router(analisis.router, prefix=settings.api_prefix)
 app.include_router(casos_recibidos.router, prefix=settings.api_prefix)
 app.include_router(configuracion.router, prefix=settings.api_prefix)
 app.include_router(dashboard.router, prefix=settings.api_prefix)
+app.include_router(eventos.router, prefix=settings.api_prefix)

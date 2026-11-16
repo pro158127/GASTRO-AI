@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # Redis: el mandadero de Celery, por aquí pasan las tareas y sus resultados
     redis_url: str = "redis://localhost:6379/0"
+    # Cada cuánto el stream SSE revisa que la sesión siga valiendo (y si no, la corta)
+    eventos_intervalo_segundos: float = 15.0
 
     # MinIO, nuestro S3 hecho en casa. Dentro de Docker el host es «minio», no localhost
     s3_endpoint_url: str = "http://localhost:9000"
