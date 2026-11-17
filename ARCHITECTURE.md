@@ -104,6 +104,38 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 Las rutas de nginx son las mismas en los dos ambientes (`backend/docker/nginx/rutas.conf`);
 `nginx.conf` (desarrollo) y `nginx.prod.conf` (producción) solo cambian lo de alrededor.
 
+### 2.5 Respaldo y restauración (RNF-26)
+
+```bash
+# Desde la raíz, con el stack arriba (en producción, con los dos -f del §2.4)
+COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"   backend/scripts/respaldar.sh /srv/respaldos        # RESPALDOS_A_CONSERVAR=7 borra los viejos
+# En un servidor limpio (base vacía), con el mismo .env y backend/.env
+COMPOSE="…" backend/scripts/restaurar.sh /srv/respaldos/gastroai-20261117T030000Z
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Cada respaldo es una carpeta `gastroai-<fecha UTC>/` con:
+
+| Archivo | Qué es |
+|---|---|
+| `base.dump` | `pg_dump` (formato custom): cuentas, análisis, bitácora, logs de inferencia, métricas y modelo desplegado |
+| `archivos.tar` | imágenes y mapas de MinIO con su tipo y metadatos, más `indice.json` con la huella de cada uno (sin `tmp/`) |
+| `pesos.bin` | copia de los pesos, solo si `HF_PESOS_ARCHIVO` está configurado; se baja con la revisión fija y se verifica contra `HF_SHA256` |
+| `manifiesto.json` | conteos por tabla, huella SHA-256 de la bitácora completa, modelo vigente y resumen de los archivos |
+| `SHA256SUMS` | huellas de todo lo anterior |
+
+- **Consistencia:** el manifiesto se toma antes y después del `pg_dump`; si la base cambió en
+  medio, se repite (hasta 3 veces).
+- **Verificación al restaurar:** se revisan las huellas, se restaura y se recalcula el
+  manifiesto. Tiene que coincidir todo: conteos, bitácora entrada por entrada (RNF-05) y
+  archivos. Si algo no cuadra, el script lo dice y sale con error.
+- **Seguridad:** `restaurar.sh` se niega a correr si la base ya tiene tablas (nunca pisa una
+  instalación en uso). El respaldo trae seudónimos, hashes e imágenes: dato personal
+  protegido (Ley 1581). Queda solo legible por el dueño (`umask 077`); guárdalo cifrado y
+  fuera del servidor.
+- Las piezas que corren dentro del contenedor están en `scripts/respaldo.py` (todo por
+  stdin/stdout, sin montar carpetas).
+
 ---
 
 ## 3. Backend (`backend/`)
@@ -119,6 +151,7 @@ backend/
 ├── docker/nginx/nginx.conf  # puerta de entrada (la usan los dos compose)
 ├── scripts/init_storage.py  # crea el bucket
 ├── scripts/cargar_metricas.py  # carga el reporte de evaluación del modelo (RM-06)
+├── scripts/respaldar.sh, restaurar.sh, respaldo.py  # respaldo y restauración (RNF-26)
 └── app/
     ├── main.py              # FastAPI, manejadores de error y routers
     ├── seed.py              # carga inicial (python -m app.seed)
@@ -143,7 +176,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | Base de datos y cola | `DATABASE_URL`, `REDIS_URL`, `EVENTOS_INTERVALO_SEGUNDOS` (15) |
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
-| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
+| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HF_PESOS_ARCHIVO` (respaldo), `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
 | Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
 | Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
 | Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |

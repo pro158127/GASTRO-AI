@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     hf_repo: str = ""
     hf_revision: str = ""  # SHA fijo, nunca «main»: luego cambian el modelo y nadie sabe qué pasó
     hf_sha256: str = ""  # huella de los pesos, pa que no nos den gato por liebre
+    # Ruta de los pesos dentro de HF_REPO (p. ej. best_gastroai_masked_loss.pth). Solo la
+    # usa el respaldo (RNF-26) pa guardar una copia; vacía = el respaldo no los copia
+    hf_pesos_archivo: str = ""
     http_timeout_seconds: float = 30.0
     # Space de mentiras pa desarrollo mientras ML publica el de verdad. Solo funciona con
     # ENVIRONMENT=development; en cualquier otro ambiente el worker se niega a arrancar.
