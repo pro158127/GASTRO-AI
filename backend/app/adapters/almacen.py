@@ -8,6 +8,8 @@ Dos clientes, misma llave:
 La firma S3v4 incluye el host: por eso no sirve firmar con uno y reescribir la URL después.
 """
 
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Protocol
 
 import boto3
@@ -27,6 +29,19 @@ class ErrorAlmacen(Exception):
 # Área temporal de POST /imagenes: lo que no se usa en un día lo barre MinIO solito
 PREFIJO_TEMPORAL = "tmp/"
 DIAS_TEMPORAL = 1  # S3 cuenta el ciclo de vida en días; el vencimiento fino lo revisa la API
+
+
+@dataclass(frozen=True)
+class ObjetoGuardado:
+    clave: str
+    tamano: int
+
+
+@dataclass(frozen=True)
+class ArchivoCompleto:
+    datos: bytes
+    tipo_contenido: str
+    metadatos: dict[str, str]
 
 
 class Almacen(Protocol):
@@ -157,6 +172,30 @@ class AlmacenS3:
             return True
         except (BotoCoreError, ClientError):
             return False
+
+    # ------------------------------------------------------------- respaldo (RNF-26)
+
+    def listar(self) -> Iterator[ObjetoGuardado]:
+        """Todas las claves del bucket con su tamaño, en orden alfabético."""
+        try:
+            paginas = self._interno.get_paginator("list_objects_v2").paginate(Bucket=self._bucket)
+            for pagina in paginas:
+                for obj in pagina.get("Contents", []):
+                    yield ObjetoGuardado(obj["Key"], obj["Size"])
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo listar el almacén.") from error
+
+    def descargar(self, clave: str) -> ArchivoCompleto:
+        """El objeto con su tipo y sus metadatos, pa respaldarlo tal cual."""
+        try:
+            r = self._interno.get_object(Bucket=self._bucket, Key=clave)
+            return ArchivoCompleto(
+                r["Body"].read(),
+                r.get("ContentType", "application/octet-stream"),
+                dict(r.get("Metadata", {})),
+            )
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo leer el archivo.") from error
 
     def asegurar_bucket(self) -> bool:
         """Crea el bucket si falta. Devuelve True si lo tuvo que crear.
