@@ -1,0 +1,12 @@
+# Conjunto de imágenes de prueba (no forman parte del servicio desplegado)
+imagenes_reales-*/
+respuestas_endpoint/
+
+# Documentación de pruebas
+TESTING.md
+
+# Artefactos Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
