@@ -23,7 +23,7 @@ from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import autenticacion
 from app.services.auditoria import PublicadorEventos
 
-SECRETO = "JBSWY3DPEHPK3PXP"  # Solo prueba; nunca usar en una cuenta.
+SECRETO = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"  # Solo prueba; nunca usar en una cuenta.
 
 
 @pytest.fixture

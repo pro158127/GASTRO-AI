@@ -7,7 +7,7 @@ import pytest
 from app.core.seguridad import CifradorTotp, ErrorCifrado, verificar_codigo_totp
 from app.schemas.auth import CodigoEntrada
 
-SECRETO = "JBSWY3DPEHPK3PXP"
+SECRETO = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 AHORA = 1800000000
 
 
