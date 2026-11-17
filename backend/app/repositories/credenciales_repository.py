@@ -12,6 +12,14 @@ class RepositorioCredenciales:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def guardar_hash(self) -> None:
+        """Escribe ya en la base (flush, sin commit) el hash nuevo de la temporal.
+
+        Va antes del correo: si la base lo rechaza, el correo no sale (ver
+        services/credenciales.py).
+        """
+        self.db.flush()
+
     def registrar(
         self,
         usuario_id: UUID,
