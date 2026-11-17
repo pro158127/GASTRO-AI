@@ -69,6 +69,8 @@ class ServicioCredenciales:
         usuario.hash_contrasena = hashear_contrasena(temporal)
         usuario.contrasena_temporal = True
         usuario.temporal_expira_en = vence
+        # Primero la base y después el correo: si la base falla, la temporal no sale
+        self._repositorio.guardar_hash()
 
         try:
             self._enviador.enviar(
