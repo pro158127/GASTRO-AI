@@ -1,118 +1,142 @@
+# Gastro-AI completo: nginx, frontend, api, worker, postgres, redis y minio.
+#
+#   cp backend/.env.example backend/.env      # una sola vez
+#   docker compose up -d --build              # http://localhost
+#
+# La primera vez compila MinIO desde el código fuente (~3 min) y el servicio «preparar»
+# aplica las migraciones, crea el bucket y hace la carga inicial antes de que arranque la API.
+# Las credenciales de Postgres y MinIO salen del .env de ESTA carpeta (opcional, ver
+# .env.example); si no existe, se usan los valores de desarrollo, que coinciden con
+# backend/.env.example.
+
+x-backend: &backend
+  build: ./backend
+  image: gastroia/backend:dev
+  env_file:
+    - path: ./backend/.env
+      required: false
+  environment:
+    # Dentro de Docker cada servicio se llama por su nombre; esto pisa lo de backend/.env
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-gastroia}:${POSTGRES_PASSWORD:-gastroia_dev}@postgres:5432/${POSTGRES_DB:-gastroia}
+    REDIS_URL: redis://redis:6379/0
+    S3_ENDPOINT_URL: http://minio:9000
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-gastroia}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-gastroia_dev_secret}
+    # Las URL firmadas van con el host que ve el navegador
+    S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+    # Correo de desarrollo: Mailpit lo atrapa todo (http://localhost:8025). En producción se
+    # quitan estas tres líneas y manda el SMTP real de backend/.env
+    SMTP_HOST: ${SMTP_HOST_DOCKER:-mailpit}
+    SMTP_PORT: ${SMTP_PORT_DOCKER:-1025}
+    SMTP_STARTTLS: ${SMTP_STARTTLS_DOCKER:-false}
+
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: gastroai_nginx
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gastroia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gastroia_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-gastroia}
     ports:
-      - "80:80"
+      - "5432:5432"   # pa DBeaver/psql en desarrollo; no se publica en producción
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - postgres16_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]   # AOF: la cola sobrevive un reinicio
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    # Compilado desde el código oficial: MinIO ya no publica imágenes ni binarios
+    build: ./backend/docker/minio
+    image: gastroia/minio:RELEASE.2025-10-15T17-29-55Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-gastroia}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-gastroia_dev_secret}
+    ports:
+      - "9000:9000"   # API S3: el navegador abre aquí las URL firmadas
+      - "9001:9001"   # consola web (solo ver archivos)
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Corre una vez y termina: migraciones, bucket y carga inicial. Se puede repetir sin duplicar
+  preparar:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && python -m scripts.init_storage && python -m app.seed"]
+    restart: "no"
     depends_on:
-      - api
-      - frontend
-    networks:
-      - gastroai_net
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    expose:
+      - "8000"
+    depends_on: &listo
+      preparar:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    depends_on: *listo
+
+  # Solo desarrollo: servidor SMTP de mentiras con bandeja web en http://localhost:8025.
+  # Ahí llegan las contraseñas temporales de las cuentas que crea el administrador.
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "8025:8025"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.frontend
-    container_name: gastroai_frontend
     expose:
       - "80"
-    depends_on:
-      - api
-    networks:
-      - gastroai_net
 
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.backend
-    container_name: gastroai_api
-    command: sh -c "python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    env_file:
-      - .env
-    expose:
-      - "8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
-    networks:
-      - gastroai_net
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.backend
-    container_name: gastroai_worker
-    command: celery -A app.worker.celery_app worker --loglevel=info
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
-    networks:
-      - gastroai_net
-
-  redis:
-    image: redis:7-alpine
-    container_name: gastroai_redis
-    command: redis-server --appendonly yes
+  nginx:
+    image: nginx:1.28-alpine
     volumes:
-      - redis_data:/data
-    networks:
-      - gastroai_net
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: gastroai_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - ./backend/docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - gastroai_net
-
-  minio:
-    image: bitnamilegacy/minio:latest
-    container_name: gastroai_minio
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-    volumes:
-      - minio_data:/bitnami/minio/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - gastroai_net
-
-networks:
-  gastroai_net:
-    driver: bridge
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_started
 
 volumes:
-  postgres_data:
+  postgres16_data:
   redis_data:
   minio_data:

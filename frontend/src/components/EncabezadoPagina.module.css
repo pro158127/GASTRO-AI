@@ -1,0 +1,45 @@
+/* Encabezado de pantalla: H1 de 28 px en escritorio y de 24 px en tableta y celular (T-15, M-15). */
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espacio-4);
+}
+
+.textos {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--espacio-1);
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h1);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* El layout lleva el foco al título al cambiar de pantalla: se ve con teclado. */
+.titulo:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.descripcion {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+@media (max-width: 1279px) {
+  .titulo {
+    font: var(--texto-titulo-h2);
+  }
+
+  .descripcion {
+    font: var(--texto-cuerpo-pequeno);
+  }
+}

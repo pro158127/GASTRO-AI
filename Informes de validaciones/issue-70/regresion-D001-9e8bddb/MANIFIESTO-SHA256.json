@@ -1,0 +1,66 @@
+[
+  {
+    "archivo": "cobertura-suite.json",
+    "sha256": "58c98863ef9adc242545de127abfe230a07145b366ed9e53dad2f3ed179d68cf"
+  },
+  {
+    "archivo": "cobertura-unicode.json",
+    "sha256": "eeb1f936a722578e0097458d929164b3cbb40e0d2b22f15dafc7a5a150d03a15"
+  },
+  {
+    "archivo": "comparacion-8b22250/cobertura-70-8b22250.json",
+    "sha256": "09f6e14a006f16828968a593f63b2e8425c4b2967f2c5c0292bd69eab3bab2c5"
+  },
+  {
+    "archivo": "comparacion-8b22250/resultados-70-8b22250.xml",
+    "sha256": "8267b632e2a0915ccbcdb66277fda94291665dc172eccf69e695c3a3d52d869c"
+  },
+  {
+    "archivo": "contexto.json",
+    "sha256": "b4ea59d65f5df2c0fe78d3128cde835ce6daca7237e1615c37360f20394b0862"
+  },
+  {
+    "archivo": "dependencias.txt",
+    "sha256": "be40d7464adabea4475a7de44cac46e27972f772fe294c69c62debd0b8ae27af"
+  },
+  {
+    "archivo": "pip-check.txt",
+    "sha256": "672aec65a45bed50e70229c70934a7eebf0462595c459b83023027645d57cccf"
+  },
+  {
+    "archivo": "PROCEDENCIA.json",
+    "sha256": "a09ca3f43a45c67e29f8d3f5da895f6b4b038269f6b2c41cc9977b25bfa4f263"
+  },
+  {
+    "archivo": "suite-77.txt",
+    "sha256": "40aa986e263b8f0a2e0f6a814b08f6821ade6d561309a68905a84ab1b5d6ce32"
+  },
+  {
+    "archivo": "suite-77.xml",
+    "sha256": "8f9281ab18483e8e80de122ecc05681fc9e7932332013614108600f4be7ee75b"
+  },
+  {
+    "archivo": "suite-exit.txt",
+    "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+  },
+  {
+    "archivo": "unicode-exit.txt",
+    "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+  },
+  {
+    "archivo": "unicode.txt",
+    "sha256": "84324400ccd9cca7297c2ce95a35a617d7e575e636069ad9cbf70dc7efb742d7"
+  },
+  {
+    "archivo": "unicode.xml",
+    "sha256": "d8216bf6d487393f79d331962751eb50700a9ad475df03719f6ca74f3042c44e"
+  },
+  {
+    "archivo": "../registros-tsp/TSP_Defect_Log_Gastro-AI.xlsx",
+    "sha256": "1413dbb52952e76bc9cc05572e7b906f58c0c880ad374248fe372acf51f34246"
+  },
+  {
+    "archivo": "../Informe-regresion-D001-9e8bddb.md",
+    "sha256": "dfe98549c195b308b27d72ddb5d7053088977679c9846b1b6a3d1c8980e6c82a"
+  }
+]

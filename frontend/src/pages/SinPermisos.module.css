@@ -1,0 +1,7 @@
+/* El estado vacío queda centrado en el espacio libre del contenido (Figma W-28). */
+.centro {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+}

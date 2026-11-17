@@ -1,0 +1,14 @@
+{
+  "Pruebas": 77,
+  "Aprobadas": 76,
+  "Fallidas": 1,
+  "Errores": 0,
+  "Omitidas": 0,
+  "Cobertura": 45.215593620791495,
+  "Umbral": 70,
+  "CumpleUmbral": false,
+  "CasosIdenticos": true,
+  "DefectoUnicodePersiste": true,
+  "SalidaPytest": 1,
+  "Nota": "Datos de entrada sinteticos de las pruebas; no se utilizaron credenciales reales. Esta ejecucion corresponde exclusivamente a QA 6225ab6."
+}

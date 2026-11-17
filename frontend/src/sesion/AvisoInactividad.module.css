@@ -1,0 +1,61 @@
+/* Pantalla W-05 · Aviso de inactividad (Figma 45:681). Sin animación de entrada: nada que
+   desactivar con prefers-reduced-motion. */
+
+/* Por encima del menú del celular (capa 40, panel 50). */
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espacio-4);
+  overflow-y: auto;
+  background: var(--color-fondo-superposicion);
+}
+
+.dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  /* 480 px en Figma; a 320 px ocupa el ancho disponible sin desplazamiento horizontal. */
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  padding: var(--espacio-6);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-3-dialogo);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-3);
+}
+
+/* Texto oculto a la vista: solo lo anuncia el lector de pantalla. */
+.soloLector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

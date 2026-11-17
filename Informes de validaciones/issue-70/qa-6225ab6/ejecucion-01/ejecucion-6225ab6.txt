@@ -1,0 +1,217 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- [DIRECTORIO_LOCAL]\GASTRO-AI-qa-preparacion-70\backend\.venv\Scripts\python.exe
+rootdir: [DIRECTORIO_LOCAL]\GASTRO-AI-qa-preparacion-70\backend
+configfile: pyproject.toml
+plugins: anyio-4.16.0, cov-7.1.0
+collecting ... collected 77 items
+
+tests/test_acceso_sesion.py::test_solo_administrador_supera_control_de_rol[PARAMETRO_OMITIDO] PASSED [  1%]
+tests/test_acceso_sesion.py::test_solo_administrador_supera_control_de_rol[PARAMETRO_OMITIDO] PASSED [  2%]
+tests/test_acceso_sesion.py::test_actividad_pasiva_no_renueva_sesion[PARAMETRO_OMITIDO] PASSED [  3%]
+tests/test_acceso_sesion.py::test_actividad_pasiva_no_renueva_sesion[PARAMETRO_OMITIDO] PASSED [  5%]
+tests/test_acceso_sesion.py::test_sesion_expira_por_inactividad PASSED   [  6%]
+tests/test_acceso_sesion.py::test_segundo_factor_pendiente_no_accede_a_sesion_activa PASSED [  7%]
+tests/test_autenticacion_tanda2.py::test_T70_A01_login_selecciona_etapa_y_guarda_hash[PARAMETRO_OMITIDO] PASSED [  9%]
+tests/test_autenticacion_tanda2.py::test_T70_A01_login_selecciona_etapa_y_guarda_hash[PARAMETRO_OMITIDO] PASSED [ 10%]
+tests/test_autenticacion_tanda2.py::test_T70_A01_login_selecciona_etapa_y_guarda_hash[PARAMETRO_OMITIDO] PASSED [ 11%]
+tests/test_autenticacion_tanda2.py::test_T70_A02_login_no_revela_estado_de_cuenta[PARAMETRO_OMITIDO] PASSED [ 12%]
+tests/test_autenticacion_tanda2.py::test_T70_A02_login_no_revela_estado_de_cuenta[PARAMETRO_OMITIDO] PASSED [ 14%]
+tests/test_autenticacion_tanda2.py::test_T70_A02_login_no_revela_estado_de_cuenta[PARAMETRO_OMITIDO] PASSED [ 15%]
+tests/test_autenticacion_tanda2.py::test_T70_A02_login_no_revela_estado_de_cuenta[PARAMETRO_OMITIDO] PASSED [ 16%]
+tests/test_autenticacion_tanda2.py::test_T70_A02_login_no_revela_estado_de_cuenta[PARAMETRO_OMITIDO] PASSED [ 18%]
+tests/test_autenticacion_tanda2.py::test_T70_A03_quinto_fallo_bloquea_quince_minutos PASSED [ 19%]
+tests/test_autenticacion_tanda2.py::test_T70_A04_temporal_vencida_no_crea_sesion[PARAMETRO_OMITIDO] PASSED [ 20%]
+tests/test_autenticacion_tanda2.py::test_T70_A04_temporal_vencida_no_crea_sesion[PARAMETRO_OMITIDO] PASSED [ 22%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 23%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 24%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 25%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 27%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 28%]
+tests/test_autenticacion_tanda2.py::test_T70_A05_sesiones_no_autorizadas[PARAMETRO_OMITIDO] PASSED [ 29%]
+tests/test_autenticacion_tanda2.py::test_T70_A06_totp_valido_activa_y_reinicio_de_contador PASSED [ 31%]
+tests/test_autenticacion_tanda2.py::test_T70_A07_totp_invalido_cuenta_y_bloquea[PARAMETRO_OMITIDO] PASSED [ 32%]
+tests/test_autenticacion_tanda2.py::test_T70_A07_totp_invalido_cuenta_y_bloquea[PARAMETRO_OMITIDO] PASSED [ 33%]
+tests/test_autenticacion_tanda2.py::test_T70_A08_vinculacion_cifra_secreto_y_confirma_cuenta PASSED [ 35%]
+tests/test_autenticacion_tanda2.py::test_T70_A09_vinculacion_rechaza_fallos[PARAMETRO_OMITIDO] PASSED [ 36%]
+tests/test_autenticacion_tanda2.py::test_T70_A09_vinculacion_rechaza_fallos[PARAMETRO_OMITIDO] PASSED [ 37%]
+tests/test_autenticacion_tanda2.py::test_T70_A09_vinculacion_rechaza_fallos[PARAMETRO_OMITIDO] PASSED [ 38%]
+tests/test_autenticacion_tanda2.py::test_T70_A10_cambiar_temporal_actualiza_hash_y_etapa[PARAMETRO_OMITIDO] PASSED [ 40%]
+tests/test_autenticacion_tanda2.py::test_T70_A10_cambiar_temporal_actualiza_hash_y_etapa[PARAMETRO_OMITIDO] PASSED [ 41%]
+tests/test_autenticacion_tanda2.py::test_T70_A11_cierre_impide_reutilizar_sesion[PARAMETRO_OMITIDO] PASSED [ 42%]
+tests/test_autenticacion_tanda2.py::test_T70_A11_cierre_impide_reutilizar_sesion[PARAMETRO_OMITIDO] PASSED [ 44%]
+tests/test_autenticacion_tanda2.py::test_T70_A12_dependencia_transmite_cookie_etapa_y_actividad[PARAMETRO_OMITIDO] PASSED [ 45%]
+tests/test_autenticacion_tanda2.py::test_T70_A12_dependencia_transmite_cookie_etapa_y_actividad[PARAMETRO_OMITIDO] PASSED [ 46%]
+tests/test_autenticacion_tanda2.py::test_T70_A12_dependencia_transmite_cookie_etapa_y_actividad[PARAMETRO_OMITIDO] PASSED [ 48%]
+tests/test_autenticacion_tanda2.py::test_T70_A13_cambio_de_rol_revoca_permiso PASSED [ 49%]
+tests/test_autenticacion_tanda2.py::test_T70_A14_aviso_antes_del_cierre PASSED [ 50%]
+tests/test_politica_contrasena.py::test_limites_de_longitud[PARAMETRO_OMITIDO] PASSED [ 51%]
+tests/test_politica_contrasena.py::test_limites_de_longitud[PARAMETRO_OMITIDO] PASSED [ 53%]
+tests/test_politica_contrasena.py::test_limites_de_longitud[PARAMETRO_OMITIDO] PASSED [ 54%]
+tests/test_politica_contrasena.py::test_limites_de_longitud[PARAMETRO_OMITIDO] PASSED [ 55%]
+tests/test_politica_contrasena.py::test_rechazo_de_claves_inseguras[PARAMETRO_OMITIDO] PASSED [ 57%]
+tests/test_politica_contrasena.py::test_rechazo_de_claves_inseguras[PARAMETRO_OMITIDO] PASSED [ 58%]
+tests/test_politica_contrasena.py::test_rechazo_de_claves_inseguras[PARAMETRO_OMITIDO] PASSED [ 59%]
+tests/test_politica_contrasena.py::test_rechazo_de_claves_inseguras[PARAMETRO_OMITIDO] PASSED [ 61%]
+tests/test_politica_contrasena.py::test_confirmacion_y_reutilizacion_de_temporal PASSED [ 62%]
+tests/test_politica_contrasena.py::test_longitud_unicode_normalizada PASSED [ 63%]
+tests/test_seguridad.py::test_bcrypt_unicode_sin_truncamiento PASSED     [ 64%]
+tests/test_seguridad.py::test_hash_ausente_o_corrupto_rechaza_acceso[PARAMETRO_OMITIDO] PASSED [ 66%]
+tests/test_seguridad.py::test_hash_ausente_o_corrupto_rechaza_acceso[PARAMETRO_OMITIDO] PASSED [ 67%]
+tests/test_seguridad.py::test_totp_valido_no_se_puede_reutilizar PASSED  [ 68%]
+tests/test_seudonimo.py::test_normaliza_tipo_y_separadores PASSED        [ 70%]
+tests/test_seudonimo.py::test_rechaza_documento_invalido_sin_revelarlo[PARAMETRO_OMITIDO] PASSED [ 71%]
+tests/test_seudonimo.py::test_rechaza_documento_invalido_sin_revelarlo[PARAMETRO_OMITIDO] PASSED [ 72%]
+tests/test_seudonimo.py::test_rechaza_documento_invalido_sin_revelarlo[PARAMETRO_OMITIDO] PASSED [ 74%]
+tests/test_seudonimo.py::test_rechaza_documento_invalido_sin_revelarlo[PARAMETRO_OMITIDO] PASSED [ 75%]
+tests/test_seudonimo.py::test_hmac_y_rotacion_conservan_busqueda_anterior PASSED [ 76%]
+tests/test_seudonimo.py::test_rechaza_configuracion_hmac_invalida[PARAMETRO_OMITIDO] PASSED [ 77%]
+tests/test_seudonimo.py::test_rechaza_configuracion_hmac_invalida[PARAMETRO_OMITIDO] PASSED [ 79%]
+tests/test_seudonimo.py::test_rechaza_configuracion_hmac_invalida[PARAMETRO_OMITIDO] PASSED [ 80%]
+tests/test_totp_tanda2.py::test_T70_S01_ventana_totp[PARAMETRO_OMITIDO] PASSED   [ 81%]
+tests/test_totp_tanda2.py::test_T70_S01_ventana_totp[PARAMETRO_OMITIDO] PASSED    [ 83%]
+tests/test_totp_tanda2.py::test_T70_S01_ventana_totp[PARAMETRO_OMITIDO] PASSED      [ 84%]
+tests/test_totp_tanda2.py::test_T70_S01_ventana_totp[PARAMETRO_OMITIDO] PASSED     [ 85%]
+tests/test_totp_tanda2.py::test_T70_S01_ventana_totp[PARAMETRO_OMITIDO] PASSED    [ 87%]
+tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[PARAMETRO_OMITIDO] PASSED [ 88%]
+tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[PARAMETRO_OMITIDO] PASSED [ 89%]
+tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[PARAMETRO_OMITIDO] PASSED [ 90%]
+tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[digitos-unicode] FAILED [ 92%]
+tests/test_totp_tanda2.py::test_T70_S03_cifrado_asociado_a_usuario[PARAMETRO_OMITIDO] PASSED [ 93%]
+tests/test_totp_tanda2.py::test_T70_S03_cifrado_asociado_a_usuario[PARAMETRO_OMITIDO] PASSED [ 94%]
+tests/test_totp_tanda2.py::test_T70_S03_cifrado_asociado_a_usuario[PARAMETRO_OMITIDO] PASSED [ 96%]
+tests/test_totp_tanda2.py::test_T70_S03_cifrado_asociado_a_usuario[PARAMETRO_OMITIDO] PASSED [ 97%]
+tests/test_totp_tanda2.py::test_T70_S04_clave_de_cifrado_invalida[PARAMETRO_OMITIDO] PASSED [ 98%]
+tests/test_totp_tanda2.py::test_T70_S04_clave_de_cifrado_invalida[PARAMETRO_OMITIDO] PASSED [100%]
+ERROR: Coverage failure: total of 45 is less than fail-under=70
+
+
+================================== FAILURES ===================================
+_________ test_T70_S02_codigo_malformado_se_rechaza[digitos-unicode] __________
+
+codigo = '\uff11\uff12\uff13\uff14\uff15\uff16'
+
+    @pytest.mark.parametrize("codigo", ["", "12345", "abcdef", "\uff11\uff12\uff13\uff14\uff15\uff16"],
+                             ids=["vacio", "corto", "letras", "digitos-unicode"])
+    def test_T70_S02_codigo_malformado_se_rechaza(codigo):
+        # La entrada API permite estos seis d�gitos Unicode; el servicio debe rechazarlos.
+        if codigo == "\uff11\uff12\uff13\uff14\uff15\uff16":
+            assert CodigoEntrada(codigo=codigo).codigo == codigo
+>       assert verificar_codigo_totp(SECRETO, codigo, None, ahora=AHORA) is None
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_totp_tanda2.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+secreto = '[DATO_TOTP_SINTETICO_OMITIDO]', codigo = '\uff11\uff12\uff13\uff14\uff15\uff16', ultimo_paso = None
+ahora = 1800000000
+
+    def verificar_codigo_totp(
+        secreto: str, codigo: str, ultimo_paso: int | None, ahora: float | None = None
+    ) -> int | None:
+        """Devuelve el paso de tiempo del c�digo si es v�lido y nuevo; si no, None.
+    
+        - Tolera una ventana de 30 s pa atr�s y pa adelante (relojes de celular desfasados).
+        - Rechaza un paso igual o anterior al �ltimo aceptado: el mismo c�digo no entra dos
+          veces (RF-U01 CA 7). Quien llama guarda el paso devuelto en Usuario.totp_ultimo_paso.
+        """
+        codigo = codigo.strip()
+        if len(codigo) != 6 or not codigo.isdigit():
+            return None
+        totp = pyotp.TOTP(secreto, interval=PASO_TOTP_SEGUNDOS)
+        paso_actual = int((time.time() if ahora is None else ahora) // PASO_TOTP_SEGUNDOS)
+        for paso in (paso_actual - 1, paso_actual, paso_actual + 1):
+            esperado = totp.at(paso * PASO_TOTP_SEGUNDOS)
+>           if hmac.compare_digest(esperado, codigo):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: comparing strings with non-ASCII characters is not supported
+
+app\core\seguridad.py:113: TypeError
+- generated xml file: [DIRECTORIO_LOCAL]\GASTRO-AI-qa-preparacion-70\Informes de validaciones\issue-70\qa-6225ab6\ejecucion-01\resultados-6225ab6.xml -
+=============================== tests coverage ================================
+______________ coverage: platform win32, python 3.12.10-final-0 _______________
+
+Name                                          Stmts   Miss  Cover   Missing
+---------------------------------------------------------------------------
+app\__init__.py                                   0      0   100%
+app\adapters\__init__.py                          0      0   100%
+app\adapters\almacen.py                          74     50    32%   55-56, 60, 73-76, 86-95, 99-107, 111-120, 124-127, 130-134, 138, 146-150, 154-159, 167, 183-188
+app\adapters\cola.py                             19      7    63%   29, 32, 35, 38-42
+app\adapters\correo.py                           32     19    41%   40-42, 45-60, 64
+app\adapters\filtraciones.py                     32     20    38%   23-24, 27-41, 48, 52-55
+app\adapters\inferencia.py                      132    132     0%   19-258
+app\adapters\llm.py                              54     33    39%   74-83, 94-102, 111-122, 134-135, 140-154
+app\api\__init__.py                               0      0   100%
+app\api\deps.py                                 110     22    80%   58, 65, 70, 79, 83, 96, 115, 119, 127-128, 146, 155, 163-164, 170, 179, 183, 187, 193, 211, 220, 228
+app\api\routers\__init__.py                       0      0   100%
+app\api\routers\admin_usuarios.py                71     71     0%   7-265
+app\api\routers\analisis.py                      63     63     0%   7-199
+app\api\routers\auth.py                          52     52     0%   16-182
+app\api\routers\catalogos.py                     13     13     0%   3-36
+app\api\routers\configuracion.py                 17     17     0%   3-69
+app\api\routers\health.py                         9      9     0%   6-19
+app\api\routers\imagenes.py                      19     19     0%   7-39
+app\api\routers\pacientes.py                     12     12     0%   7-28
+app\api\routers\perfil.py                        15     15     0%   3-39
+app\core\__init__.py                              0      0   100%
+app\core\config.py                               51      0   100%
+app\core\database.py                             11      4    64%   19-23
+app\core\errores.py                              75     44    41%   77-82, 87, 92, 103-108, 112-114, 121-122, 128-142, 152-160, 165-168, 172-175
+app\core\seguridad.py                            73      1    99%   66
+app\core\seudonimo.py                            47      0   100%
+app\main.py                                      19     19     0%   3-46
+app\models\__init__.py                            7      0   100%
+app\models\analisis.py                          131      0   100%
+app\models\auditoria.py                          88      0   100%
+app\models\base.py                                5      0   100%
+app\models\modelo.py                             62      0   100%
+app\models\reportes.py                           26      0   100%
+app\models\usuarios.py                           96      0   100%
+app\repositories\__init__.py                      0      0   100%
+app\repositories\analisis_repository.py          34     16    53%   30, 33, 44-45, 52, 72, 75-76, 79, 86, 104, 119-135, 139-149
+app\repositories\bitacora_repository.py           8      2    75%   11, 16
+app\repositories\catalogo_repository.py          13      6    54%   11, 14, 22-29
+app\repositories\credenciales_repository.py      15      7    53%   13, 22-28, 31
+app\repositories\health_repository.py             7      2    71%   9, 12
+app\repositories\pacientes_repository.py         20      5    75%   23, 31-55
+app\repositories\sesiones_repository.py          18      8    56%   14, 19-22, 26-31, 35
+app\repositories\traslados_repository.py         21     13    38%   13, 18-24, 39-48
+app\repositories\unidad_trabajo.py                8      3    62%   14, 17, 20
+app\repositories\usuarios_repository.py          57     29    49%   28, 31, 36, 41, 44-47, 51, 55-82, 85, 103, 108, 127-133, 136
+app\schemas\__init__.py                           0      0   100%
+app\schemas\analisis.py                         127    127     0%   6-191
+app\schemas\auth.py                              40      0   100%
+app\schemas\catalogo.py                          53     53     0%   3-83
+app\schemas\errores.py                           12     12     0%   3-22
+app\schemas\health.py                             5      5     0%   6-13
+app\schemas\paginacion.py                         6      6     0%   3-11
+app\schemas\usuarios.py                         118    118     0%   3-187
+app\seed.py                                      65     65     0%   11-160
+app\services\__init__.py                          0      0   100%
+app\services\analisis.py                        145     91    37%   93-100, 108, 115-116, 119-122, 136-144, 147-204, 207-217, 220-226, 234-245, 250-251, 255-263, 267, 270, 274-282, 286, 294-295
+app\services\auditoria.py                        45     10    78%   51, 54-55, 57, 82, 85, 88-89, 100, 103
+app\services\autenticacion.py                   192      2    99%   233, 338
+app\services\calidad_imagen.py                   34     34     0%   12-57
+app\services\clasificacion.py                    69     69     0%   12-160
+app\services\configuracion_inferencia.py         73     44    40%   41, 46, 59-61, 64-67, 71-72, 81-144
+app\services\credenciales.py                     32     19    41%   42, 59-62, 67-96
+app\services\estado_cuenta.py                    55     21    62%   21, 28, 31, 34, 37, 40, 43, 46, 55, 58, 61, 64, 67, 74, 77, 80, 83, 91, 94, 97, 115
+app\services\explicacion.py                     113     76    33%   70, 75-82, 87-88, 110-111, 120-138, 150-154, 164-194, 199-212, 218, 230-250, 254-256
+app\services\health_service.py                   12      7    42%   16, 19-24
+app\services\imagenes.py                         64     30    53%   39, 43, 55, 68, 73, 77, 88-91, 95-113, 121-136, 140
+app\services\pacientes.py                        17      9    47%   20-24, 34-35, 38-39
+app\services\perfil.py                           22     15    32%   16-17, 20-43
+app\services\politica_contrasena.py              39      1    97%   70
+app\services\politica_umbral.py                  29     16    45%   16, 25-27, 30, 37-41, 44-45, 53-55, 60
+app\services\procesamiento.py                    70     70     0%   12-114
+app\services\usuarios.py                        215    162    25%   80-87, 92, 95-98, 114-146, 151-183, 190-212, 217-223, 228-238, 247-267, 280-296, 304-315, 324-329, 333-338, 343-346, 350-353, 356-360, 365-378, 388-401, 406-414, 424
+app\services\verificadores_imagen.py             81     48    41%   45, 49-50, 53-55, 63-64, 71-93, 98-100, 110-112, 116, 125, 134, 144-156
+app\workers\__init__.py                           0      0   100%
+app\workers\celery_app.py                         5      0   100%
+app\workers\tareas.py                            32     32     0%   7-58
+---------------------------------------------------------------------------
+TOTAL                                          3386   1855    45%
+Coverage JSON written to file [DIRECTORIO_LOCAL]\GASTRO-AI-qa-preparacion-70\backend\..\Informes de validaciones\issue-70\qa-6225ab6\ejecucion-01/cobertura-6225ab6.json
+FAIL Required test coverage of 70% not reached. Total coverage: 45.22%
+=========================== short test summary info ===========================
+FAILED tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[digitos-unicode]
+======================== 1 failed, 76 passed in 15.25s ========================

@@ -1,0 +1,39 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-6);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--espacio-6) var(--espacio-4);
+  background: var(--color-fondo-lienzo);
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-5);
+  width: 100%;
+  max-width: 440px;
+  padding: var(--espacio-8);
+  background: var(--color-fondo-superficie);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.tarjeta[data-ancho="480"] {
+  max-width: 480px;
+}
+
+.tarjeta[data-ancho="560"] {
+  max-width: 560px;
+}
+
+@media (max-width: 479px) {
+  .tarjeta {
+    padding: var(--espacio-6);
+  }
+}

@@ -1,0 +1,34 @@
+/* Logo/Horizontal · sobre oscuro (Figma 66:2293). Proporciones fijas de los SVG oficiales:
+   isotipo 34,87 × 36; palabra 87,29 × 12,6; separación = 1/4 del alto del isotipo. */
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--alto) * 0.25);
+}
+
+.alto36 {
+  --alto: 36px;
+}
+
+.alto32 {
+  --alto: 32px;
+}
+
+.alto28 {
+  --alto: 28px;
+}
+
+.isotipo {
+  display: block;
+  flex-shrink: 0;
+  width: calc(var(--alto) * 0.96864);
+  height: var(--alto);
+}
+
+.palabra {
+  display: block;
+  flex-shrink: 0;
+  width: calc(var(--alto) * 2.4247);
+  height: calc(var(--alto) * 0.35);
+}

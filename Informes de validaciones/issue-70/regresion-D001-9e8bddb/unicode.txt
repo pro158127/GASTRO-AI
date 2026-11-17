@@ -1,0 +1,89 @@
+.
+ERROR: Coverage failure: total of 14 is less than fail-under=70
+                                                                         [100%]
+=============================== tests coverage ================================
+______________ coverage: platform win32, python 3.12.10-final-0 _______________
+
+Name                                          Stmts   Miss  Cover   Missing
+---------------------------------------------------------------------------
+app\__init__.py                                   0      0   100%
+app\adapters\__init__.py                          0      0   100%
+app\adapters\almacen.py                          74     74     0%   11-188
+app\adapters\cola.py                             19     19     0%   8-42
+app\adapters\correo.py                           32     32     0%   10-64
+app\adapters\filtraciones.py                     32     32     0%   8-55
+app\adapters\inferencia.py                      132    132     0%   19-258
+app\adapters\llm.py                              54     54     0%   9-154
+app\api\__init__.py                               0      0   100%
+app\api\deps.py                                 110    110     0%   8-264
+app\api\routers\__init__.py                       0      0   100%
+app\api\routers\admin_usuarios.py                71     71     0%   7-265
+app\api\routers\analisis.py                      63     63     0%   7-199
+app\api\routers\auth.py                          52     52     0%   16-182
+app\api\routers\catalogos.py                     13     13     0%   3-36
+app\api\routers\configuracion.py                 17     17     0%   3-69
+app\api\routers\health.py                         9      9     0%   6-19
+app\api\routers\imagenes.py                      19     19     0%   7-39
+app\api\routers\pacientes.py                     12     12     0%   7-28
+app\api\routers\perfil.py                        15     15     0%   3-39
+app\core\__init__.py                              0      0   100%
+app\core\config.py                               51     51     0%   7-101
+app\core\database.py                             11     11     0%   3-23
+app\core\errores.py                              75     75     0%   14-175
+app\core\seguridad.py                            73     40    45%   32, 37, 42, 52-58, 66, 74, 79, 89, 94, 111-119, 138-144, 147-148, 151-157
+app\core\seudonimo.py                            47     47     0%   16-98
+app\main.py                                      19     19     0%   3-46
+app\models\__init__.py                            7      0   100%
+app\models\analisis.py                          131      0   100%
+app\models\auditoria.py                          88      0   100%
+app\models\base.py                                5      0   100%
+app\models\modelo.py                             62      0   100%
+app\models\reportes.py                           26      0   100%
+app\models\usuarios.py                           96      0   100%
+app\repositories\__init__.py                      0      0   100%
+app\repositories\analisis_repository.py          34     34     0%   3-149
+app\repositories\bitacora_repository.py           8      8     0%   3-16
+app\repositories\catalogo_repository.py          13     13     0%   3-29
+app\repositories\credenciales_repository.py      15     15     0%   3-31
+app\repositories\health_repository.py             7      7     0%   3-12
+app\repositories\pacientes_repository.py         20     20     0%   3-55
+app\repositories\sesiones_repository.py          18     18     0%   3-35
+app\repositories\traslados_repository.py         21     21     0%   3-48
+app\repositories\unidad_trabajo.py                8      8     0%   9-20
+app\repositories\usuarios_repository.py          57     57     0%   3-136
+app\schemas\__init__.py                           0      0   100%
+app\schemas\analisis.py                         127    127     0%   6-191
+app\schemas\auth.py                              40      0   100%
+app\schemas\catalogo.py                          53     53     0%   3-83
+app\schemas\errores.py                           12     12     0%   3-22
+app\schemas\health.py                             5      5     0%   6-13
+app\schemas\paginacion.py                         6      6     0%   3-11
+app\schemas\usuarios.py                         118    118     0%   3-188
+app\seed.py                                      65     65     0%   11-160
+app\services\__init__.py                          0      0   100%
+app\services\analisis.py                        145    145     0%   13-295
+app\services\auditoria.py                        45     45     0%   11-103
+app\services\autenticacion.py                   192    192     0%   21-378
+app\services\calidad_imagen.py                   34     34     0%   12-57
+app\services\clasificacion.py                    69     69     0%   12-160
+app\services\configuracion_inferencia.py         73     73     0%   8-144
+app\services\credenciales.py                     32     32     0%   16-96
+app\services\estado_cuenta.py                    55     55     0%   16-115
+app\services\explicacion.py                     113    113     0%   15-256
+app\services\health_service.py                   12     12     0%   7-24
+app\services\imagenes.py                         64     64     0%   11-140
+app\services\pacientes.py                        17     17     0%   9-39
+app\services\perfil.py                           22     22     0%   8-43
+app\services\politica_contrasena.py              39     39     0%   13-124
+app\services\politica_umbral.py                  29     29     0%   9-60
+app\services\procesamiento.py                    70     70     0%   12-114
+app\services\usuarios.py                        215    215     0%   16-424
+app\services\verificadores_imagen.py             81     81     0%   12-156
+app\workers\__init__.py                           0      0   100%
+app\workers\celery_app.py                         5      5     0%   7-19
+app\workers\tareas.py                            32     32     0%   7-58
+---------------------------------------------------------------------------
+TOTAL                                          3386   2898    14%
+Coverage JSON written to file [DIRECTORIO_LOCAL]\GASTRO-AI-regresion-9e8bddb\evidencias-regresion/cobertura-unicode.json
+FAIL Required test coverage of 70% not reached. Total coverage: 14.41%
+1 passed in 3.70s

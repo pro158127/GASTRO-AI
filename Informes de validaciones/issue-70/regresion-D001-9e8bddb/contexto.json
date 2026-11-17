@@ -1,0 +1,30 @@
+{
+  "commit": "9e8bddb7f0f34bf2e843932ceea541a1ba2c3441",
+  "backend_anterior": "8b22250",
+  "modo": "copia independiente HEAD detached; Docker no utilizado ni modificado",
+  "resultados": {
+    "unicode": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "coverage": 14.412285883047844,
+      "timestamp": "2026-11-11T17:14:14.767658-05:00",
+      "exit": 1
+    },
+    "suite": {
+      "tests": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "coverage": 45.215593620791495,
+      "timestamp": "2026-11-11T17:14:19.974709-05:00",
+      "exit": 1
+    }
+  },
+  "casos_identicos": true,
+  "dependencias": "81 versiones iguales a ejecucion anterior; pip check correcto",
+  "comando_unicode": "python -m pytest tests/test_totp_tanda2.py::test_T70_S02_codigo_malformado_se_rechaza[digitos-unicode] -q -p no:cacheprovider --junitxml=unicode.xml --cov-report=json:cobertura-unicode.json",
+  "comando_suite": "python -m pytest tests -q -p no:cacheprovider --junitxml=suite-77.xml --cov-report=json:cobertura-suite.json",
+  "configuracion": "--cov=app --cov-report=term-missing --cov-fail-under=70"
+}

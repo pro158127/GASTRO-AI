@@ -1,0 +1,16 @@
+.indicador {
+  animation: indicador-girar 0.9s linear infinite;
+}
+
+@keyframes indicador-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Con «reducir movimiento» no gira: el texto «Iniciando sesión…» ya comunica la espera. */
+@media (prefers-reduced-motion: reduce) {
+  .indicador {
+    animation: none;
+  }
+}

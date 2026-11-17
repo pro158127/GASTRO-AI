@@ -1,0 +1,12 @@
+{
+  "Rama": "test/70-preparacion-qa",
+  "Integracion": "6225ab680cb5cbadfcb02561b7ffba1314590e0d",
+  "Backend": "8b222500f41fcaff96893666179f44d71d1cf04c",
+  "Frontend": "428b7fbdac9dde25a40c9796adae1a35eb91b59d",
+  "Python": "3.12.10",
+  "SalidaPytest": 1,
+  "PipCheck": 0,
+  "VersionesIdenticas": true,
+  "Comando": "python -m pytest tests -v -p no:cacheprovider --junitxml=resultados-6225ab6.xml --cov-report=json:cobertura-6225ab6.json",
+  "Configuracion": "pyproject.toml: --cov=app --cov-report=term-missing --cov-fail-under=70"
+}

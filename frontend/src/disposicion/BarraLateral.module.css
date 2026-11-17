@@ -1,0 +1,81 @@
+/* Barra lateral: 248 px en escritorio, 72 px contraída en tableta (T-15), oculta en celular. */
+
+.barra {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--espacio-1);
+  align-self: flex-start;
+  width: 248px;
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--espacio-6) var(--espacio-3);
+  overflow-y: auto;
+  background: var(--color-fondo-navegacion);
+}
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 var(--espacio-6) var(--espacio-3);
+}
+
+.rol {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-sobre-oscuro);
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .barra {
+    align-items: center;
+    gap: var(--espacio-2);
+    width: 72px;
+    padding: 20px 0;
+    /* Los tooltips salen de la barra: no se puede recortar. */
+    overflow: visible;
+  }
+
+  .marca {
+    align-items: center;
+    padding: 0 0 var(--espacio-4);
+  }
+
+  /* Solo el isotipo; el rol queda como texto oculto a la vista. */
+  .marca img[data-palabra] {
+    display: none;
+  }
+
+  .rol {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .lista {
+    align-items: center;
+    gap: var(--espacio-2);
+  }
+}
+
+@media (max-width: 767px) {
+  .barra {
+    display: none;
+  }
+}
