@@ -518,8 +518,10 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   fecha, quién lo hizo, modelo (repositorio @ revisión), tabla de características
   (probabilidad, umbral aplicado, si lo supera), regiones con confianza y área, la
   explicación del LLM si está `GENERADA` y las observaciones.
-- En **cada página**: la etiqueta «Análisis experimental» arriba y el aviso completo abajo
-  (RF-R04 CA 4, RNF-22). Nunca el documento ni el seudónimo, y sin imágenes.
+- En **cada página**: el logo de la app y la etiqueta «Análisis experimental» arriba, y el
+  aviso completo abajo (RF-R04 CA 4, RNF-22). Nunca el documento ni el seudónimo, y sin
+  imágenes. El logo sale de `app/assets/` (copia de `frontend/src/assets/logo-*.svg`) y
+  se dibuja en vectores con `services/logo_pdf.py`, sin librerías de SVG.
 - Se guarda en MinIO (`reportes/{id}.pdf`); la tabla `Reporte` + `ReporteAnalisis` deja
   quién lo generó y qué análisis entraron. La descarga es `Reporte_GastroAI_<código>.pdf`
   con `Cache-Control: no-store`.

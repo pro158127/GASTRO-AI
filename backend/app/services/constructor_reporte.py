@@ -34,6 +34,7 @@ from reportlab.platypus import (
 
 from app.schemas.analisis import AVISO_EXPERIMENTAL
 from app.services.analisis import ZONA_COLOMBIA
+from app.services.logo_pdf import isotipo, palabra
 
 VALORACIONES = {
     "COINCIDE": "Coincide con el resultado",
@@ -41,6 +42,8 @@ VALORACIONES = {
     "NO_CONCLUYENTE": "No concluyente",
 }
 EXPLICACION_LISTA = "GENERADA"
+ALTO_ISOTIPO = 0.85 * cm
+ALTO_PALABRA = 0.36 * cm
 
 
 @dataclass(frozen=True)
@@ -186,7 +189,7 @@ class ConstructorReporte:
         documento = SimpleDocTemplate(
             salida,
             pagesize=LETTER,
-            topMargin=2.2 * cm,
+            topMargin=2.4 * cm,
             bottomMargin=2.4 * cm,
             title="Reporte de resultados · Gastro-AI",
             author="Gastro-AI",
@@ -222,12 +225,23 @@ class ConstructorReporte:
 
 
 def _marco(lienzo, documento) -> None:
-    """Etiqueta arriba y aviso completo abajo en todas las páginas (RF-R04 CA 4)."""
+    """En todas las páginas: logo y etiqueta arriba, aviso completo abajo (RF-R04 CA 4)."""
     ancho, alto = documento.pagesize
     lienzo.saveState()
+    # Logo de la app arriba a la izquierda: isotipo + nombre, centrados en la misma línea
+    base = alto - 1.75 * cm
+    ancho_isotipo = isotipo().dibujar(lienzo, documento.leftMargin, base, ALTO_ISOTIPO)
+    palabra().dibujar(
+        lienzo,
+        documento.leftMargin + ancho_isotipo + 0.2 * cm,
+        base + (ALTO_ISOTIPO - ALTO_PALABRA) / 2,
+        ALTO_PALABRA,
+    )
     lienzo.setFont("Helvetica-Bold", 9)
     lienzo.setFillColor(colors.HexColor("#8a4b00"))
-    lienzo.drawString(documento.leftMargin, alto - 1.3 * cm, AVISO_EXPERIMENTAL["etiqueta"].upper())
+    lienzo.drawRightString(
+        ancho - documento.rightMargin, base + 0.3 * cm, AVISO_EXPERIMENTAL["etiqueta"].upper()
+    )
     lienzo.setFont("Helvetica", 7.5)
     lienzo.setFillColor(colors.HexColor("#444444"))
     renglones = simpleSplit(AVISO_EXPERIMENTAL["texto"], "Helvetica", 7.5, documento.width)
