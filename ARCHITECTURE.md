@@ -152,6 +152,7 @@ backend/
 ├── scripts/init_storage.py  # crea el bucket
 ├── scripts/cargar_metricas.py  # carga el reporte de evaluación del modelo (RM-06)
 ├── scripts/respaldar.sh, restaurar.sh, respaldo.py  # respaldo y restauración (RNF-26)
+├── scripts/recuperar_admin.py  # recupera al único administrador (RF-U09 CA 10)
 └── app/
     ├── main.py              # FastAPI, manejadores de error y routers
     ├── seed.py              # carga inicial (python -m app.seed)
@@ -628,6 +629,8 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   pero cualquier cambio sobre ellas responde 404.
 - Desactivar, eliminar, restablecer y cambiar el correo cierran las sesiones abiertas de esa
   cuenta. Restablecer, además, desvincula la app autenticadora (RF-U09 CA 9).
+- Si hay un único administrador y pierde el acceso, se recupera desde el servidor con
+  `scripts/recuperar_admin` (RF-U09 CA 10, ver `backend/README.md`).
 - Para elegir el doctor de destino: `GET /admin/usuarios?rol=DOCTOR&estado=ACTIVO&excluir={id}`.
 
 | HTTP | `codigo` | Cuándo |
