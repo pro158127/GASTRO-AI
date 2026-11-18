@@ -197,7 +197,8 @@ class ServicioAutenticacion:
         if sesion.cerrada_en is not None:
             raise _sesion_expirada(MOTIVO_BLOQUEO if bloqueada else None)
 
-        por_inactividad = ahora - sesion.ultima_actividad_en > self._reglas.inactividad
+        # RF-U10 CA 5 y RNF-02: al ALCANZAR los 10 minutos ya se cierra (>=), no después
+        por_inactividad = ahora - sesion.ultima_actividad_en >= self._reglas.inactividad
         cuenta_fuera = usuario.estado not in ESTADOS_QUE_ENTRAN or bloqueada
         if por_inactividad or cuenta_fuera:
             sesion.cerrada_en = ahora
