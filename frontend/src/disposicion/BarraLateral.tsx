@@ -27,6 +27,7 @@ export default function BarraLateral({ items, rolEtiqueta, casosSinRevisar }: Pr
               etiqueta={item.etiqueta}
               Icono={item.Icono}
               ruta={item.ruta}
+              incluyeSubrutas={item.incluyeSubrutas}
               contador={item.conContadorCasosRecibidos ? casosSinRevisar : undefined}
               enBarraLateral
             />

@@ -1,0 +1,258 @@
+/* Pantalla W-09 · Usuarios (Figma 48:836), T-09 (110:1246) y M-09 (110:1362).
+   Escritorio (desde 1280 px): tabla. Tableta: tarjetas en dos columnas. Celular: una columna y
+   «Crear usuario» a ancho completo. A 320 px no hay desplazamiento horizontal (WCAG 1.4.10). */
+
+/* ---------- Encabezado ---------- */
+
+.iconoBoton {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+/* ---------- Búsqueda: 400 px en escritorio; ancho completo en tableta y celular ---------- */
+
+.buscador {
+  width: 100%;
+  max-width: 400px;
+  margin: 0;
+}
+
+/* ---------- Resultados ---------- */
+
+.resultados {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
+/* Recibe el foco por programa tras cambiar de página; no está en el orden de tabulación. */
+.resultados:focus {
+  outline: none;
+}
+
+.errorCarga {
+  display: flex;
+  width: 100%;
+  max-width: 640px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
+
+/* ---------- Tabla (escritorio) ---------- */
+
+.marcoTabla {
+  overflow: hidden;
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-primario);
+  text-align: left;
+}
+
+/* Encabezados en texto plano: la API no permite ordenar (sin íconos ni aria-sort). */
+.tabla thead th {
+  padding: var(--espacio-2) var(--espacio-3);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  white-space: nowrap;
+}
+
+.tabla tbody th,
+.tabla tbody td {
+  padding: var(--espacio-2) var(--espacio-3);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+  vertical-align: middle;
+}
+
+/* Sangría de Figma: 20 px al inicio de la fila y 24 px al final. */
+.tabla tr > :first-child {
+  padding-left: var(--espacio-5);
+}
+
+.tabla tr > :last-child {
+  padding-right: var(--espacio-6);
+}
+
+/* Anchos de columna de Figma (240 / 300 / 200 / 220 px; Acciones ocupa el resto). */
+.columnaNombre {
+  width: 240px;
+}
+.columnaCorreo {
+  width: 300px;
+}
+.columnaRol {
+  width: 200px;
+}
+.columnaEstado {
+  width: 220px;
+}
+
+.columnaAcciones {
+  text-align: right;
+}
+
+.celdaNombre {
+  font: var(--texto-cuerpo-pequeno-enfasis);
+}
+
+.celdaCorreo {
+  overflow-wrap: anywhere;
+}
+
+/* Encabezado que acompaña al esqueleto (W-09d): mismo aspecto que el de la tabla. */
+.encabezadoEsqueleto {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 240px) minmax(0, 300px) minmax(0, 200px) minmax(0, 220px) minmax(0, 1fr);
+  padding: var(--espacio-2) var(--espacio-6) var(--espacio-2) var(--espacio-5);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+}
+
+/* ---------- Tarjetas (tableta y celular) ---------- */
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espacio-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.tarjetaNombre {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.tarjetaDato {
+  max-width: 100%;
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+.tarjetaAccion {
+  padding-top: var(--espacio-1);
+}
+
+/* ---------- Estados vacíos W-09b y W-09c ---------- */
+
+.tarjetaVacia {
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* ---------- Pie: resumen y paginación ---------- */
+
+.pieLista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.resumen {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.paginacion {
+  display: flex;
+  gap: var(--espacio-2);
+}
+
+/* ---------- Texto solo para el lector de pantalla ---------- */
+
+.soloLector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Cambio de disposición por tamaño ----------
+   Se renderizan la tabla y las tarjetas; display: none saca la oculta del árbol de
+   accesibilidad y del orden de tabulación. */
+
+.soloTarjetas {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .soloEscritorio {
+    display: none;
+  }
+
+  .soloTarjetas {
+    display: grid;
+  }
+
+  /* T-09 y M-09: «Crear usuario» debajo del título. */
+  .accionEncabezado {
+    flex-basis: 100%;
+  }
+
+  .buscador {
+    max-width: none;
+  }
+
+  .resultados {
+    gap: var(--espacio-5);
+  }
+}
+
+@media (max-width: 767px) {
+  .tarjetas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* M-09: «Crear usuario» de ancho completo. */
+  .accionEncabezado > a {
+    width: 100%;
+  }
+
+  .resultados {
+    gap: var(--espacio-4);
+  }
+
+  .tarjetaVacia {
+    padding: var(--espacio-4);
+  }
+}

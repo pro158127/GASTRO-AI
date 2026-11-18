@@ -1,7 +1,10 @@
 import io
+import os
+import sys
 import base64
+import hashlib
+import re
 import time
-import logging
 import cv2
 import numpy as np
 import torch
@@ -9,38 +12,63 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.models import efficientnet_b1
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 
-# 1. Inicialización de FastAPI y CORS
-app = FastAPI(
-    title="Gastro-AI Inference API",
-    description="API de diagnóstico endoscópico y explicabilidad Grad-CAM",
-    version="1.0.0"
+# ==============================================================================
+# 1. CONFIGURACIÓN Y CONTROLES DE SEGURIDAD (RNF-30 & RF-A01)
+# ==============================================================================
+EXPECTED_SHA256 = os.getenv(
+    "HF_SHA256",
+    "d4b264bf0a954cad5b2c26f834ec8a02eb07eeac41eed14b6e65e4f46b41fc76"
 )
+WEIGHTS_PATH = "best_gastroai_masked_loss.pth"
+REVISION_SHA = os.getenv("GASTROAI_REVISION_SHA") or os.getenv("SPACE_COMMIT_HASH", "")
+if not re.fullmatch(r"[0-9a-fA-F]{40}", REVISION_SHA):
+    raise RuntimeError(
+        "GASTROAI_REVISION_SHA debe ser el SHA de 40 caracteres del commit desplegado en Hugging Face."
+    )
+REVISION_SHA = REVISION_SHA.lower()
+EXPECTED_API_KEY = os.getenv("GASTROAI_API_KEY")
+if not EXPECTED_API_KEY:
+    raise RuntimeError("Falta configurar GASTROAI_API_KEY en los secretos del Space.")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+bearer_scheme = HTTPBearer(auto_error=False)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger("gastroai")
+def verify_file_integrity(file_path: str, expected_hash: str):
+    """Verifica la huella SHA-256 del archivo de pesos antes de cargar."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"❌ CRÍTICO: No existe el archivo de pesos: {file_path}")
+
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+
+    calculated_hash = sha256_hash.hexdigest().lower()
+    if calculated_hash != expected_hash.lower():
+        raise ValueError(
+            f"❌ CRÍTICO: Huella SHA-256 no coincide.\nCalculada: {calculated_hash}\nEsperada:   {expected_hash}"
+        )
+
+# FAIL-FAST: El servidor SE NIEGA A ARRANCAR si no existen los pesos válidos
+try:
+    verify_file_integrity(WEIGHTS_PATH, EXPECTED_SHA256)
+except Exception as e:
+    sys.stderr.write(f"\n[GASTRO-AI ERROR INICIALIZACIÓN] {e}\n\n")
+    sys.exit(1) # Aborta la ejecución de Uvicorn/Docker inmediatamente
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# 2. Arquitectura EfficientNet-B1
+# ==============================================================================
+# 2. ARQUITECTURA Y CARGA OBLIGATORIA DEL MODELO
+# ==============================================================================
 class GastroAI_EfficientNetB1(nn.Module):
     def __init__(self, num_classes=4):
         super(GastroAI_EfficientNetB1, self).__init__()
         self.backbone = efficientnet_b1(weights=None)
-        in_features = self.backbone.classifier.in_features
+        in_features = self.backbone.classifier[1].in_features
         self.backbone.classifier = nn.Sequential(
             nn.Dropout(p=0.3, inplace=True),
             nn.Linear(in_features, num_classes)
@@ -49,21 +77,21 @@ class GastroAI_EfficientNetB1(nn.Module):
     def forward(self, x):
         return self.backbone(x)
 
-# Cargar Modelo con Pesos de Pérdida Enmascarada (Época 07)
 model = GastroAI_EfficientNetB1(num_classes=4).to(device)
-WEIGHTS_PATH = "best_gastroai_masked_loss.pth"
 
 try:
     model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device))
     model.eval()
-    logger.info("Pesos de Gastro-AI cargados correctamente en Hugging Face Space.")
 except Exception as e:
-    logger.error("Error al cargar los pesos: %s", e)
+    sys.stderr.write(f"❌ CRÍTICO: Fallo al cargar state_dict: {e}\n")
+    sys.exit(1)
 
-# Umbrales Óptimos Calibrados en las Matrices de Confusión
-OPTIMAL_THRESHOLDS = np.array([0.335, 0.499, 0.946, 0.982])
-CLASS_NAMES = ['normal_mucosa', 'erythematous_gastritis', 'gastric_atrophy', 'h_pylori_signs']
-CLASS_LABELS_ES = ['Mucosa Normal', 'Gastritis Eritematosa', 'Atrofia Gástrica', 'Signos H. Pylori']
+# Umbrales acotados estrictamente entre el 10% y el 90% según RF-A01
+CLASS_MAPPING = {
+    1: {"name": "GASTRITIS", "threshold": 0.499},  # 49.9%
+    2: {"name": "ATROFIA",   "threshold": 0.900},  # Acotado a 90.0% por RF-A01
+    3: {"name": "HPYLORI",   "threshold": 0.900}   # Acotado a 90.0% por RF-A01
+}
 
 val_transform = transforms.Compose([
     transforms.Resize((240, 240)),
@@ -71,7 +99,9 @@ val_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# 3. Explicabilidad Grad-CAM
+# ==============================================================================
+# 3. EXPLICABILIDAD GRAD-CAM Y EXTRACCIÓN DE ROI
+# ==============================================================================
 class GradCAM:
     def __init__(self, model, target_layer):
         self.model = model
@@ -94,12 +124,12 @@ class GradCAM:
         score = output[0, class_idx]
         score.backward(retain_graph=True)
 
-        gradients = self.gradients.data.cpu().numpy()
-        activations = self.activations.data.cpu().numpy()
-        weights = np.mean(gradients, axis=(1, 2))
-        cam = np.zeros(activations.shape[1:], dtype=np.float32)
+        gradients = self.gradients.data.cpu().numpy()       # [1, C, H, W]
+        activations = self.activations.data.cpu().numpy()   # [1, C, H, W]
+        weights = np.mean(gradients[0], axis=(1, 2))        # [C]
+        cam = np.zeros(activations.shape[2:], dtype=np.float32)  # [H, W]
         for i, w in enumerate(weights):
-            cam += w * activations[i, :, :]
+            cam += w * activations[0, i, :, :]
         cam = np.maximum(cam, 0)
         if np.max(cam) > 0:
             cam = cam / np.max(cam)
@@ -108,91 +138,107 @@ class GradCAM:
 
 gradcam = GradCAM(model, model.backbone.features[-1])
 
-def ndarray_to_base64(img_np):
-    img_pil = Image.fromarray(img_np)
+def extract_roi_box_and_png(cam, threshold=0.5):
+    cam_resized = cv2.resize(cam, (240, 240))
+
+    # Extraer bounding box ROI
+    binary_mask = (cam_resized >= threshold).astype(np.uint8) * 255
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if contours:
+        largest_contour = max(contours, key=cv2.contourArea)
+        x, y, box_w, box_h = cv2.boundingRect(largest_contour)
+        area_pct = round(((box_w * box_h) / (240 * 240)) * 100, 2)
+        roi_data = {"x": int(x), "y": int(y), "ancho": int(box_w), "alto": int(box_h), "area_pct": area_pct}
+    else:
+        roi_data = {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0}
+
+    # Generar imagen aislada del mapa de calor en formato PNG Base64
+    heatmap_color = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
+    heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
+
+    img_pil = Image.fromarray(heatmap_color)
     buffer = io.BytesIO()
-    img_pil.save(buffer, format="JPEG", quality=90)
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+    img_pil.save(buffer, format="PNG")
+    heatmap_png_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
+    return roi_data, heatmap_png_b64
 
-def check_image_quality(img_np):
-    """Control de calidad automático (RF-P01).
+# ==============================================================================
+# 4. FASTAPI APP & ENDPOINTS (CERO LOGGING / PRIVACIDAD RNF-30)
+# ==============================================================================
+app = FastAPI(title="Gastro-AI Service", version="1.0.0")
 
-    Rechaza imágenes demasiado oscuras o desenfocadas antes de la inferencia.
-    Devuelve (ok, motivo). `ok == False` implica rechazo.
-    """
-    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-    brightness = float(gray.mean())
-    laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-
-    if brightness < 40.0:
-        return False, f"imagen demasiado oscura (brillo medio {brightness:.1f})"
-    if laplacian_var < 50.0:
-        return False, f"imagen desenfocada (varianza de Laplaciano {laplacian_var:.1f})"
-    return True, f"brillo {brightness:.1f}, varianza Laplaciano {laplacian_var:.1f}"
-
-# 4. Endpoints de la API
-@app.get("/")
-def health_check():
-    return {
-        "status": "online",
-        "service": "Gastro-AI Inference API",
-        "model": "EfficientNet-B1 (Masked Loss - Época 07)"
-    }
-
-@app.post("/api/v1/analyze")
-async def analyze_endoscopy(file: UploadFile = File(...)):
-    start_time = time.time()
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen válida.")
-
-    contents = await file.read()
-    raw_pil = Image.open(io.BytesIO(contents)).convert('RGB')
-    raw_resized = raw_pil.resize((240, 240))
-    img_np = np.array(raw_resized)
-
-    ok, qc_reason = check_image_quality(img_np)
-    if not ok:
-        logger.warning("QC rechazó la imagen '%s': %s", file.filename, qc_reason)
-        raise HTTPException(status_code=422, detail=f"Control de calidad no superado: {qc_reason}")
-
-    input_tensor = val_transform(raw_pil).unsqueeze(0).to(device)
-
-    diagnostics = {}
-    gradcam_b64 = {}
-
-    for class_idx in range(4):
-        c_name = CLASS_NAMES[class_idx]
-        c_label = CLASS_LABELS_ES[class_idx]
-        thresh = float(OPTIMAL_THRESHOLDS[class_idx])
-
-        cam, probs = gradcam.generate_heatmap(input_tensor, class_idx)
-        prob_pct = float(probs[0, class_idx])
-        detected = bool(prob_pct >= thresh)
-
-        heatmap = cv2.resize(cam, (240, 240))
-        heatmap_color = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
-        heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
-        overlay = cv2.addWeighted(img_np, 0.6, heatmap_color, 0.4, 0)
-
-        diagnostics[c_name] = {
-            "label_es": c_label,
-            "probability": round(prob_pct, 4),
-            "percentage": round(prob_pct * 100, 2),
-            "threshold": thresh,
-            "detected": detected
-        }
-        gradcam_b64[c_name] = ndarray_to_base64(overlay)
-
-    probs_log = {k: v["percentage"] for k, v in diagnostics.items()}
-    elapsed_ms = (time.time() - start_time) * 1000
-    logger.info(
-        "Inferencia '%s' (%s) en %.1f ms | probs=%s",
-        file.filename, qc_reason, elapsed_ms, probs_log,
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("GASTROAI_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+):
+    invalid_credentials = (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or credentials.credentials != EXPECTED_API_KEY
+    )
+    if invalid_credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Acceso denegado."
+        )
+    return credentials.credentials
+
+@app.get("/")
+def status_check():
+    return {"status": "ready", "revision_sha": REVISION_SHA}
+
+@app.post("/clasificar", dependencies=[Depends(verify_api_key)])
+async def clasificar_imagen(imagen: UploadFile = File(...)):
+    started_at = time.perf_counter()
+    contents = await imagen.read()
+    try:
+        raw_pil = Image.open(io.BytesIO(contents)).convert('RGB')
+    except Exception:
+        raise HTTPException(status_code=400, detail="Imagen inválida.")
+
+    input_tensor = val_transform(raw_pil).unsqueeze(0).to(device)
+    resultados_clases = {}
+
+    # Procesar únicamente las 3 patologías de RF-M01
+    for class_idx, info in CLASS_MAPPING.items():
+        c_name = info["name"]
+
+        cam, probs = gradcam.generate_heatmap(input_tensor, class_idx)
+        prob_val = float(probs[0, class_idx])
+
+        roi_box, heatmap_png = extract_roi_box_and_png(cam, threshold=0.5)
+
+        resultados_clases[c_name] = {
+            "codigo": c_name,
+            "probabilidad": round(prob_val, 4),
+            "regiones": [{
+                "x": round(roi_box["x"] / 240, 4),
+                "y": round(roi_box["y"] / 240, 4),
+                "ancho": round(roi_box["ancho"] / 240, 4),
+                "alto": round(roi_box["alto"] / 240, 4),
+                "area_pct": roi_box["area_pct"],
+                "mapa_calor_base64": heatmap_png,
+            }],
+        }
+
+    # RNF-30: Cero impresión de logs de archivos o predicciones
     return {
-        "filename": file.filename,
-        "diagnostics": diagnostics,
-        "gradcam_visualizations_b64": gradcam_b64
+        "revision_sha": REVISION_SHA,
+        "latencia_ms": round((time.perf_counter() - started_at) * 1000),
+        "caracteristicas": list(resultados_clases.values()),
     }

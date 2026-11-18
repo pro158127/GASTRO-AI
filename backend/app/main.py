@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import (
+    admin_bitacora,
     admin_usuarios,
     analisis,
     auth,
@@ -39,6 +40,7 @@ app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(perfil.router, prefix=settings.api_prefix)
 app.include_router(admin_usuarios.router, prefix=settings.api_prefix)
+app.include_router(admin_bitacora.router, prefix=settings.api_prefix)
 app.include_router(catalogos.router, prefix=settings.api_prefix)
 app.include_router(pacientes.router, prefix=settings.api_prefix)
 app.include_router(imagenes.router, prefix=settings.api_prefix)

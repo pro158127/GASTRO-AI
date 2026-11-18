@@ -2,9 +2,12 @@
 // `gastro_sesion`: el frontend nunca la lee ni la guarda, y no hay header Authorization.
 import type {
   CampoConError,
+  EdicionPerfil,
   EtapaSesion,
   HealthResponse,
+  Perfil,
   RequisitoContrasena,
+  RespuestaContinuar,
   RespuestaEtapa,
   RespuestaIngreso,
   RespuestaSesion,
@@ -23,7 +26,7 @@ function esEtapaSesion(valor: unknown): valor is EtapaSesion {
 interface DetalleError {
   codigo?: string | null;
   idSolicitud?: string | null;
-  /** `motivo` de SESION_EXPIRADA (por ejemplo `INACTIVIDAD`). */
+  /** `motivo` de SESION_EXPIRADA (`INACTIVIDAD` o `DEMASIADOS_INTENTOS`, ver `MotivoSesionExpirada`). */
   motivo?: string | null;
   /** `etapa` de ETAPA_INVALIDA: la etapa actual de la sesión. */
   etapa?: EtapaSesion | null;
@@ -75,12 +78,21 @@ export class ErrorApi extends Error {
 
 /** Reacciones globales a los errores que no dependen de la pantalla que hizo la llamada. */
 export interface ManejadoresGlobales {
-  /** 401 SESION_EXPIRADA. Trae el `motivo` (`INACTIVIDAD` si fue por inactividad), si vino. */
+  /**
+   * 401 SESION_EXPIRADA. Trae el `motivo`, si vino (`INACTIVIDAD` o `DEMASIADOS_INTENTOS`, ver
+   * `MotivoSesionExpirada`).
+   */
   alSinSesion?: (motivo: string | null) => void;
   /** 403 PERMISO_DENEGADO. */
   alSinPermiso?: () => void;
   /** 403 ETAPA_INVALIDA: falta un paso del inicio de sesión. Trae la etapa actual, si vino. */
   alEtapaInvalida?: (etapa: EtapaSesion | null) => void;
+  /**
+   * Respuesta 2xx de una petición NO pasiva: el servidor renovó la inactividad de la sesión.
+   * Trae el instante de envío (`performance.now()`): el servidor renovó entre el envío y la
+   * respuesta, así que contar desde el envío nunca da más tiempo del que queda.
+   */
+  alActividadRenovada?: (instanteEnvio: number) => void;
 }
 
 let manejadores: ManejadoresGlobales | null = null;
@@ -89,8 +101,8 @@ export function registrarManejadoresGlobales(nuevos: ManejadoresGlobales | null)
   manejadores = nuevos;
 }
 
-interface OpcionesSolicitud {
-  metodo?: "GET" | "POST";
+export interface OpcionesSolicitud {
+  metodo?: "GET" | "POST" | "PATCH";
   cuerpo?: unknown;
   /** Consulta automática: no renueva la inactividad de la sesión (header X-Actividad-Pasiva: 1). */
   pasiva?: boolean;
@@ -136,12 +148,25 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
   });
 }
 
-async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
+/** Cuerpo de la respuesta junto con lo que hace falta para medir el tiempo con el reloj del servidor. */
+interface RespuestaCompleta<T> {
+  datos: T;
+  /** Cabecera `Date` en milisegundos (reloj del servidor), o `null` si no vino o no se entiende. */
+  fechaServidorMs: number | null;
+  /** `performance.now()` al recibir la respuesta. */
+  instanteRecibido: number;
+}
+
+async function solicitarCompleta<T>(
+  ruta: string,
+  opciones: OpcionesSolicitud = {}
+): Promise<RespuestaCompleta<T>> {
   const { metodo = "GET", cuerpo, pasiva = false, global = true } = opciones;
   const headers: Record<string, string> = {};
   if (cuerpo !== undefined) headers["Content-Type"] = "application/json";
   if (pasiva) headers["X-Actividad-Pasiva"] = "1";
 
+  const instanteEnvio = performance.now();
   let respuesta: Response;
   try {
     respuesta = await fetch(`${BASE}${ruta}`, {
@@ -168,8 +193,20 @@ async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Pro
     throw error;
   }
 
-  if (respuesta.status === 204) return undefined as T;
-  return (await respuesta.json()) as T;
+  const instanteRecibido = performance.now();
+  const fecha = Date.parse(respuesta.headers.get("Date") ?? "");
+  if (!pasiva) manejadores?.alActividadRenovada?.(instanteEnvio);
+
+  const datos = respuesta.status === 204 ? (undefined as T) : ((await respuesta.json()) as T);
+  return { datos, fechaServidorMs: Number.isNaN(fecha) ? null : fecha, instanteRecibido };
+}
+
+/**
+ * Llamada a la API con la cookie de sesión. La usan los demás módulos de `src/services/`; los
+ * componentes nunca la llaman directamente.
+ */
+export async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
+  return (await solicitarCompleta<T>(ruta, opciones)).datos;
 }
 
 /** POST /auth/login. Deja la cookie puesta y responde la etapa que sigue. */
@@ -183,12 +220,34 @@ export function login(correo: string, contrasena: string): Promise<RespuestaEtap
   });
 }
 
+/** GET /auth/sesion con lo necesario para medir la inactividad con el reloj del servidor. */
+export interface ConsultaSesion {
+  sesion: RespuestaSesion;
+  /** Cabecera `Date` en milisegundos, o `null` si no vino. */
+  fechaServidorMs: number | null;
+  /** `performance.now()` al recibir la respuesta. */
+  instanteRecibido: number;
+}
+
 /**
  * GET /auth/sesion. Quién es el usuario, en qué etapa va y cómo va la inactividad. Sirve en
  * cualquier etapa. Quien llama decide qué hacer con un 401 (es lo normal si no hay sesión).
+ * Las consultas automáticas van con `pasiva: true` para no renovar la sesión.
  */
-export function obtenerSesion(opciones: { pasiva?: boolean } = {}): Promise<RespuestaSesion> {
-  return solicitar<RespuestaSesion>("/auth/sesion", { ...opciones, global: false });
+export async function obtenerSesion(opciones: { pasiva?: boolean } = {}): Promise<ConsultaSesion> {
+  const { datos, fechaServidorMs, instanteRecibido } = await solicitarCompleta<RespuestaSesion>(
+    "/auth/sesion",
+    { ...opciones, global: false }
+  );
+  return { sesion: datos, fechaServidorMs, instanteRecibido };
+}
+
+/**
+ * POST /auth/sesion/continuar (W-05, «Seguir conectado»). Solo en la etapa ACTIVA. Renueva la
+ * inactividad como cualquier petición no pasiva; los errores van a los manejadores globales.
+ */
+export function continuarSesion(): Promise<RespuestaContinuar> {
+  return solicitar<RespuestaContinuar>("/auth/sesion/continuar", { metodo: "POST" });
 }
 
 /**
@@ -243,13 +302,32 @@ export function verificarTotp(codigo: string): Promise<RespuestaIngreso> {
 
 /**
  * POST /auth/logout. Cierra la sesión en el servidor y borra la cookie. Siempre responde 204,
- * incluso si la sesión ya había vencido. Funciona en cualquier etapa.
+ * incluso si la sesión ya había vencido. Funciona en cualquier etapa. `motivo` queda en la
+ * bitácora: `inactividad` cuando lo cierra el aviso de W-05.
  */
-export function cerrarSesionEnServidor(): Promise<void> {
+export function cerrarSesionEnServidor(motivo: "manual" | "inactividad" = "manual"): Promise<void> {
   return solicitar<void>("/auth/logout", {
     metodo: "POST",
-    cuerpo: { motivo: "manual" },
+    cuerpo: { motivo },
     global: false,
+  });
+}
+
+/** GET /perfil (W-18). Datos del propio usuario; cualquier rol. Contiene datos personales: no se registran. */
+export function obtenerPerfil(): Promise<Perfil> {
+  return solicitar<Perfil>("/perfil");
+}
+
+/**
+ * PATCH /perfil (W-18). Envía solo `{nombre, apellido, telefono}`; nunca el correo ni el rol.
+ * Responde el perfil con los valores normalizados (por ejemplo, el teléfono sin espacios).
+ * 422 DATOS_INVALIDOS trae `campos` (`nombre`, `apellido` o `telefono`).
+ */
+export function actualizarPerfil(edicion: EdicionPerfil): Promise<Perfil> {
+  const { nombre, apellido, telefono } = edicion;
+  return solicitar<Perfil>("/perfil", {
+    metodo: "PATCH",
+    cuerpo: { nombre, apellido, telefono },
   });
 }
 
