@@ -28,6 +28,7 @@ from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
 from app.repositories import dashboard_tecnico_repository as repo_tecnico
+from app.repositories import reportes_repository as repo_reportes
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
 from app.repositories.casos_recibidos_repository import RepositorioCasosRecibidos
@@ -47,6 +48,7 @@ from app.services import bitacora as servicio_bitacora
 from app.services import dashboard_tecnico as servicio_tecnico
 from app.services import estado_operativo as servicio_estado
 from app.services import eventos as servicio_eventos
+from app.services import reportes as servicio_reportes
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
@@ -424,3 +426,17 @@ def get_verificador_stream(
 
 
 VerificadorDelStream = Annotated[VerificadorStream, Depends(get_verificador_stream)]
+
+
+# ------------------------------------------------------------------ reporte PDF (RF-H02)
+
+
+def get_servicio_reportes(
+    db: DbSession, almacen: Annotated[Almacen, Depends(get_almacen)]
+) -> servicio_reportes.ServicioReportes:
+    return servicio_reportes.ServicioReportes(
+        repo_reportes.RepositorioReportes(db), almacen, UnidadTrabajo(db), _ahora
+    )
+
+
+ServicioDeReportes = Annotated[servicio_reportes.ServicioReportes, Depends(get_servicio_reportes)]
