@@ -1,0 +1,43 @@
+/* Insignia (Figma 14:574): 0 × 8 px de relleno, borde de 1 px y radio completo. */
+
+.insignia {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: var(--espacio-0) var(--espacio-2);
+  border: var(--borde-grosor) solid;
+  border-radius: var(--radio-completo);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  /* En celular el texto largo («Contraseña temporal expirada») puede partirse antes que desbordar. */
+  overflow-wrap: anywhere;
+}
+
+.exito {
+  background: var(--color-estado-exito-fondo);
+  border-color: var(--color-estado-exito-borde);
+  color: var(--color-estado-exito-texto);
+}
+
+.info {
+  background: var(--color-estado-info-fondo);
+  border-color: var(--color-estado-info-borde);
+  color: var(--color-estado-info-texto);
+}
+
+.advertencia {
+  background: var(--color-estado-advertencia-fondo);
+  border-color: var(--color-estado-advertencia-borde);
+  color: var(--color-estado-advertencia-texto);
+}
+
+.error {
+  background: var(--color-estado-error-fondo);
+  border-color: var(--color-estado-error-borde);
+  color: var(--color-estado-error-texto);
+}
+
+.neutral {
+  background: var(--color-fondo-superficie-sutil);
+  border-color: var(--color-borde-sutil);
+  color: var(--color-texto-secundario);
+}

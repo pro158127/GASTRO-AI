@@ -23,6 +23,11 @@ export interface ItemMenu {
   Icono: ComponentType<PropiedadesIcono>;
   /** Muestra el contador de casos recibidos sin revisar (se oculta cuando vale 0). */
   conContadorCasosRecibidos?: boolean;
+  /**
+   * El ítem queda activo también en sus subrutas (Usuarios en /usuarios/nuevo y /usuarios/:id).
+   * Por defecto solo en su ruta exacta.
+   */
+  incluyeSubrutas?: boolean;
 }
 
 export const menusPorRol: Record<RolInterfaz, ItemMenu[]> = {
@@ -40,7 +45,7 @@ export const menusPorRol: Record<RolInterfaz, ItemMenu[]> = {
   ],
   administrador: [
     { id: "dashboard", etiqueta: "Dashboard", ruta: "/dashboard", Icono: IconoInicio },
-    { id: "usuarios", etiqueta: "Usuarios", ruta: "/usuarios", Icono: IconoUsuarios },
+    { id: "usuarios", etiqueta: "Usuarios", ruta: "/usuarios", Icono: IconoUsuarios, incluyeSubrutas: true },
     { id: "cuentas-pendientes", etiqueta: "Cuentas pendientes", ruta: "/cuentas-pendientes", Icono: IconoUsuario },
     { id: "bitacora", etiqueta: "Bitácora", ruta: "/bitacora", Icono: IconoBitacora },
     { id: "estado-operativo", etiqueta: "Estado operativo", ruta: "/estado-operativo", Icono: IconoEstado },

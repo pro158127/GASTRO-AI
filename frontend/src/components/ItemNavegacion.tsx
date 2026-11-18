@@ -21,6 +21,8 @@ interface PropiedadesItemNavegacion {
   contador?: number;
   /** Variante de la barra lateral (se contrae a íconos en tableta y lleva tooltip). */
   enBarraLateral?: boolean;
+  /** Activo también en las subrutas de `ruta` (por defecto, solo en la ruta exacta). */
+  incluyeSubrutas?: boolean;
 }
 
 export default function ItemNavegacion({
@@ -30,6 +32,7 @@ export default function ItemNavegacion({
   onActivar,
   contador,
   enBarraLateral = false,
+  incluyeSubrutas = false,
 }: PropiedadesItemNavegacion) {
   const [conCursor, setConCursor] = useState(false);
   const [conFoco, setConFoco] = useState(false);
@@ -81,7 +84,7 @@ export default function ItemNavegacion({
       {ruta ? (
         <NavLink
           to={ruta}
-          end
+          end={!incluyeSubrutas}
           className={({ isActive }) => [estilos.item, isActive ? estilos.activo : ""].filter(Boolean).join(" ")}
           onClick={onActivar}
           aria-label={nombreAccesible}

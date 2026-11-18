@@ -62,6 +62,7 @@ export default function PanelMenuMovil({
                 etiqueta={item.etiqueta}
                 Icono={item.Icono}
                 ruta={item.ruta}
+                incluyeSubrutas={item.incluyeSubrutas}
                 contador={item.conContadorCasosRecibidos ? casosSinRevisar : undefined}
                 onActivar={onCerrar}
               />

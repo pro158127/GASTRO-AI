@@ -30,6 +30,8 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `POST /api/auth/logout` | implementado | `POST /api/v1/auth/logout`, con cookie |
 | `GET /api/auth/me` | implementado | `GET /api/v1/auth/sesion` |
 | `GET /api/casos-recibidos/resumen` | propuesto | pendiente (ruta pasa a `/api/v1`) |
+| `GET /api/v1/admin/usuarios`: parámetro `orden` | propuesto | el endpoint existe, sin `orden` |
+| `GET /api/v1/admin/usuarios`: `q` en la query string | observación | sin cambio en el contrato |
 
 ## Propuestas
 
@@ -113,3 +115,40 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
     se consulta automáticamente, debería llevar `X-Actividad-Pasiva: 1`.
 - **Simulación actual:** valor fijo 4 en `src/services/simulados/usuario.ts`, único lugar del
   dato. Es un valor de ejemplo del componente de Figma; el dashboard W-15 dibuja 0.
+
+### Parámetro `orden` en `GET /api/v1/admin/usuarios` · W-09
+
+- **Estado:** propuesto. El endpoint existe (`../ARCHITECTURE.md` § 3.5) con
+  `?q&rol&estado&excluir&pagina&por_pagina`, pero no permite elegir el orden.
+- **Por qué:** W-09 (Figma 48:836) dibuja los encabezados Nombre, Correo, Rol y Estado como
+  ordenables (componente «Encabezado de tabla», con `aria-sort`), con «Nombre ↑» activo. Hoy el
+  servidor ordena siempre por apellido y luego nombre, y ordenar en el navegador solo
+  ordenaría la página actual de 8. Mientras no exista, el frontend muestra los encabezados como
+  texto plano, sin íconos ni `aria-sort`.
+- **Solicitud propuesta:** `orden` opcional, con el mismo formato que `GET /api/v1/analisis`
+  (campo, y `-` delante para descendente):
+  - `nombre` | `-nombre`: nombre completo (nombre y apellido);
+  - `correo` | `-correo`;
+  - `rol` | `-rol`;
+  - `estado` | `-estado`.
+
+  Sin `orden`, el orden actual (apellido, nombre). Desempate estable por `id` para que la
+  paginación no repita ni salte cuentas.
+- **Respuesta:** la misma `{items, paginacion}`.
+- **Errores:** `422 DATOS_INVALIDOS` con `campos: [{campo: "orden", …}]` si el valor no es uno
+  de los anteriores.
+- **Dudas para el backend:** cómo ordenar `estado` cuando la cuenta está bloqueada (el frontend
+  muestra una sola insignia con la prioridad Bloqueada > Pendiente/Expirada > Inactiva > Activa;
+  ver `src/utils/presentacionUsuario.ts`).
+
+### Búsqueda `q` en la query string de `GET /api/v1/admin/usuarios` · W-09
+
+- **Estado:** observación para el backend; el frontend no cambia el contrato.
+- **Qué pasa:** la búsqueda de W-09 es «por nombre o correo», así que `q` puede llevar un
+  correo completo. Como el endpoint es un `GET`, `q` viaja en la URL de la petición
+  (`/api/v1/admin/usuarios?q=ana.perez%40usc.edu.co&…`) y puede quedar en los logs de acceso de
+  nginx o de la API, aunque el frontend nunca la pone en la barra de direcciones, en el
+  historial ni en el almacenamiento del navegador.
+- **Opciones para el backend:** excluir la query string de los logs de acceso de esa ruta, o
+  una búsqueda por `POST` con `q` en el cuerpo, como ya se hace con el documento del paciente
+  (`POST /pacientes/analisis/buscar`).

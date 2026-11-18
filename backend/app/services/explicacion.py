@@ -56,7 +56,9 @@ TERMINOS_PROHIBIDOS = (
     "**",
     "##",
 )
-_PORCENTAJE = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
+# «N %» con su signo, si lo trae (guion, signo menos Unicode o raya). El signo solo cuenta si no
+# viene pegado a otra cifra: «-50 %» es negativo, pero «40-50 %» es un rango y el 50 es positivo.
+_PORCENTAJE = re.compile(r"(?<![\w.,])([-−–]\s?)?(\d+(?:[.,]\d+)?)\s*%")
 
 
 class CodigoFallaExplicacion(StrEnum):
@@ -131,7 +133,9 @@ def validar_explicacion(texto: str, resumen: dict[str, Any]) -> bool:
             *(g["area_pct"] for g in c["regiones"]),
         )
     ]
-    for numero in _PORCENTAJE.findall(texto):
+    for signo, numero in _PORCENTAJE.findall(texto):
+        if signo:  # ninguna probabilidad, umbral ni área es negativa (D-003, issue #247)
+            return False
         valor = float(numero.replace(",", "."))
         if not any(abs(valor - permitido) <= 0.5 for permitido in permitidos):
             return False

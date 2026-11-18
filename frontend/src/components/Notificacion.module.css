@@ -1,0 +1,100 @@
+/* Notificación (Figma 91:2326). Escritorio: 420 px, arriba a la derecha del contenido (16 px bajo
+   la barra superior de 64 px y 32 px del borde). Celular (M-N01): 12 px bajo la barra de 56 px y
+   16 px a cada lado. Sin animación de entrada: nada que desactivar con prefers-reduced-motion. */
+
+.notificacion {
+  position: fixed;
+  top: calc(64px + var(--espacio-4));
+  right: var(--espacio-8);
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  width: 420px;
+  max-width: calc(100% - 2 * var(--espacio-4));
+  padding: 14px var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-estado-exito-icono);
+  border-left-width: 4px;
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-2-menu);
+}
+
+.icono {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--color-estado-exito-icono);
+}
+
+.texto {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+/* El ícono mide 24 px (objetivo mínimo de WCAG 2.5.8); en celular el área táctil crece a 44 px
+   con margen negativo, sin mover el diseño. */
+.cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tamano-objetivo-minimo);
+  height: var(--tamano-objetivo-minimo);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-sm);
+  background: transparent;
+  color: var(--color-texto-secundario);
+  cursor: pointer;
+}
+
+.cerrar:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.iconoCerrar {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 1279px) {
+  .notificacion {
+    right: var(--espacio-6);
+  }
+}
+
+@media (max-width: 767px) {
+  .notificacion {
+    top: calc(56px + var(--espacio-3));
+    right: var(--espacio-4);
+    left: var(--espacio-4);
+    width: auto;
+    max-width: none;
+  }
+
+  .cerrar {
+    width: var(--tamano-control-tactil);
+    height: var(--tamano-control-tactil);
+    margin: -10px;
+  }
+}

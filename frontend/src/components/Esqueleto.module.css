@@ -1,0 +1,72 @@
+/* Esqueleto (Figma 91:2297), variante «Fila de tabla»: 44 px de alto, 16 px de relleno, barras de
+   12 px con radio de 4 px separadas 40 px. */
+
+.barra {
+  display: block;
+  flex-shrink: 1;
+  height: 12px;
+  min-width: 0;
+  border-radius: var(--radio-sm);
+  background: var(--color-borde-sutil);
+  animation: esqueleto-pulso 1.6s ease-in-out infinite;
+}
+
+.fila {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-10);
+  height: 44px;
+  padding: var(--espacio-4);
+  overflow: hidden;
+}
+
+.ancho80 {
+  width: 80px;
+}
+.ancho100 {
+  width: 100px;
+}
+.ancho140 {
+  width: 140px;
+}
+.ancho200 {
+  width: 200px;
+}
+
+/* Tarjeta (no dibujada): mismo relleno y radio que las tarjetas de T-09 y M-09. */
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.tarjetaTitulo {
+  width: 50%;
+}
+.tarjetaLinea {
+  width: 75%;
+}
+.tarjetaLineaCorta {
+  width: 60%;
+}
+.tarjetaInsignia {
+  width: 96px;
+  height: 20px;
+  border-radius: var(--radio-completo);
+}
+
+@keyframes esqueleto-pulso {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra {
+    animation: none;
+  }
+}

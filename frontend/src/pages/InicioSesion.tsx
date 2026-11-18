@@ -25,7 +25,8 @@ interface Aviso {
 const AVISOS = {
   // W-01b. Mensaje genérico: nunca dice si falló el correo o la contraseña (ni si la cuenta está
   // inactiva o bloqueada). Se usa también cuando el correo o la contraseña están vacíos o mal
-  // escritos (no se llama al servidor) y cuando el servidor rechaza los datos (422).
+  // escritos (no se llama al servidor), cuando el servidor rechaza los datos (422) y al llegar por
+  // SESION_EXPIRADA con motivo DEMASIADOS_INTENTOS (cuenta bloqueada, nota de W-04b).
   credenciales: {
     tipo: "error",
     titulo: "No se pudo iniciar sesión",

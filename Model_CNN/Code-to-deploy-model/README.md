@@ -46,8 +46,9 @@ Correa (progresión gástrica), prediciendo **cuatro clases simultáneas**
 
 ## Datos de origen
 
-Entrenado sobre tres datasets públicos de imágenes endoscópicas, todos
-licenciados (CC BY 4.0 / uso académico):
+Entrenado sobre tres datasets públicos de imágenes endoscópicas. Cada dataset
+mantiene sus propios términos de uso; ver las fuentes originales antes de
+redistribuir sus imágenes:
 
 - **EGID** (Endoscopic Gastric Image Dataset) — anotaciones de H. pylori y
   atrofia gástrica.
@@ -72,6 +73,10 @@ muestras reales anotadas (excluyendo ceros imputados de EGID).
 Entrenamiento (Masked Loss): Train Loss `0.0727`, Val Loss `0.0314`,
 ROC-AUC enmascarado `0.9992`, F1 enmascarado `0.9774`.
 
+> **Umbrales en producción (RF-A01):** los umbrales quedan acotados al rango
+> 10%–90%. Atrofia y H. Pylori se despliegan en `0.900` (no `0.946`/`0.982`),
+> lo que prioriza sensibilidad sobre precisión respecto a la calibración F1.
+
 > Ver el reporte completo de evaluación y calibración en
 > `Documentacion/Data-documentation/reports/Reporte_Metricas_Calibracion_GastroAI.md`.
 
@@ -91,20 +96,52 @@ ROC-AUC enmascarado `0.9992`, F1 enmascarado `0.9774`.
 
 Endpoints expuestos en el Space (puerto 7860):
 
-- `GET /` → estado del servicio.
-- `POST /api/v1/analyze` → recibe una imagen (`multipart/form-data`, campo
-  `file`) y devuelve, por clase, la probabilidad, el umbral, si fue detectada
-  y el overlay Grad-CAM en base64.
+- `GET /` → estado del servicio (incluye `revision_sha`).
+- `POST /clasificar` → recibe una imagen (`multipart/form-data`, campo
+  `imagen`) y devuelve `revision_sha`, `latencia_ms` y tres `caracteristicas`
+  con `codigo`, `probabilidad` y `regiones`. Cada región incluye coordenadas
+  normalizadas del ROI, `area_pct` y el mapa de calor Grad-CAM en PNG Base64.
+  La respuesta no incluye el umbral ni un indicador booleano de detección.
+
+El endpoint requiere `Authorization: Bearer <token>`. Configura
+`GASTROAI_API_KEY` como secreto del Space y `HF_TOKEN` con el mismo valor en
+el backend. El backend envía esta cabecera.
+
+`GASTROAI_REVISION_SHA` debe ser el SHA hexadecimal de 40 caracteres del
+commit del Space desplegado. Hugging Face proporciona `SPACE_COMMIT_HASH`; la
+app lo usa si no se define explícitamente `GASTROAI_REVISION_SHA`. Configura
+el mismo SHA en `HF_REVISION` del backend. Para CORS, el Space no permite
+orígenes por defecto; si se necesita acceso desde navegador, define
+`GASTROAI_ALLOWED_ORIGINS` con una lista separada por comas de orígenes
+exactos.
+
+Respuesta (3 patologías, `normal_mucosa` no se reporta):
+
+```json
+{
+  "revision_sha": "<40-character commit SHA>",
+  "latencia_ms": 1840,
+  "caracteristicas": [
+    {"codigo": "GASTRITIS", "probabilidad": 0.8123, "regiones": [
+      {"x": 0.0417, "y": 0.0833, "ancho": 0.4167, "alto": 0.5,
+       "area_pct": 20.83, "mapa_calor_base64": "<PNG base64>"}
+    ]}
+  ]
+}
+```
 
 ```bash
-curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/api/v1/analyze" \
-     -F "file=@imagen_endoscopia.bmp"
+curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/clasificar" \
+     -H "Authorization: Bearer $GASTROAI_API_KEY" \
+     -F "imagen=@imagen_endoscopia.bmp"
 ```
 
 ## Licencia
 
-Código y pesos bajo **CC BY-NC 4.0** (uso no comercial). Los datasets de
-origen mantienen sus propias licencias (CC BY 4.0 / académica). Ver `LICENSE`.
+Código y pesos bajo **CC BY-NC 4.0** (uso no comercial). Las imágenes de
+origen mantienen las licencias de sus autores; las atribuciones de los
+subconjuntos EGID y GastroHUN incluidos en las imágenes de verificación están
+en `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/CREDITOS.md`.
 
 ## Reproducibilidad
 

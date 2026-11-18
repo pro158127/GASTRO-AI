@@ -1,0 +1,48 @@
+/* Diálogo de confirmación (Figma 14:602; celular M-D01). 480 px centrado; a 320 px ocupa el ancho
+   disponible sin desplazamiento horizontal. Sin animación de entrada: nada que desactivar con
+   prefers-reduced-motion. */
+
+/* Por encima del menú del celular (capa 40, panel 50) y por debajo del aviso W-05 (60). */
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espacio-4);
+  overflow-y: auto;
+  background: var(--color-fondo-superposicion);
+}
+
+.dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  padding: var(--espacio-6);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-3-dialogo);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-3);
+}
