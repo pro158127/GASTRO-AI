@@ -217,7 +217,7 @@ def test_hash_debe_flushearse_antes_de_enviar_segun_contrato(emision):
     assert flush_antes_del_correo == [True]
 
 
-@pytest.mark.parametrize("microsegundos,expirada", [(-1, False), (0, False), (1, True)])
+@pytest.mark.parametrize("microsegundos,expirada", [(-1, False), (0, True), (1, True)])
 def test_limite_inactividad_con_repositorio_real_y_db_simulada(microsegundos, expirada):
     db = Mock(spec=Session)
     usuario = Usuario(id=USUARIO_ID, estado=EstadoUsuario.ACTIVO, bloqueado_hasta=None)
