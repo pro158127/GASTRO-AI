@@ -514,14 +514,19 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - Errores: análisis o caso ajeno o inexistente → `404 NO_ENCONTRADO`; alguno sin resultado
   → `422 ANALISIS_SIN_RESULTADO`; el paciente no tiene análisis completados →
   `422 SIN_ANALISIS`; más de 50 → `422 DEMASIADOS_ANALISIS`; MinIO caído → `503`.
-- El PDF (`services/constructor_reporte.py`, patrón Builder) lleva por análisis: código,
-  fecha, quién lo hizo, modelo (repositorio @ revisión), tabla de características
-  (probabilidad, umbral aplicado, si lo supera), regiones con confianza y área, la
-  explicación del LLM si está `GENERADA` y las observaciones.
-- En **cada página**: el logo de la app y la etiqueta «Análisis experimental» arriba, y el
-  aviso completo abajo (RF-R04 CA 4, RNF-22). Nunca el documento ni el seudónimo, y sin
-  imágenes. El logo sale de `app/assets/` (copia de `frontend/src/assets/logo-*.svg`) y
-  se dibuja en vectores con `services/logo_pdf.py`, sin librerías de SVG.
+- El PDF (`services/constructor_reporte.py`, patrón Builder) sigue el diseño R-01 / R-02:
+  - **Por análisis (R-01):** recuadro «Análisis experimental»; Trazabilidad (código, fecha,
+    quién lo hizo, modelo y revisión, «Paciente: no se incluye»); imagen anonimizada y mapa
+    Grad-CAM lado a lado con la línea de cada región (confianza y área); características
+    frente al umbral; explicación del LLM si está `GENERADA`; valoración profesional.
+  - **Varios (R-02):** hoja de resumen (código, fecha, característica principal,
+    probabilidad, valoración y página donde empieza) y cada análisis desde una página nueva.
+  - **En cada página:** logo, título («… (continuación)» si sigue) y «Generado el … por …»
+    arriba; abajo el aviso de herramienta experimental y «Página X de N» (RF-R04 CA 4,
+    RNF-22). El total y las páginas del resumen salen de una primera pasada de maquetación.
+  - Nunca el documento ni el seudónimo. Si una imagen no se puede leer, va el recuadro vacío.
+  - El logo sale de `app/assets/` (copia de `frontend/src/assets/logo-*.svg`) y se dibuja en
+    vectores con `services/logo_pdf.py`, sin librerías de SVG.
 - Se guarda en MinIO (`reportes/{id}.pdf`); la tabla `Reporte` + `ReporteAnalisis` deja
   quién lo generó y qué análisis entraron. La descarga es `Reporte_GastroAI_<código>.pdf`
   con `Cache-Control: no-store`.

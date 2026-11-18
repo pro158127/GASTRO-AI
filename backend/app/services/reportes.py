@@ -8,6 +8,7 @@
 - El PDF se guarda en MinIO (`reportes/{id}.pdf`) y solo lo descarga quien lo generó.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,6 +27,8 @@ from app.services.constructor_reporte import (
     FilaRegion,
 )
 
+log = logging.getLogger(__name__)
+
 MAXIMO_ANALISIS = 50  # un PDF razonable; más que eso se pide por partes
 TIPO_PDF = "application/pdf"
 
@@ -38,8 +41,22 @@ def _nombre(u: Usuario) -> str:
     return f"{u.nombre} {u.apellido}".strip()
 
 
-def datos_de(a: Analisis) -> DatosAnalisisReporte:
-    """Del modelo de la base a los datos planos que usa el constructor (sin nada del paciente)."""
+def _leer(almacen: Almacen, clave: str | None) -> bytes | None:
+    """La imagen de MinIO, o None si no está: el PDF sale igual, con el recuadro vacío."""
+    if not clave:
+        return None
+    try:
+        return almacen.leer(clave)
+    except ErrorAlmacen:
+        log.warning("No se pudo leer una imagen para el reporte; va sin ella")
+        return None
+
+
+def datos_de(a: Analisis, almacen: Almacen, doctor_id: UUID) -> DatosAnalisisReporte:
+    """Del modelo de la base a los datos planos que usa el constructor (sin nada del paciente).
+
+    `doctor_id` es quien pide el reporte: si el análisis lo hizo otro, llegó por traslado.
+    """
     resultados = sorted(a.resultados, key=lambda r: r.probabilidad, reverse=True)
     regiones = sorted(
         ((r, g) for r in resultados for g in r.regiones),
@@ -49,7 +66,7 @@ def datos_de(a: Analisis) -> DatosAnalisisReporte:
         codigo=a.codigo,
         solicitado_en=a.solicitado_en,
         realizado_por=_nombre(a.doctor_ejecutor),
-        modelo=f"{a.modelo.repositorio_hf} @ {a.modelo.revision_sha[:7]}",
+        modelo=f"{a.modelo.repositorio_hf} · revisión {a.modelo.revision_sha[:7]}",
         caracteristicas=[
             FilaCaracteristica(
                 r.caracteristica.nombre, r.probabilidad, r.umbral_aplicado, r.supera_umbral
@@ -66,6 +83,10 @@ def datos_de(a: Analisis) -> DatosAnalisisReporte:
             FilaObservacion(o.valoracion.value, o.texto, _nombre(o.autor), o.registrada_en)
             for o in sorted(a.observaciones, key=lambda o: o.registrada_en)
         ],
+        imagen=_leer(almacen, a.imagen_clave_objeto),
+        # El mapa principal: la primera región de la característica más probable (como W-08)
+        mapa_calor=_leer(almacen, regiones[0][1].mapa_calor_clave_objeto) if regiones else None,
+        trasladado_de=_nombre(a.doctor_ejecutor) if a.doctor_ejecutor_id != doctor_id else None,
     )
 
 
@@ -121,10 +142,10 @@ class ServicioReportes:
 
         reporte = self._repo.crear(doctor.id, [a.id for a in elegidos])
         constructor = ConstructorReporte().encabezado(
-            _nombre(doctor), reporte.generado_en, len(elegidos)
+            _nombre(doctor), reporte.generado_en, len(elegidos), de_paciente=caso_id is not None
         )
         for a in elegidos:
-            constructor.analisis(datos_de(a))
+            constructor.analisis(datos_de(a, self._almacen, doctor.id))
         clave = f"reportes/{reporte.id}.pdf"
         try:
             self._almacen.subir(clave, constructor.construir(), TIPO_PDF)
