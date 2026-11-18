@@ -318,6 +318,8 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/analisis/{id}/explicacion` | `DOCTOR` | — | `{estado, texto?, generada_en?, codigo_error?, mensaje?, intentos, puede_reintentar}` |
 | POST | `/analisis/{id}/explicacion/reintentar` | `DOCTOR` | — | `202 {estado: "PENDIENTE", intentos}` |
 | POST | `/analisis/{id}/observaciones` | `DOCTOR` | `{valoracion, texto?}` | `201 {observacion: {id, valoracion, texto, autor, registrada_en}}` |
+| POST | `/reportes` | `DOCTOR` | `{analisis_ids}` o `{caso_id}` | `201 {id, formato: "PDF", generado_en, analisis, descarga_url}` |
+| GET | `/reportes/{id}/archivo` | `DOCTOR` (el que lo generó) | — | `application/pdf` (attachment) |
 | GET | `/analisis` | `DOCTOR` | `?pagina&por_pagina&origen&estado&codigo&caracteristica&desde&hasta&orden` | `{items, paginacion}` («Mis análisis») |
 | GET | `/casos-recibidos` | `DOCTOR` | `?origen_id&limite` | `{nuevos, total_traslados, total_casos, doctores_origen, traslados}` |
 | POST | `/casos-recibidos/buscar` | `DOCTOR` | `{tipo_documento, numero_documento, origen_id?, limite?}` | igual + `analisis_propios_paciente` |
@@ -504,6 +506,31 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 - Solo sobre un resultado: `409 ANALISIS_NO_COMPLETADO`. Análisis ajeno: `404`.
 - Se ven en `GET /analisis/{id}` → `observaciones`, con `es_mia`.
 
+**Reporte PDF (RF-H02).**
+
+- `POST /reportes` con `analisis_ids` (1 a 50, los repetidos cuentan una vez) **o** `caso_id`
+  (todos los análisis del paciente: «Descargar reporte de este paciente», CA 4). Mismo
+  criterio de acceso que «Mis análisis»: casos asignados al doctor, propios o recibidos.
+- Errores: análisis o caso ajeno o inexistente → `404 NO_ENCONTRADO`; alguno sin resultado
+  → `422 ANALISIS_SIN_RESULTADO`; el paciente no tiene análisis completados →
+  `422 SIN_ANALISIS`; más de 50 → `422 DEMASIADOS_ANALISIS`; MinIO caído → `503`.
+- El PDF (`services/constructor_reporte.py`, patrón Builder) sigue el diseño R-01 / R-02:
+  - **Por análisis (R-01):** recuadro «Análisis experimental»; Trazabilidad (código, fecha,
+    quién lo hizo, modelo y revisión, «Paciente: no se incluye»); imagen anonimizada y mapa
+    Grad-CAM lado a lado con la línea de cada región (confianza y área); características
+    frente al umbral; explicación del LLM si está `GENERADA`; valoración profesional.
+  - **Varios (R-02):** hoja de resumen (código, fecha, característica principal,
+    probabilidad, valoración y página donde empieza) y cada análisis desde una página nueva.
+  - **En cada página:** logo, título («… (continuación)» si sigue) y «Generado el … por …»
+    arriba; abajo el aviso de herramienta experimental y «Página X de N» (RF-R04 CA 4,
+    RNF-22). El total y las páginas del resumen salen de una primera pasada de maquetación.
+  - Nunca el documento ni el seudónimo. Si una imagen no se puede leer, va el recuadro vacío.
+  - El logo sale de `app/assets/` (copia de `frontend/src/assets/logo-*.svg`) y se dibuja en
+    vectores con `services/logo_pdf.py`, sin librerías de SVG.
+- Se guarda en MinIO (`reportes/{id}.pdf`); la tabla `Reporte` + `ReporteAnalisis` deja
+  quién lo generó y qué análisis entraron. La descarga es `Reporte_GastroAI_<código>.pdf`
+  con `Cache-Control: no-store`.
+
 **Historial (RF-H01).**
 
 - Las dos listas muestran los análisis de los **casos asignados al doctor**: los propios y los
@@ -632,6 +659,7 @@ probarlas sin base de datos (RNF-19).
 - `estado_operativo.py`: panel de supervisión; corre en paralelo los chequeos de
   `adapters/salud.py` y compara el modelo vigente con la revisión configurada.
 - `monitoreo.py`: métricas del reporte de evaluación y logs técnicos de inferencia.
+- `reportes.py` y `constructor_reporte.py`: reporte PDF de resultados (Builder).
 - `dashboard_tecnico.py`: pantalla inicial del administrador; conteos sin datos clínicos y
   la medición compartida del estado operativo.
 - `verificadores_imagen.py`: cadena de responsabilidad peso → formato → resolución, y la

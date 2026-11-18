@@ -23,6 +23,7 @@ from app.api.routers import (
     imagenes,
     pacientes,
     perfil,
+    reportes,
 )
 from app.core.config import get_settings
 from app.core.errores import registrar_manejadores
@@ -71,3 +72,4 @@ app.include_router(casos_recibidos.router, prefix=settings.api_prefix)
 app.include_router(configuracion.router, prefix=settings.api_prefix)
 app.include_router(dashboard.router, prefix=settings.api_prefix)
 app.include_router(eventos.router, prefix=settings.api_prefix)
+app.include_router(reportes.router, prefix=settings.api_prefix)
