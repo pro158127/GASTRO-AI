@@ -52,10 +52,13 @@ AMBAR_FONDO = colors.HexColor("#FEF3C7")
 AMBAR_BORDE = colors.HexColor("#B45309")
 AMBAR_TEXTO = colors.HexColor("#9A3412")
 
+# Va en el pie de TODAS las páginas, junto al aviso oficial (RF-R04): así también lo
+# llevan las páginas en que un análisis continúa, que no repiten el recuadro ámbar
 PIE = (
-    "Gastro-AI · Herramienta académica y experimental. No es un dispositivo médico ni emite "
-    "diagnósticos; requiere la interpretación de un profesional de la salud."
+    "Gastro-AI es una herramienta académica: no es un dispositivo médico ni emite "
+    "diagnósticos y requiere la interpretación de un profesional de la salud."
 )
+LINEA_PIE = 2.5 * cm  # la raya que separa el contenido del pie
 NOTA_MULTIETIQUETA = "Clasificación multietiqueta: las probabilidades no suman 100 %."
 PACIENTE = "No se incluye: el sistema no guarda la cédula (RNF-04)"
 VALORACIONES = {
@@ -340,15 +343,21 @@ def _marco(c: Canvas, titulo: str, generado_por: str, generado_en: datetime, tot
     c.drawRightString(
         ancho - MARGEN, base - 0.1 * cm, f"Generado el {_fecha(generado_en)} por {generado_por}"
     )
-    # Pie: línea, aviso de herramienta experimental y número de página
+    # Pie: la etiqueta y el aviso oficial (RF-R04) en cada página, y el número de página
     c.setStrokeColor(LINEA)
     c.setLineWidth(0.6)
-    c.line(MARGEN, 2.0 * cm, ancho - MARGEN, 2.0 * cm)
-    c.setFont("Helvetica", 8)
+    c.line(MARGEN, LINEA_PIE, ancho - MARGEN, LINEA_PIE)
+    y = LINEA_PIE - 0.5 * cm
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(AMBAR_TEXTO)
+    c.drawString(MARGEN, y, AVISO_EXPERIMENTAL["etiqueta"])
     c.setFillColor(GRIS)
-    for i, renglon in enumerate(simpleSplit(PIE, "Helvetica", 8, ancho - 2 * MARGEN - 3 * cm)):
-        c.drawString(MARGEN, 1.5 * cm - i * 10.5, renglon)
-    c.drawRightString(ancho - MARGEN, 1.5 * cm, f"Página {c.getPageNumber()} de {total}")
+    c.drawRightString(ancho - MARGEN, y, f"Página {c.getPageNumber()} de {total}")
+    c.setFont("Helvetica", 8)
+    texto = f"{AVISO_EXPERIMENTAL['texto']} {PIE}"
+    for renglon in simpleSplit(texto, "Helvetica", 8, ancho - 2 * MARGEN):
+        y -= 10.5
+        c.drawString(MARGEN, y, renglon)
     c.restoreState()
 
 
@@ -392,7 +401,7 @@ class ConstructorReporte:
             leftMargin=MARGEN,
             rightMargin=MARGEN,
             topMargin=3.0 * cm,
-            bottomMargin=2.5 * cm,
+            bottomMargin=LINEA_PIE + 0.5 * cm,
             title="Reporte de resultados · Gastro-AI",
             author="Gastro-AI",
             subject=AVISO_EXPERIMENTAL["etiqueta"],
