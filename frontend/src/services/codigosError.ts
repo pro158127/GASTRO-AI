@@ -23,6 +23,16 @@ export const CodigoErrorApi = {
   /** 409 · `/auth/totp/vincular` sin haber llamado `/auth/totp/iniciar`. */
   TOTP_NO_INICIADO: "TOTP_NO_INICIADO",
   ARCHIVO_DEMASIADO_GRANDE: "ARCHIVO_DEMASIADO_GRANDE",
+  /**
+   * 409 · Crear una cuenta (o cambiarle el correo) con un correo que ya usa otra. Trae `campos`
+   * con `{campo: "correo"}`, así que el error se pinta en ese campo → W-10c.
+   */
+  CORREO_YA_REGISTRADO: "CORREO_YA_REGISTRADO",
+  /**
+   * 409 · La acción no aplica al estado de la cuenta (por ejemplo, reenviar la credencial de una
+   * cuenta que ya se activó).
+   */
+  TRANSICION_INVALIDA: "TRANSICION_INVALIDA",
   DATOS_INVALIDOS: "DATOS_INVALIDOS",
   /** 422 · W-02b: trae `campos` y `requisitos`. */
   CONTRASENA_NO_CUMPLE_POLITICA: "CONTRASENA_NO_CUMPLE_POLITICA",

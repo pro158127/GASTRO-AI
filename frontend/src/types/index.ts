@@ -98,6 +98,26 @@ export type EstadoUsuario = "PENDIENTE" | "ACTIVO" | "INACTIVO" | "ELIMINADO";
 /** Solo en cuentas PENDIENTE: si la contraseña temporal sigue vigente o ya venció (RF-U06). */
 export type EstadoActivacion = "PENDIENTE" | "EXPIRADA";
 
+/** Por qué se envió una contraseña temporal (`motivo` de `credencial`). */
+export type MotivoCredencial = "CREACION" | "RESTABLECIMIENTO" | "CAMBIO_CORREO";
+
+/** Resultado del envío del correo con la contraseña temporal (`estado` de `credencial`). */
+export type EstadoEnvioCredencial = "ENVIADO" | "FALLIDO";
+
+/**
+ * `credencial` de las rutas que generan una contraseña temporal (../ARCHITECTURE.md § 3.5,
+ * «Usuarios»). **La contraseña temporal nunca viaja aquí**: solo va por correo.
+ *
+ * Con el correo caído, `estado` es `FALLIDO` y `codigo_error` es `CORREO_NO_ENVIADO`: la cuenta
+ * queda creada igual y la interfaz ofrece reenviar (W-10d, RF-U05 CA 9).
+ */
+export interface Credencial {
+  motivo: MotivoCredencial;
+  estado: EstadoEnvioCredencial;
+  intentado_en: string;
+  codigo_error: string | null;
+}
+
 /**
  * `usuario` de las rutas `/admin/usuarios` (../ARCHITECTURE.md § 3.5, «Usuarios»). `bloqueado` va
  * aparte de `estado`: una cuenta ACTIVO puede estar bloqueada por intentos fallidos (RF-U12).
@@ -110,6 +130,8 @@ export interface UsuarioResumen {
   correo: string | null;
   telefono: string | null;
   rol: RolUsuario;
+  /** Nombre visible del rol, tal como lo da el servidor («Doctor/Gastroenterólogo»). */
+  rol_nombre: string;
   estado: EstadoUsuario;
   bloqueado: boolean;
   creado_en: string;
@@ -118,6 +140,29 @@ export interface UsuarioResumen {
   estado_activacion?: EstadoActivacion | null;
   /** Solo en cuentas PENDIENTE. */
   temporal_expira_en?: string | null;
+  /** Último envío de la contraseña temporal, o `null` si no hubo ninguno. */
+  ultimo_envio?: Credencial | null;
+}
+
+/**
+ * Cuerpo de `POST /admin/usuarios` (RF-U05). `telefono` es opcional: se omite cuando está vacío.
+ * El servidor normaliza el correo a minúsculas y el teléfono sin separadores.
+ */
+export interface NuevoUsuario {
+  nombre: string;
+  apellido: string;
+  correo: string;
+  telefono?: string;
+  rol: RolUsuario;
+}
+
+/**
+ * Respuesta de `POST /admin/usuarios` (201) y de
+ * `POST /admin/usuarios/{id}/reenviar-credencial`.
+ */
+export interface RespuestaCredencial {
+  usuario: UsuarioResumen;
+  credencial: Credencial;
 }
 
 /** Paginación de las listas: `?pagina&por_pagina` (máximo 100). */

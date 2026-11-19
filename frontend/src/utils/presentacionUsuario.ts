@@ -3,11 +3,15 @@
 import type { RolUsuario, UsuarioResumen } from "../types";
 
 /**
- * TEMPORAL: etiqueta del rol por código. Las rutas `/admin/usuarios` solo traen el código
- * (`DOCTOR`, `ADMINISTRADOR`); se pidió al backend que devuelvan `rol.nombre`, como `/perfil`.
- * Cuando llegue, se usa ese nombre y esta tabla se elimina.
+ * PROVISIONAL: etiquetas de los roles para el selector de W-10 (crear usuario).
+ *
+ * Las respuestas de `/admin/usuarios` traen `rol_nombre` y es ese el que se muestra en todas las
+ * demás pantallas. Pero el formulario de creación necesita las etiquetas *antes* de que la cuenta
+ * exista, y **no hay endpoint de catálogo de roles**: `rol` es un enum cerrado del backend
+ * (`DOCTOR`, `ADMINISTRADOR`) que nunca llega como lista. Esta tabla se usa SOLO en ese formulario
+ * y se elimina cuando exista `GET /catalogos/roles` (consulta U-16 en CONTRATOS_API.md).
  */
-export const ETIQUETA_ROL_USUARIO: Record<RolUsuario, string> = {
+export const ETIQUETA_ROL_FORMULARIO: Record<RolUsuario, string> = {
   DOCTOR: "Doctor/Gastroenterólogo",
   ADMINISTRADOR: "Administrador",
 };

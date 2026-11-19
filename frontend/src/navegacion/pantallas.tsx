@@ -4,6 +4,7 @@
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
+import CrearUsuario from "../pages/CrearUsuario";
 import MiPerfil from "../pages/MiPerfil";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import SinPermisos from "../pages/SinPermisos";
@@ -67,7 +68,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/usuarios/nuevo",
     titulo: "Crear usuario",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-10)
+    elemento: (titulo) => <CrearUsuario titulo={titulo} />, // W-10
   },
   {
     ruta: "/usuarios/:id",

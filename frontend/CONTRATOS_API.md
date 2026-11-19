@@ -30,8 +30,10 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `POST /api/auth/logout` | implementado | `POST /api/v1/auth/logout`, con cookie |
 | `GET /api/auth/me` | implementado | `GET /api/v1/auth/sesion` |
 | `GET /api/casos-recibidos/resumen` | propuesto | pendiente (ruta pasa a `/api/v1`) |
-| `GET /api/v1/admin/usuarios`: parámetro `orden` | propuesto | el endpoint existe, sin `orden` |
+| `GET /api/v1/admin/usuarios`: parámetro `orden` | implementado | ya acepta `orden`; W-09 todavía no lo usa |
 | `GET /api/v1/admin/usuarios`: `q` en la query string | observación | sin cambio en el contrato |
+| `rol_nombre` en los usuarios del administrador (U-8) | implementado | llega en cada `usuario`; el frontend ya lo muestra |
+| `GET /api/v1/catalogos/roles` (U-16) | propuesto | no existe; W-10 usa una tabla local |
 
 ## Propuestas
 
@@ -118,8 +120,14 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 
 ### Parámetro `orden` en `GET /api/v1/admin/usuarios` · W-09
 
-- **Estado:** propuesto. El endpoint existe (`../ARCHITECTURE.md` § 3.5) con
-  `?q&rol&estado&excluir&pagina&por_pagina`, pero no permite elegir el orden.
+- **Estado:** implementado. El backend ya acepta `orden` con los valores que se proponían aquí
+  (`nombre`, `correo`, `rol`, `estado`, con `-` delante para descendente) y desempata siempre por
+  apellido, nombre e `id`, así que la paginación es estable. También entrega ya `conteos`
+  (resumen por estado, U-1) y `ultimo_envio` en cada usuario.
+- **Pendiente en el frontend:** W-09 todavía pinta los encabezados como texto plano y no muestra
+  el resumen de conteos. Queda para la tarea del bloque de W-09 (U-1 y U-15); no entró en la
+  tarea 2a (crear usuario).
+- **Texto original de la propuesta:**
 - **Por qué:** W-09 (Figma 48:836) dibuja los encabezados Nombre, Correo, Rol y Estado como
   ordenables (componente «Encabezado de tabla», con `aria-sort`), con «Nombre ↑» activo. Hoy el
   servidor ordena siempre por apellido y luego nombre, y ordenar en el navegador solo
@@ -152,3 +160,40 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 - **Opciones para el backend:** excluir la query string de los logs de acceso de esa ruta, o
   una búsqueda por `POST` con `q` en el cuerpo, como ya se hace con el documento del paciente
   (`POST /pacientes/analisis/buscar`).
+
+### `rol_nombre` en los usuarios del administrador (U-8) · W-09, W-10
+
+- **Estado:** implementado. Cada `usuario` de `/admin/usuarios` trae ahora `rol` (el código) y
+  `rol_nombre` (el nombre visible, p. ej. «Doctor/Gastroenterólogo»).
+- **Qué hace el frontend:** W-09 muestra `rol_nombre` tal cual. Se eliminó la tabla temporal
+  `ETIQUETA_ROL_USUARIO` de `src/utils/presentacionUsuario.ts`, que existía solo mientras el
+  backend no mandaba el nombre.
+
+### `GET /api/v1/catalogos/roles` · W-10 (consulta U-16)
+
+- **Estado:** propuesto. No existe; tampoco está en `../ARCHITECTURE.md` § 3.5.
+- **Por qué:** `rol_nombre` resuelve *mostrar* el rol de una cuenta que ya existe, pero W-10
+  (crear usuario) necesita las etiquetas **antes** de que la cuenta exista, para pintar el grupo
+  de opciones «Rol». Hoy `rol` es un enum cerrado del backend (`CodigoRol`: `DOCTOR`,
+  `ADMINISTRADOR`) que nunca llega como lista, así que el frontend tiene que repetir los nombres.
+- **Solicitud propuesta:** sin parámetros; cualquier rol con sesión `ACTIVA` (o solo
+  `ADMINISTRADOR`, si el backend lo prefiere: hoy solo lo usa una pantalla de administrador).
+  Mismo patrón que `GET /catalogos/tipos-documento`, que ya existe.
+- **Respuesta propuesta:**
+
+  ```json
+  { "items": [
+      { "codigo": "DOCTOR", "nombre": "Doctor/Gastroenterólogo" },
+      { "codigo": "ADMINISTRADOR", "nombre": "Administrador" }
+  ] }
+  ```
+
+  Los mismos `nombre` que la tabla `Rol` ya guarda y que viajan en `rol_nombre`, para que el
+  selector de W-10 y la lista de W-09 digan exactamente lo mismo.
+- **Errores:** `401 SESION_EXPIRADA`; `403 PERMISO_DENEGADO` si se restringe a administradores.
+- **Qué hace el frontend mientras tanto:** tabla local `ETIQUETA_ROL_FORMULARIO` en
+  `src/utils/presentacionUsuario.ts`, usada **solo** por el formulario de W-10 y marcada como
+  provisional. Cuando exista el endpoint se borra esa tabla y el formulario pinta las opciones
+  con lo que responda el catálogo.
+- **Nota:** si el conjunto de roles no va a cambiar nunca, el backend puede decirlo y la tabla
+  local se queda como decisión consciente, no como parche.
