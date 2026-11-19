@@ -6,3 +6,13 @@
   color: var(--color-texto-terciario);
   text-align: center;
 }
+
+.etiqueta {
+  display: block;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+}
+
+.valoracion {
+  display: block;
+}
