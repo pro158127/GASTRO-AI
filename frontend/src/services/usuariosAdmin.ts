@@ -35,6 +35,25 @@ export function listarUsuarios({ q, pagina }: ConsultaUsuarios): Promise<PaginaU
 }
 
 /**
+ * GET /admin/usuarios?estado=PENDIENTE (W-20, RF-U06): las cuentas creadas que todavía no
+ * completan su primer ingreso. Incluye tanto las de contraseña temporal vigente
+ * (`estado_activacion: "PENDIENTE"`) como las vencidas (`"EXPIRADA"`): las dos tienen
+ * `estado: "PENDIENTE"`.
+ *
+ * Sin `orden`: el servidor solo ordena por `nombre`, `correo`, `rol` o `estado`, y ninguno separa
+ * expirada de pendiente (consulta U-17 en CONTRATOS_API.md). W-20 pide las expiradas primero, así
+ * que la pantalla las ordena en el navegador dentro de la página y muestra el total real de
+ * expiradas que viene en `conteos`.
+ */
+export function listarCuentasPendientes({ pagina }: { pagina: number }): Promise<PaginaUsuarios> {
+  const parametros = new URLSearchParams();
+  parametros.set("estado", "PENDIENTE");
+  parametros.set("pagina", String(pagina));
+  parametros.set("por_pagina", String(USUARIOS_POR_PAGINA));
+  return solicitar<PaginaUsuarios>(`/admin/usuarios?${parametros.toString()}`);
+}
+
+/**
  * POST /admin/usuarios (W-10, RF-U05). Crea la cuenta en estado PENDIENTE y manda la contraseña
  * temporal al correo registrado.
  *
@@ -67,6 +86,13 @@ export function crearUsuario(nuevo: NuevoUsuario): Promise<RespuestaCredencial> 
  * nueva, vigente 72 horas, y anula la anterior.
  *
  * Solo aplica a cuentas PENDIENTE: en una cuenta ya activa responde 409 TRANSICION_INVALIDA.
+ * También cierra las sesiones abiertas de esa cuenta. **No** desvincula la aplicación
+ * autenticadora ni quita bloqueos: eso lo hace `restablecer-contrasena`, que es otra acción
+ * (W-11) y solo aplica a cuentas activas.
+ *
+ * Un `200` no significa que el correo haya salido: con el servidor de correo caído responde igual
+ * con `credencial.estado: "FALLIDO"` y `codigo_error: "CORREO_NO_ENVIADO"`. Quien llama tiene que
+ * mirar `credencial.estado` antes de decir que se envió.
  */
 export function reenviarCredencial(id: string): Promise<RespuestaCredencial> {
   return solicitar<RespuestaCredencial>(

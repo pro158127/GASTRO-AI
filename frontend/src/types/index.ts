@@ -172,10 +172,28 @@ export interface Paginacion {
   total: number;
 }
 
+/**
+ * `conteos` de `GET /admin/usuarios`: resumen de **todas** las cuentas, sin importar los filtros
+ * de la consulta (../ARCHITECTURE.md § 3.5, «Usuarios»).
+ *
+ * `pendientes` y `expiradas` son conjuntos distintos: «pendientes» son las de contraseña temporal
+ * vigente y «expiradas» las de temporal vencida. Las dos tienen `estado: "PENDIENTE"`, así que las
+ * cuentas pendientes de activación de W-20 son la suma de ambas.
+ */
+export interface ConteosUsuarios {
+  activos: number;
+  pendientes: number;
+  expiradas: number;
+  inactivos: number;
+  bloqueadas: number;
+  eliminadas: number;
+}
+
 /** Respuesta de `GET /admin/usuarios`. */
 export interface PaginaUsuarios {
   items: UsuarioResumen[];
   paginacion: Paginacion;
+  conteos: ConteosUsuarios;
 }
 
 /** Respuesta de `GET /health`. */

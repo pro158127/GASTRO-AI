@@ -57,6 +57,29 @@ export function insigniaDeEstado(usuario: UsuarioResumen): InsigniaEstado {
   }
 }
 
+/**
+ * Insignias de la columna «Estado» de W-20 (cuentas pendientes de activación).
+ *
+ * Distinta de `insigniaDeEstado`: allí se resume toda la cuenta y aquí todas son PENDIENTE, así
+ * que el texto es el corto que dibuja Figma («Expirada», «Pendiente») y cabe en la columna.
+ *
+ * Devuelve una lista porque **pueden aplicar dos a la vez**: Figma dibuja «Correo no enviado» en
+ * lugar de «Expirada»/«Pendiente», pero una cuenta puede tener la temporal vencida *y* el correo
+ * caído, y entonces una sola insignia esconde información. Se pintan las dos. Anotado para diseño.
+ */
+export function insigniasDeCuentaPendiente(usuario: UsuarioResumen): InsigniaEstado[] {
+  const insignias: InsigniaEstado[] =
+    usuario.estado_activacion === "EXPIRADA"
+      ? [{ texto: "Expirada", tipo: "advertencia" }]
+      : [{ texto: "Pendiente", tipo: "info" }];
+
+  // `CORREO_NO_ENVIADO` no es un error HTTP: viaja dentro de la respuesta, en `credencial`.
+  if (usuario.ultimo_envio?.estado === "FALLIDO") {
+    insignias.push({ texto: "Correo no enviado", tipo: "advertencia" });
+  }
+  return insignias;
+}
+
 /** «Ana Pérez». */
 export function nombreCompleto(usuario: Pick<UsuarioResumen, "nombre" | "apellido">): string {
   return `${usuario.nombre} ${usuario.apellido}`;

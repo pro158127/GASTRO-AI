@@ -34,6 +34,7 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `GET /api/v1/admin/usuarios`: `q` en la query string | observación | sin cambio en el contrato |
 | `rol_nombre` en los usuarios del administrador (U-8) | implementado | llega en cada `usuario`; el frontend ya lo muestra |
 | `GET /api/v1/catalogos/roles` (U-16) | propuesto | no existe; W-10 usa una tabla local |
+| `GET /api/v1/admin/usuarios`: orden que ponga las expiradas primero (U-17) | propuesto | no existe; W-20 ordena en el navegador dentro de la página |
 
 ## Propuestas
 
@@ -197,3 +198,36 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   con lo que responda el catálogo.
 - **Nota:** si el conjunto de roles no va a cambiar nunca, el backend puede decirlo y la tabla
   local se queda como decisión consciente, no como parche.
+
+### Orden que ponga las expiradas primero en `GET /api/v1/admin/usuarios` · W-20 (consulta U-17)
+
+- **Estado:** propuesto. El parámetro `orden` ya existe, pero ninguno de sus valores sirve para
+  esto.
+- **Por qué:** W-20 (Figma 69:4286) es la lista de cuentas pendientes de activación
+  (`?estado=PENDIENTE`). Su nota de pantalla, CA 4, pide que **las expiradas vayan primero**, y
+  son las únicas que llevan el botón primario: son las que el administrador tiene que resolver
+  ya. Pero las dos clases de cuenta tienen el mismo `estado` (`PENDIENTE`) y se distinguen por
+  `estado_activacion` (`PENDIENTE` o `EXPIRADA`), que no es un valor aceptado de `orden`
+  (`nombre`, `correo`, `rol`, `estado`). Ordenar por `estado` no las separa.
+- **Solicitud propuesta:** un valor más de `orden`, con el mismo formato que los demás (`-`
+  delante para descendente). Dos formas posibles, la que le resulte más natural al backend:
+  - `orden=activacion`: primero `EXPIRADA`, después `PENDIENTE`; o
+  - `orden=temporal_expira_en`: por la fecha de vencimiento de la temporal, ascendente, que deja
+    las vencidas arriba y, entre las vigentes, las que están por vencer.
+
+  Con el desempate estable que ya existe (apellido, nombre, `id`), para que la paginación no
+  repita ni salte cuentas.
+- **Respuesta:** la misma `{items, paginacion, conteos}`; no cambia nada más.
+- **Errores:** `422 DATOS_INVALIDOS` con `campos: [{campo: "orden", …}]` si el valor no se
+  reconoce, igual que hoy.
+- **Qué hace el frontend mientras tanto:** `listarCuentasPendientes` pide la página sin `orden` y
+  `src/pages/CuentasPendientes.tsx` la ordena en el navegador (expiradas primero y, dentro de
+  cada grupo, por fecha de creación ascendente). Eso solo vale para la página visible, así que el
+  número de expiradas del pie **no** se cuenta sobre las filas: sale de `conteos.expiradas`, que
+  el backend calcula sobre todas las cuentas.
+- **Nota relacionada:** por lo mismo, los encabezados de la tabla de W-20 van en texto plano, sin
+  ícono ni `aria-sort`, aunque Figma los dibuje ordenables con «Creada ↑» activo. El servidor no
+  ordena por «Creada» (`creado_en`) ni por «Vigencia» (`temporal_expira_en`), y unos encabezados
+  que solo reordenaran la página visible dirían algo falso. Es la misma decisión ya tomada en
+  W-09 (ver «Parámetro `orden`» más arriba). Si el backend añade también `creado_en` como valor
+  de `orden`, W-20 puede pasar a encabezados ordenables de verdad.
