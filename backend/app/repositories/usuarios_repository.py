@@ -21,7 +21,8 @@ class FiltroUsuarios:
     excluir: UUID | None = None
     pagina: int = 1
     por_pagina: int = 20
-    orden: str = "nombre"  # nombre | correo | rol | estado; con «-» delante, descendente
+    # nombre | correo | rol | estado | activacion; con «-» delante, descendente
+    orden: str = "nombre"
 
 
 def _criterio_orden(orden: str):
@@ -56,6 +57,8 @@ def _orden(orden: str) -> list:
     se pierde entre páginas aunque haya varias con el mismo nombre (U-14).
     """
     descendente = orden.startswith("-")
+    if orden.removeprefix("-") == "activacion":
+        return _orden_activacion(descendente)
     criterio = _criterio_orden(orden)
     if criterio is None:
         if descendente:
@@ -63,6 +66,37 @@ def _orden(orden: str) -> list:
         return [Usuario.apellido, Usuario.nombre, Usuario.id]
     principal = criterio.desc() if descendente else criterio.asc()
     return [principal.nulls_last(), Usuario.apellido, Usuario.nombre, Usuario.id]
+
+
+def _orden_activacion(descendente: bool) -> list:
+    """U-17 (W-20): primero las pendientes con la temporal vencida, luego las vigentes.
+
+    Dentro de cada grupo, la que vence (o venció) antes va primero: así la que lleva más
+    tiempo vencida encabeza la lista. «Vencida» es lo mismo que la respuesta marca como
+    EXPIRADA (`temporal_expira_en < ahora`). Las cuentas que no están PENDIENTE van al
+    final; en W-20 no aparecen porque esa lista filtra `estado=PENDIENTE`.
+    """
+    pendiente = Usuario.estado == EstadoUsuario.PENDIENTE
+    grupo = case(
+        (pendiente & (Usuario.temporal_expira_en < func.now()), 0),
+        (pendiente, 1),
+        else_=2,
+    )
+    if descendente:
+        return [
+            grupo.desc(),
+            Usuario.temporal_expira_en.desc().nulls_last(),
+            Usuario.apellido,
+            Usuario.nombre,
+            Usuario.id,
+        ]
+    return [
+        grupo,
+        Usuario.temporal_expira_en.asc().nulls_last(),
+        Usuario.apellido,
+        Usuario.nombre,
+        Usuario.id,
+    ]
 
 
 class RepositorioUsuarios:

@@ -92,9 +92,18 @@ def traslado(resultado: ResultadoTraslado | None) -> TrasladoResumen | None:
 # ------------------------------------------------------------------------ rutas
 
 
-# U-15: las columnas ordenables de W-09
+# U-15: las columnas ordenables de W-09; U-17: «activacion» pa W-20 (vencidas primero)
 OrdenUsuarios = Literal[
-    "nombre", "-nombre", "correo", "-correo", "rol", "-rol", "estado", "-estado"
+    "nombre",
+    "-nombre",
+    "correo",
+    "-correo",
+    "rol",
+    "-rol",
+    "estado",
+    "-estado",
+    "activacion",
+    "-activacion",
 ]
 
 
@@ -114,7 +123,9 @@ def listar(
     """Cuentas con filtros. `estado=PENDIENTE` = pendientes de activación (RF-U06).
 
     `orden`: `nombre` (apellido y nombre), `correo`, `rol` o `estado` (la prioridad de la
-    insignia: bloqueada, pendiente, inactiva, activa); con `-` delante, descendente.
+    insignia: bloqueada, pendiente, inactiva, activa) o `activacion` (cuentas pendientes con
+    la temporal vencida primero y, dentro de cada grupo, por vencimiento; para W-20); con
+    `-` delante, descendente.
 
     Las eliminadas no salen salvo `estado=ELIMINADO`. Pa elegir el doctor de destino de
     un traslado: `?rol=DOCTOR&estado=ACTIVO&excluir={id}`.
