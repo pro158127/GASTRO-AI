@@ -80,13 +80,11 @@ import type { RolUsuario, UsuarioDetalle } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
 import { fechaHoraCorta } from "../utils/fechas";
-import { ETIQUETA_ROL_FORMULARIO, insigniaDeEstado, nombreCompleto } from "../utils/presentacionUsuario";
+import { insigniaDeEstado, nombreCompleto } from "../utils/presentacionUsuario";
 import FormularioDatosCuenta from "./DetalleCuentaFormulario";
 import estilos from "./DetalleCuenta.module.css";
 
 const RUTA_USUARIOS = "/usuarios";
-
-const ROLES: RolUsuario[] = ["DOCTOR", "ADMINISTRADOR"];
 
 /** Acción en curso: solo puede haber una a la vez. */
 type AccionCuenta = "rol" | "contrasena" | "activar" | "desbloquear";
@@ -510,15 +508,9 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
           titulo={`Cambiar el rol de ${nombre}`}
           mensaje="El nuevo rol reemplaza al actual y se aplica de inmediato: cambian los módulos a los que tiene acceso (RF-U08 CA 2 y 3)."
           etiquetaCampo="Nuevo rol"
-          // El rol actual va marcado en su propia etiqueta: dentro del diálogo no se ve la
-          // tarjeta que lo dice, y sin eso habría que recordarlo de memoria para elegir bien.
-          opciones={ROLES.map((rol) => ({
-            valor: rol,
-            etiqueta:
-              rol === usuario.rol
-                ? `${ETIQUETA_ROL_FORMULARIO[rol]} (rol actual)`
-                : ETIQUETA_ROL_FORMULARIO[rol],
-          }))}
+          // El diálogo pide el catálogo de roles y marca el actual en su propia etiqueta: dentro
+          // del diálogo no se ve la tarjeta que lo dice.
+          rolActual={usuario.rol}
           valor={rolElegido}
           onCambio={(valor) => setRolElegido(valor as RolUsuario)}
           ayuda={

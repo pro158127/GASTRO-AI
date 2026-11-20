@@ -33,8 +33,8 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `GET /api/v1/admin/usuarios`: parámetro `orden` | implementado | ya acepta `orden`; W-09 todavía no lo usa |
 | `GET /api/v1/admin/usuarios`: `q` en la query string | observación | sin cambio en el contrato |
 | `rol_nombre` en los usuarios del administrador (U-8) | implementado | llega en cada `usuario`; el frontend ya lo muestra |
-| `GET /api/v1/catalogos/roles` (U-16) | propuesto | no existe; W-10 usa una tabla local |
-| `GET /api/v1/admin/usuarios`: orden que ponga las expiradas primero (U-17) | propuesto | no existe; W-20 ordena en el navegador dentro de la página |
+| `GET /api/v1/catalogos/roles` (U-16) | implementado | existe tal cual se propuso; W-10 y D-04 lo consumen y la tabla local se eliminó |
+| `GET /api/v1/admin/usuarios`: orden que ponga las expiradas primero (U-17) | implementado | `orden=activacion` y `-activacion`; W-20 ordena en el servidor y «Vigencia» es ordenable |
 | IP del bloqueo en el detalle de la cuenta (U-18) | propuesto | no existe; W-11b dice la fecha y los intentos, y remite a la bitácora |
 | «Es el último administrador activo» en el detalle (U-19) | propuesto | no existe; W-11 lo deduce con una segunda consulta |
 | Motivo de la desactivación en el detalle (U-20) | propuesto | no existe; W-11c dice desde cuándo y cuántos casos se reasignaron |
@@ -173,9 +173,25 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   `ETIQUETA_ROL_USUARIO` de `src/utils/presentacionUsuario.ts`, que existía solo mientras el
   backend no mandaba el nombre.
 
-### `GET /api/v1/catalogos/roles` · W-10 (consulta U-16)
+### `GET /api/v1/catalogos/roles` · W-10 y D-04 (consulta U-16)
 
-- **Estado:** propuesto. No existe; tampoco está en `../ARCHITECTURE.md` § 3.5.
+- **Estado:** **implementado** (rama `feature/63-backend-base`, commit `ae62b00`). Tal cual se
+  propuso: `GET /api/v1/catalogos/roles`, para cualquier sesión activa, con los mismos nombres
+  que viajan en `rol_nombre`. Respuesta real:
+
+  ```json
+  { "items": [
+      { "codigo": "DOCTOR", "nombre": "Doctor/Gastroenterólogo" },
+      { "codigo": "ADMINISTRADOR", "nombre": "Administrador" }
+  ] }
+  ```
+
+  El frontend lo consume en `src/services/catalogos.ts` y lo pinta con el componente
+  `src/components/CampoRol.tsx`, que usan W-10 (crear usuario) y D-04 (cambiar rol). Se pide una
+  sola vez por sesión del navegador: el servicio guarda en memoria el resultado del primer éxito
+  y comparte la petición si dos pantallas lo piden a la vez. Un fallo no se guarda, así que el
+  botón «Reintentar» del campo vuelve a salir a la red. La tabla local `ETIQUETA_ROL_FORMULARIO`
+  se eliminó.
 - **Por qué:** `rol_nombre` resuelve *mostrar* el rol de una cuenta que ya existe, pero W-10
   (crear usuario) necesita las etiquetas **antes** de que la cuenta exista, para pintar el grupo
   de opciones «Rol». Hoy `rol` es un enum cerrado del backend (`CodigoRol`: `DOCTOR`,
@@ -195,45 +211,42 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   Los mismos `nombre` que la tabla `Rol` ya guarda y que viajan en `rol_nombre`, para que el
   selector de W-10 y la lista de W-09 digan exactamente lo mismo.
 - **Errores:** `401 SESION_EXPIRADA`; `403 PERMISO_DENEGADO` si se restringe a administradores.
-- **Qué hace el frontend mientras tanto:** tabla local `ETIQUETA_ROL_FORMULARIO` en
-  `src/utils/presentacionUsuario.ts`, usada **solo** por el formulario de W-10 y marcada como
-  provisional. Cuando exista el endpoint se borra esa tabla y el formulario pinta las opciones
-  con lo que responda el catálogo.
-- **Nota:** si el conjunto de roles no va a cambiar nunca, el backend puede decirlo y la tabla
-  local se queda como decisión consciente, no como parche.
+- **Qué pasa si el catálogo no responde:** el campo «Rol» explica que no se pudieron cargar los
+  roles y ofrece «Reintentar». No hay una lista de respaldo escrita en el frontend: sería la
+  misma tabla provisional con otro nombre y mostraría un nombre inventado si el backend
+  renombrara un rol. Sin opciones no se puede elegir ninguna, así que W-10 no deja crear la
+  cuenta y D-04 deja «Cambiar rol» no disponible, que es lo correcto.
 
 ### Orden que ponga las expiradas primero en `GET /api/v1/admin/usuarios` · W-20 (consulta U-17)
 
-- **Estado:** propuesto. El parámetro `orden` ya existe, pero ninguno de sus valores sirve para
-  esto.
-- **Por qué:** W-20 (Figma 69:4286) es la lista de cuentas pendientes de activación
-  (`?estado=PENDIENTE`). Su nota de pantalla, CA 4, pide que **las expiradas vayan primero**, y
+- **Estado:** **implementado** (rama `feature/63-backend-base`, commit `ae62b00`). `orden` acepta
+  ahora `activacion` y `-activacion`, que fue la primera de las dos formas propuestas. Agrupa
+  primero las pendientes con la temporal vencida y, dentro de cada grupo, por
+  `temporal_expira_en` ascendente, así que la que lleva más tiempo vencida encabeza la lista; las
+  cuentas que no están PENDIENTE van al final. Se resuelve en SQL, con el mismo desempate estable
+  de siempre (apellido, nombre, `id`), así que **vale para todas las páginas**.
+
+  `src/services/usuariosAdmin.ts` lo manda en `listarCuentasPendientes` y W-20 abre con
+  `activacion`. El ordenamiento en el navegador se eliminó, y «Vigencia» pasó a ser un encabezado
+  ordenable de verdad, con `aria-sort` y los íconos de orden. «Creada» sigue en texto plano: el
+  servidor no ordena por `creado_en`.
+- **Por qué se pidió:** W-20 (Figma 69:4286) es la lista de cuentas pendientes de activación
+  (`?estado=PENDIENTE`). La nota de la pantalla en Figma pide que **las expiradas vayan
+  primero**, y
   son las únicas que llevan el botón primario: son las que el administrador tiene que resolver
   ya. Pero las dos clases de cuenta tienen el mismo `estado` (`PENDIENTE`) y se distinguen por
   `estado_activacion` (`PENDIENTE` o `EXPIRADA`), que no es un valor aceptado de `orden`
   (`nombre`, `correo`, `rol`, `estado`). Ordenar por `estado` no las separa.
-- **Solicitud propuesta:** un valor más de `orden`, con el mismo formato que los demás (`-`
-  delante para descendente). Dos formas posibles, la que le resulte más natural al backend:
-  - `orden=activacion`: primero `EXPIRADA`, después `PENDIENTE`; o
-  - `orden=temporal_expira_en`: por la fecha de vencimiento de la temporal, ascendente, que deja
-    las vencidas arriba y, entre las vigentes, las que están por vencer.
-
-  Con el desempate estable que ya existe (apellido, nombre, `id`), para que la paginación no
-  repita ni salte cuentas.
-- **Respuesta:** la misma `{items, paginacion, conteos}`; no cambia nada más.
+- **Respuesta:** la misma `{items, paginacion, conteos}`; no cambió nada más. El número de
+  expiradas del pie sigue saliendo de `conteos.expiradas`, que el backend calcula sobre todas las
+  cuentas y no sobre la página.
 - **Errores:** `422 DATOS_INVALIDOS` con `campos: [{campo: "orden", …}]` si el valor no se
-  reconoce, igual que hoy.
-- **Qué hace el frontend mientras tanto:** `listarCuentasPendientes` pide la página sin `orden` y
-  `src/pages/CuentasPendientes.tsx` la ordena en el navegador (expiradas primero y, dentro de
-  cada grupo, por fecha de creación ascendente). Eso solo vale para la página visible, así que el
-  número de expiradas del pie **no** se cuenta sobre las filas: sale de `conteos.expiradas`, que
-  el backend calcula sobre todas las cuentas.
-- **Nota relacionada:** por lo mismo, los encabezados de la tabla de W-20 van en texto plano, sin
-  ícono ni `aria-sort`, aunque Figma los dibuje ordenables con «Creada ↑» activo. El servidor no
-  ordena por «Creada» (`creado_en`) ni por «Vigencia» (`temporal_expira_en`), y unos encabezados
-  que solo reordenaran la página visible dirían algo falso. Es la misma decisión ya tomada en
-  W-09 (ver «Parámetro `orden`» más arriba). Si el backend añade también `creado_en` como valor
-  de `orden`, W-20 puede pasar a encabezados ordenables de verdad.
+  reconoce, igual que antes.
+- **Lo que queda pendiente:** «Creada» no es ordenable, porque `creado_en` no es un valor de
+  `orden`. Figma dibuja W-20 con «Creada ↑» como columna activa; mientras el servidor no ordene
+  por esa fecha, ese encabezado se queda en texto plano, igual que en W-09. Si el backend añade
+  `creado_en`, W-20 puede ofrecer también esa columna sin más cambios que pasarla al mismo
+  componente de encabezado ordenable.
 
 ### IP del bloqueo en `GET /api/v1/admin/usuarios/{id}` · W-11b (consulta U-18)
 

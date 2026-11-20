@@ -12,9 +12,9 @@
 // atrapado y devuelto al botón que lo abrió, y Esc cancela mientras no se esté enviando.
 import { useEffect, useId, useRef } from "react";
 import Boton from "./Boton";
-import CampoOpciones from "./CampoOpciones";
-import type { Opcion } from "./CampoOpciones";
+import CampoRol, { useRoles } from "./CampoRol";
 import { useAtraparFoco } from "../disposicion/useAtraparFoco";
+import type { RolUsuario } from "../types";
 import estilos from "./DialogoCambiarRol.module.css";
 
 interface PropiedadesDialogoCambiarRol {
@@ -24,7 +24,8 @@ interface PropiedadesDialogoCambiarRol {
   mensaje: string;
   /** Etiqueta del grupo de opciones; D-04 usa «Nuevo rol». */
   etiquetaCampo: string;
-  opciones: readonly Opcion[];
+  /** Rol que la cuenta tiene ahora: se marca en su opción, que aquí no se ve de otra forma. */
+  rolActual: RolUsuario;
   valor: string;
   onCambio: (valor: string) => void;
   /** Explicación bajo el campo, por ejemplo por qué una opción no está disponible. */
@@ -47,7 +48,7 @@ export default function DialogoCambiarRol({
   titulo,
   mensaje,
   etiquetaCampo,
-  opciones,
+  rolActual,
   valor,
   onCambio,
   ayuda,
@@ -61,6 +62,9 @@ export default function DialogoCambiarRol({
   const idTitulo = useId();
   const idMensaje = useId();
   const idCampo = useId();
+  // El catálogo se pide aquí: el diálogo es el único que sabe que necesita los roles, y el
+  // servicio ya evita repetir la petición si W-10 la hizo antes en esta sesión.
+  const catalogoRoles = useRoles();
   // Mientras se envía, Esc no cierra: la petición ya salió y cerrar dejaría la pantalla mintiendo.
   useAtraparFoco(dialogoRef, () => {
     if (!enviando) onCancelar();
@@ -99,11 +103,12 @@ export default function DialogoCambiarRol({
         <p id={idMensaje} className={estilos.mensaje}>
           {mensaje}
         </p>
-        <CampoOpciones
+        <CampoRol
+          estado={catalogoRoles}
           id={idCampo}
           nombre={`${idCampo}-rol`}
           etiqueta={etiquetaCampo}
-          opciones={opciones}
+          rolActual={rolActual}
           valor={valor}
           onCambio={onCambio}
           ayuda={ayuda}

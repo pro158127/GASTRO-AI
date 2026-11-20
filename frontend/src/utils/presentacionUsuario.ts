@@ -1,20 +1,6 @@
 // Cómo se muestran el rol y el estado de una cuenta en las pantallas del administrador (W-09 y
 // las que siguen). Es el único lugar con estas reglas.
-import type { RolUsuario, UsuarioResumen } from "../types";
-
-/**
- * PROVISIONAL: etiquetas de los roles para el selector de W-10 (crear usuario).
- *
- * Las respuestas de `/admin/usuarios` traen `rol_nombre` y es ese el que se muestra en todas las
- * demás pantallas. Pero el formulario de creación necesita las etiquetas *antes* de que la cuenta
- * exista, y **no hay endpoint de catálogo de roles**: `rol` es un enum cerrado del backend
- * (`DOCTOR`, `ADMINISTRADOR`) que nunca llega como lista. Esta tabla se usa SOLO en ese formulario
- * y se elimina cuando exista `GET /catalogos/roles` (consulta U-16 en CONTRATOS_API.md).
- */
-export const ETIQUETA_ROL_FORMULARIO: Record<RolUsuario, string> = {
-  DOCTOR: "Doctor/Gastroenterólogo",
-  ADMINISTRADOR: "Administrador",
-};
+import type { UsuarioResumen } from "../types";
 
 /** Variantes del componente Insignia (Figma 14:574). */
 export type TipoInsignia = "exito" | "info" | "advertencia" | "error" | "neutral";

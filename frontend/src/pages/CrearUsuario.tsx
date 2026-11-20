@@ -5,7 +5,9 @@
 //
 // Decisiones del equipo sobre lo que Figma dibuja y la API entrega:
 // - El rol va como grupo de opciones (radios), que es lo que dibuja W-10; no hay lista desplegable.
-//   Las etiquetas salen de ETIQUETA_ROL_FORMULARIO porque NO existe catálogo de roles en la API.
+//   Las etiquetas salen de `GET /catalogos/roles` (consulta U-16, ya resuelta): son las mismas que
+//   el servidor manda luego como `rol_nombre`. Mientras el catálogo carga o si falla, el campo lo
+//   explica y ofrece reintentar (ver CampoRol).
 // - Teléfono (opcional) no está dibujado en W-10, pero el endpoint lo acepta y los requisitos v5 lo
 //   contemplan. Pendiente de agregar a Figma.
 // - W-10d: Figma no dibuja «Reintentar envío» (manda a Cuentas pendientes, W-20, que todavía no
@@ -26,7 +28,7 @@ import { useBlocker, useNavigate } from "react-router";
 import type { BlockerFunction } from "react-router";
 import Alerta from "../components/Alerta";
 import Boton from "../components/Boton";
-import CampoOpciones from "../components/CampoOpciones";
+import CampoRol, { useRoles } from "../components/CampoRol";
 import CampoTexto from "../components/CampoTexto";
 import DialogoConfirmacion from "../components/DialogoConfirmacion";
 import EncabezadoPagina from "../components/EncabezadoPagina";
@@ -38,7 +40,6 @@ import type { RolUsuario } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
 import { dejarNotificacion } from "../utils/notificacionPendiente";
-import { ETIQUETA_ROL_FORMULARIO } from "../utils/presentacionUsuario";
 import {
   LONGITUD_MAXIMA_CORREO,
   LONGITUD_MAXIMA_NOMBRE,
@@ -78,7 +79,12 @@ const VALORES_INICIALES: ValoresFormulario = {
   rol: ROL_POR_DEFECTO,
 };
 
-const ROLES: RolUsuario[] = ["DOCTOR", "ADMINISTRADOR"];
+/** W-10 no deja crear la cuenta si el catálogo de roles no cargó: no se elige a ciegas. */
+const AVISO_SIN_ROLES: AvisoError = {
+  titulo: "No se pudieron cargar los roles",
+  mensaje:
+    "La cuenta no se puede crear sin elegir un rol. Reintente la carga de los roles e intente de nuevo.",
+};
 
 /** Textos por campo. Se eligen por campo, nunca con el `mensaje` del servidor. */
 const MENSAJES_ERROR: Record<CampoFormulario, string> = {
@@ -127,6 +133,7 @@ interface CuentaCreada {
 export default function CrearUsuario({ titulo }: { titulo: string }) {
   const { autenticado } = useSesion();
   const navegar = useNavigate();
+  const catalogoRoles = useRoles();
   const idBase = useId();
   const idCampo = (campo: CampoFormulario) => `${idBase}-${campo}`;
 
@@ -183,8 +190,10 @@ export default function CrearUsuario({ titulo }: { titulo: string }) {
   function enfocarPrimerError(conError: ErroresFormulario) {
     const campo = ORDEN_CAMPOS.find((c) => conError[c]);
     if (!campo) return;
-    // El grupo de radios no es un control único: el foco va a su primera opción.
-    const id = campo === "rol" ? `${idCampo("rol")}-${ROLES[0]}` : idCampo(campo);
+    // El grupo de radios no es un control único: el foco va a su primera opción, que ahora sale
+    // del catálogo y no de una lista fija.
+    const primerRol = catalogoRoles.roles[0]?.codigo;
+    const id = campo === "rol" && primerRol ? `${idCampo("rol")}-${primerRol}` : idCampo(campo);
     document.getElementById(id)?.focus();
   }
 
@@ -285,6 +294,13 @@ export default function CrearUsuario({ titulo }: { titulo: string }) {
     // el formulario sin pasar por el clic del botón.
     if (enviandoRef.current || bloqueado) return;
     setAvisoFormulario(null);
+
+    // Sin catálogo no hay opciones de rol a la vista: crear la cuenta con el valor por omisión
+    // sería elegir por el administrador.
+    if (catalogoRoles.roles.length === 0) {
+      setAvisoFormulario(AVISO_SIN_ROLES);
+      return;
+    }
 
     const conError = validar(valores);
     setErrores(conError);
@@ -422,11 +438,11 @@ export default function CrearUsuario({ titulo }: { titulo: string }) {
             required
           />
 
-          <CampoOpciones
+          <CampoRol
+            estado={catalogoRoles}
             id={idCampo("rol")}
             nombre={`${idBase}-rol`}
             etiqueta="Rol"
-            opciones={ROLES.map((rol) => ({ valor: rol, etiqueta: ETIQUETA_ROL_FORMULARIO[rol] }))}
             valor={valores.rol}
             onCambio={(rol) => cambiar("rol", rol)}
             mensajeError={errores.rol}

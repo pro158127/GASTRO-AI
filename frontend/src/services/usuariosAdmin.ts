@@ -44,19 +44,32 @@ export function listarUsuarios({ q, pagina }: ConsultaUsuarios): Promise<PaginaU
 }
 
 /**
+ * Orden de W-20 (consulta U-17, resuelta). `activacion` pone primero las cuentas con la
+ * contraseña temporal vencida y, dentro de cada grupo, la que venció o vence antes; `-activacion`
+ * lo invierte. Lo resuelve la base de datos, así que vale para todas las páginas.
+ */
+export type OrdenActivacion = "activacion" | "-activacion";
+
+/**
  * GET /admin/usuarios?estado=PENDIENTE (W-20, RF-U06): las cuentas creadas que todavía no
  * completan su primer ingreso. Incluye tanto las de contraseña temporal vigente
  * (`estado_activacion: "PENDIENTE"`) como las vencidas (`"EXPIRADA"`): las dos tienen
  * `estado: "PENDIENTE"`.
  *
- * Sin `orden`: el servidor solo ordena por `nombre`, `correo`, `rol` o `estado`, y ninguno separa
- * expirada de pendiente (consulta U-17 en CONTRATOS_API.md). W-20 pide las expiradas primero, así
- * que la pantalla las ordena en el navegador dentro de la página y muestra el total real de
- * expiradas que viene en `conteos`.
+ * El orden lo decide el servidor con `orden=activacion`: las vencidas primero, que son las que
+ * hay que resolver ya. El conteo de expiradas del pie sigue saliendo de `conteos`, que el
+ * servidor calcula sobre todas las cuentas y no solo sobre la página.
  */
-export function listarCuentasPendientes({ pagina }: { pagina: number }): Promise<PaginaUsuarios> {
+export function listarCuentasPendientes({
+  pagina,
+  orden,
+}: {
+  pagina: number;
+  orden: OrdenActivacion;
+}): Promise<PaginaUsuarios> {
   const parametros = new URLSearchParams();
   parametros.set("estado", "PENDIENTE");
+  parametros.set("orden", orden);
   parametros.set("pagina", String(pagina));
   parametros.set("por_pagina", String(USUARIOS_POR_PAGINA));
   return solicitar<PaginaUsuarios>(`/admin/usuarios?${parametros.toString()}`);

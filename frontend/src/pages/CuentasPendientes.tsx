@@ -2,14 +2,17 @@
 // pendientes, 69:4554), D-06 (enviar nueva contraseña temporal, 100:3576) y D-06b (resultado,
 // 100:3669). RF-U06 (Should) y RNF-27.
 //
-// Decisiones del equipo sobre lo que Figma dibuja y la API no entrega:
-// - Orden: la nota de W-20 (CA 4) pide las expiradas primero, pero `orden` solo acepta nombre,
-//   correo, rol y estado, y ninguno separa expirada de pendiente (todas son estado=PENDIENTE).
-//   Se ordena en el navegador dentro de la página y el conteo real de expiradas sale de
-//   `conteos`, que sí es de todas las cuentas. Consulta U-17 en CONTRATOS_API.md.
-// - Encabezados en texto plano, sin íconos ni aria-sort: el servidor no ordena por «Creada» ni
-//   por «Vigencia», y ordenar en el navegador solo afectaría la página visible. Misma decisión
-//   que en W-09.
+// Decisiones del equipo sobre lo que Figma dibuja y la API entrega:
+// - Orden: la nota de W-20 en Figma pide las expiradas primero. El servidor ya sabe hacerlo con
+//   `orden=activacion` (consulta U-17, resuelta): agrupa por temporal vencida y, dentro de cada
+//   grupo, por fecha de vencimiento. Se ordena en la base de datos, así que el orden vale para
+//   todas las páginas y la pantalla no reordena nada.
+// - «Vigencia» es el único encabezado ordenable, con ícono y `aria-sort`, porque es la columna
+//   que `orden=activacion` ordena de verdad: su fecha es el criterio y el grupo de vencidas es
+//   exactamente lo que separa. «Creada» sigue en texto plano porque el servidor no ordena por
+//   `creado_en`, y «Estado» también, porque en esta lista todas las cuentas son PENDIENTE y
+//   `orden=estado` no las separaría. Un encabezado que reordenara solo la página visible diría
+//   algo falso.
 // - Estado: Figma dibuja «Correo no enviado» en lugar de «Expirada»/«Pendiente», pero una cuenta
 //   puede tener las dos cosas. Se pintan hasta dos insignias (ver utils/presentacionUsuario.ts).
 // - Paginación: Figma no la dibuja; la API pagina. Se usa el mismo patrón de W-09 y solo aparece
@@ -35,6 +38,8 @@ import DialogoConfirmacion from "../components/DialogoConfirmacion";
 import EncabezadoPagina from "../components/EncabezadoPagina";
 import EnlaceBoton from "../components/EnlaceBoton";
 import Esqueleto from "../components/Esqueleto";
+import EncabezadoTabla from "../components/EncabezadoTabla";
+import type { OrdenColumna } from "../components/EncabezadoTabla";
 import EstadoVacio from "../components/EstadoVacio";
 import Insignia from "../components/Insignia";
 import Notificacion from "../components/Notificacion";
@@ -42,6 +47,7 @@ import IconoReintentar from "../components/iconos/IconoReintentar";
 import { ErrorApi } from "../services/api";
 import { CodigoErrorApi } from "../services/codigosError";
 import { USUARIOS_POR_PAGINA, listarCuentasPendientes, reenviarCredencial } from "../services/usuariosAdmin";
+import type { OrdenActivacion } from "../services/usuariosAdmin";
 import type { PaginaUsuarios, UsuarioResumen } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
@@ -74,19 +80,6 @@ const AVISO_CUENTA_YA_ACTIVA: AvisoError = {
   mensaje: "La cuenta completó su primer ingreso mientras tenía esta lista abierta. Se actualizó la lista.",
 };
 
-/**
- * W-20 CA 4: las expiradas primero y, dentro de cada grupo, por fecha de creación ascendente
- * («Creada ↑» de Figma). Solo ordena la página visible: el servidor no sabe ordenar por esto.
- */
-function ordenarExpiradasPrimero(usuarios: UsuarioResumen[]): UsuarioResumen[] {
-  return [...usuarios].sort((a, b) => {
-    const expiradaA = a.estado_activacion === "EXPIRADA" ? 0 : 1;
-    const expiradaB = b.estado_activacion === "EXPIRADA" ? 0 : 1;
-    if (expiradaA !== expiradaB) return expiradaA - expiradaB;
-    return a.creado_en.localeCompare(b.creado_en);
-  });
-}
-
 /** Pie de W-20: «3 cuentas pendientes · 1 expirada», con el rango cuando hay más de una página. */
 function textoResumen(pagina: PaginaUsuarios): string {
   const { items, paginacion, conteos } = pagina;
@@ -106,6 +99,8 @@ function textoResumen(pagina: PaginaUsuarios): string {
 
 export default function CuentasPendientes({ titulo }: { titulo: string }) {
   const [paginaActual, setPaginaActual] = useState(1);
+  /** W-20 abre con las vencidas primero, que es lo que pide la nota de la pantalla. */
+  const [orden, setOrden] = useState<OrdenActivacion>("activacion");
   const [intento, setIntento] = useState(0);
   const [resultado, setResultado] = useState<PaginaUsuarios | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -137,7 +132,7 @@ export default function CuentasPendientes({ titulo }: { titulo: string }) {
       }, ESPERA_ESQUELETO_MS);
     }
 
-    listarCuentasPendientes({ pagina: paginaActual })
+    listarCuentasPendientes({ pagina: paginaActual, orden })
       .then((pagina) => {
         if (!vigente) return;
         hayResultadoRef.current = true;
@@ -160,7 +155,7 @@ export default function CuentasPendientes({ titulo }: { titulo: string }) {
       vigente = false;
       window.clearTimeout(temporizador);
     };
-  }, [paginaActual, intento]);
+  }, [paginaActual, orden, intento]);
 
   useEffect(() => {
     if (cargando) return;
@@ -184,6 +179,16 @@ export default function CuentasPendientes({ titulo }: { titulo: string }) {
   function irAPagina(pagina: number) {
     enfocarResultadosRef.current = true;
     setPaginaActual(pagina);
+  }
+
+  /**
+   * Alterna el orden de «Vigencia». Vuelve a la primera página: con otro orden, la página en la
+   * que se estaba ya no contiene las mismas cuentas. El foco se queda en el encabezado, que no
+   * desaparece, así que no se lleva a la lista como al cambiar de página.
+   */
+  function alternarOrden() {
+    setOrden((actual) => (actual === "activacion" ? "-activacion" : "activacion"));
+    setPaginaActual(1);
   }
 
   /**
@@ -222,7 +227,9 @@ export default function CuentasPendientes({ titulo }: { titulo: string }) {
 
   const mostrarEsqueleto = !error && (esqueletoVisible || resultado === null);
   const listo = !error && !mostrarEsqueleto && resultado !== null;
-  const cuentas = listo ? ordenarExpiradasPrimero(resultado.items) : [];
+  // El orden viene resuelto del servidor: aquí no se reordena nada.
+  const cuentas = listo ? resultado.items : [];
+  const ordenVigencia: OrdenColumna = orden === "activacion" ? "ascendente" : "descendente";
 
   let resumen = "";
   if (mostrarEsqueleto) resumen = "Cargando cuentas pendientes…";
@@ -270,7 +277,12 @@ export default function CuentasPendientes({ titulo }: { titulo: string }) {
 
           {listo && cuentas.length > 0 && (
             <>
-              <TablaCuentas cuentas={cuentas} alPedirReenvio={setConfirmando} />
+              <TablaCuentas
+                cuentas={cuentas}
+                alPedirReenvio={setConfirmando}
+                ordenVigencia={ordenVigencia}
+                alOrdenarVigencia={alternarOrden}
+              />
               <TarjetasCuentas cuentas={cuentas} alPedirReenvio={setConfirmando} />
             </>
           )}
@@ -380,7 +392,7 @@ interface PropiedadesLista {
 
 /**
  * «Nueva contraseña», o «Reintentar envío» si el último envío falló (Figma). Primario en las
- * expiradas, que son las que hay que resolver ya (CA 4); secundario en el resto.
+ * expiradas, que son las que hay que resolver ya (nota de W-20); secundario en el resto.
  *
  * El nombre accesible lleva el nombre **y el correo** de la persona: hay un botón igual por fila
  * y dos cuentas pueden llamarse igual, así que solo el correo las distingue (WCAG 2.4.4). El
@@ -418,7 +430,12 @@ function InsigniasEstado({ cuenta }: { cuenta: UsuarioResumen }) {
 }
 
 /** Escritorio (desde 1280 px): tabla de W-20. */
-function TablaCuentas({ cuentas, alPedirReenvio }: PropiedadesLista) {
+function TablaCuentas({
+  cuentas,
+  alPedirReenvio,
+  ordenVigencia,
+  alOrdenarVigencia,
+}: PropiedadesLista & { ordenVigencia: OrdenColumna; alOrdenarVigencia: () => void }) {
   return (
     <div className={`${estilos.marcoTabla} ${estilos.soloEscritorio}`}>
       <table className={estilos.tabla}>
@@ -437,9 +454,13 @@ function TablaCuentas({ cuentas, alPedirReenvio }: PropiedadesLista) {
             <th scope="col" className={estilos.columnaEstado}>
               Estado
             </th>
-            <th scope="col" className={estilos.columnaVigencia}>
-              Vigencia
-            </th>
+            {/* La única columna que el servidor sabe ordenar en esta lista (U-17). */}
+            <EncabezadoTabla
+              columna="Vigencia"
+              orden={ordenVigencia}
+              onOrdenar={alOrdenarVigencia}
+              className={estilos.columnaVigencia}
+            />
             <th scope="col" className={estilos.columnaAccion}>
               Acción
             </th>

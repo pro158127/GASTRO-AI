@@ -63,6 +63,20 @@ export interface CampoConError {
   mensaje: string;
 }
 
+/**
+ * Un rol de `GET /catalogos/roles` (consulta U-16, resuelta). `nombre` es el mismo texto que
+ * viaja como `rol_nombre` en `/admin/usuarios`: sale de la base, no de una tabla del frontend.
+ */
+export interface RolCatalogo {
+  codigo: RolUsuario;
+  nombre: string;
+}
+
+/** Respuesta de `GET /catalogos/roles`. */
+export interface ListaRoles {
+  items: RolCatalogo[];
+}
+
 /** `rol` de `GET /perfil`: el código y el nombre que se muestra («Doctor/Gastroenterólogo»). */
 export interface RolPerfil {
   codigo: RolUsuario;
