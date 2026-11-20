@@ -306,6 +306,7 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/eventos` | `ACTIVA` (cualquier rol) | — | `text/event-stream` (§3.9) |
 | GET | `/admin/dashboard` | `ADMINISTRADOR` | — | `{usuarios, seguridad, analisis, latencia_7d, servicios, alerta, modelo_vigente, envios_credencial_fallidos, verificado_en}` |
 | GET | `/catalogos/tipos-documento` | Cualquier rol | — | `{items: [{codigo, nombre, longitud_maxima}]}` |
+| GET | `/catalogos/roles` | Cualquier rol | — | `{items: [{codigo, nombre}]}` (el mismo nombre de `rol_nombre`; U-16) |
 | GET | `/dashboard/doctor` | `DOCTOR` | — | `{primer_uso, resumen, analisis_recientes, frecuencia, concordancia, pacientes_con_seguimiento, avisos_traslado, casos_recibidos, aviso}` |
 | GET | `/caracteristicas` | Cualquier rol | — | `{items: [{id, codigo, nombre}]}` (solo las activas) |
 | POST | `/pacientes/consulta` | `DOCTOR` | `{tipo_documento, numero_documento}` | `{tiene_historial, caso_id, total_analisis, ultimo_analisis_en}` |
@@ -608,10 +609,11 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
   (`estado_activacion` = `PENDIENTE` o `EXPIRADA`, RF-U06). `rol_nombre` es el nombre
   visible del rol (p. ej. «Doctor/Gastroenterólogo»). `ultimo_envio` es la `credencial`
   más reciente o `null`: con `estado: "FALLIDO"` la fila muestra «Correo no enviado».
-- `orden` = `nombre` (por defecto: apellido y nombre), `correo`, `rol` (nombre visible) o
-  `estado` (prioridad de la insignia: bloqueada, pendiente, inactiva, activa); con `-` delante,
-  descendente (`?orden=-correo`). Siempre se desempata por apellido, nombre e `id`, así que el
-  orden es fijo entre páginas. Otro valor → 422.
+- `orden` = `nombre` (por defecto: apellido y nombre), `correo`, `rol` (nombre visible),
+  `estado` (prioridad de la insignia: bloqueada, pendiente, inactiva, activa) o `activacion`
+  (U-17, para W-20: primero las pendientes con la temporal vencida y, dentro de cada grupo, la
+  que vence o venció antes); con `-` delante, descendente (`?orden=-correo`). Siempre se
+  desempata por apellido, nombre e `id`, así que el orden es fijo entre páginas. Otro valor → 422.
 - La lista trae `conteos` = `{activos, pendientes, expiradas, inactivos, bloqueadas,
   eliminadas}` de **todas** las cuentas, sin importar los filtros (resumen de la pantalla).
 - En el detalle: `bloqueado_en` (solo con un bloqueo en curso) y `desactivado_en` (solo si
