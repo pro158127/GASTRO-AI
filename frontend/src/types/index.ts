@@ -144,6 +144,78 @@ export interface UsuarioResumen {
   ultimo_envio?: Credencial | null;
 }
 
+/** Tipo de un traslado de casos (`tipo` de `ultimo_traslado`). */
+export type TipoTraslado = "DESACTIVACION" | "ELIMINACION" | "REASIGNACION";
+
+/** Persona de un traslado: se conserva el nombre aunque la cuenta se haya eliminado (RF-U11). */
+export interface PersonaCuenta {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+/** `ultimo_traslado` del detalle: el último movimiento de casos de esta cuenta, o `null`. */
+export interface UltimoTrasladoCuenta {
+  tipo: TipoTraslado;
+  cantidad_casos: number;
+  ejecutado_en: string;
+  destino: PersonaCuenta;
+}
+
+/**
+ * Respuesta de `GET /admin/usuarios/{id}` (W-11). Es `UsuarioResumen` con lo que solo existe en
+ * el detalle (../ARCHITECTURE.md § 3.5, «Usuarios»).
+ *
+ * `bloqueado_en` solo viene con un bloqueo en curso y `desactivado_en` solo si está INACTIVO; los
+ * dos salen de la bitácora. **La IP del bloqueo no viene aquí**: se consulta en la bitácora
+ * filtrando por este usuario (consulta U-18 en CONTRATOS_API.md).
+ *
+ * `envios_credencial` es el historial de envíos de contraseña temporal, del más reciente al más
+ * antiguo; `ultimo_envio` (heredado) es el primero de esa lista.
+ *
+ * Las acciones (`PATCH`, `/rol`, `/activar`, `/desbloquear`, `/restablecer-contrasena`) responden
+ * `UsuarioResumen`, **no** este tipo: tras cada acción hay que volver a pedir el detalle.
+ */
+export interface UsuarioDetalle extends UsuarioResumen {
+  /** Casos del doctor que siguen siendo suyos; 0 en los administradores. */
+  casos_activos: number;
+  totp_vinculado: boolean;
+  intentos_fallidos: number;
+  bloqueado_hasta: string | null;
+  bloqueado_en?: string | null;
+  desactivado_en?: string | null;
+  ultimo_traslado?: UltimoTrasladoCuenta | null;
+  envios_credencial: Credencial[];
+}
+
+/**
+ * Cuerpo de `PATCH /admin/usuarios/{id}` (W-11f, RF-U07 CA 4). El servidor solo cambia lo que
+ * llega y lo compara con lo que ya tiene, así que mandar un valor igual al actual no hace nada.
+ * `telefono: null` borra el teléfono. Cambiar el `correo` emite una contraseña temporal nueva al
+ * correo nuevo y cierra las sesiones abiertas (CA 7).
+ */
+export interface EdicionUsuario {
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+  correo: string;
+}
+
+/** Respuesta de `POST /{id}/rol`, `/{id}/activar` y `/{id}/desbloquear`. */
+export interface RespuestaUsuario {
+  usuario: UsuarioResumen;
+}
+
+/**
+ * Respuesta de `PATCH /admin/usuarios/{id}`. `credencial` **solo** viene si cambió el correo; un
+ * 200 con `credencial.estado` FALLIDO significa que el correo quedó cambiado pero el aviso no
+ * salió (ver `Credencial`).
+ */
+export interface RespuestaEdicion {
+  usuario: UsuarioResumen;
+  credencial?: Credencial | null;
+}
+
 /**
  * Cuerpo de `POST /admin/usuarios` (RF-U05). `telefono` es opcional: se omite cuando está vacío.
  * El servidor normaliza el correo a minúsculas y el teléfono sin separadores.

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { matchPath } from "react-router";
 import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
+import DetalleCuenta from "../pages/DetalleCuenta";
 import MiPerfil from "../pages/MiPerfil";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import SinPermisos from "../pages/SinPermisos";
@@ -75,7 +76,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/usuarios/:id",
     titulo: "Detalle de cuenta",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-11)
+    elemento: (titulo) => <DetalleCuenta titulo={titulo} />, // W-11
   },
   {
     ruta: "/cuentas-pendientes",

@@ -35,6 +35,9 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `rol_nombre` en los usuarios del administrador (U-8) | implementado | llega en cada `usuario`; el frontend ya lo muestra |
 | `GET /api/v1/catalogos/roles` (U-16) | propuesto | no existe; W-10 usa una tabla local |
 | `GET /api/v1/admin/usuarios`: orden que ponga las expiradas primero (U-17) | propuesto | no existe; W-20 ordena en el navegador dentro de la página |
+| IP del bloqueo en el detalle de la cuenta (U-18) | propuesto | no existe; W-11b dice la fecha y los intentos, y remite a la bitácora |
+| «Es el último administrador activo» en el detalle (U-19) | propuesto | no existe; W-11 lo deduce con una segunda consulta |
+| Motivo de la desactivación en el detalle (U-20) | propuesto | no existe; W-11c dice desde cuándo y cuántos casos se reasignaron |
 
 ## Propuestas
 
@@ -231,3 +234,57 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   que solo reordenaran la página visible dirían algo falso. Es la misma decisión ya tomada en
   W-09 (ver «Parámetro `orden`» más arriba). Si el backend añade también `creado_en` como valor
   de `orden`, W-20 puede pasar a encabezados ordenables de verdad.
+
+### IP del bloqueo en `GET /api/v1/admin/usuarios/{id}` · W-11b (consulta U-18)
+
+- **Estado:** propuesto. El detalle ya trae `bloqueado_en`, `intentos_fallidos` y
+  `bloqueado_hasta`, pero no la IP.
+- **Por qué:** W-11b (Figma 99:2887) dibuja la frase completa: «Bloqueada el 19/10/2026 a las
+  15:12 por 5 intentos fallidos **desde la IP 203.0.113.45**. Se desbloquea sola a las 15:42
+  (RF-U12)». El contrato dice de forma explícita que la IP no viene aquí y que se consulta en la
+  bitácora filtrando por el usuario, así que la pantalla no puede escribir esa frase entera.
+- **Solicitud propuesta:** ningún parámetro nuevo; un campo más en la respuesta del detalle, por
+  ejemplo `bloqueado_desde_ip: string | null`, al lado de `bloqueado_en`, con la IP del último
+  intento fallido que provocó el bloqueo y `null` si no hay bloqueo en curso.
+- **Errores:** ninguno nuevo.
+- **Qué hace el frontend mientras tanto:** `src/pages/DetalleCuenta.tsx` arma la frase sin la IP
+  («Bloqueada el … tras 5 intentos fallidos. Se desbloquea sola el … La IP queda registrada en la
+  bitácora»), con lo que sí llega en el detalle. No se inventa el dato ni se deja la frase a
+  medias.
+- **Nota:** si el equipo prefiere no repetir la IP fuera de la bitácora por privacidad, la
+  decisión es igual de válida; entonces conviene quitar la IP del texto de W-11b en Figma para que
+  el diseño y el contrato digan lo mismo.
+
+### «Es el último administrador activo» en `GET /api/v1/admin/usuarios/{id}` · W-11i (consulta U-19)
+
+- **Estado:** propuesto. Hoy solo se sabe después de intentarlo (409 `ULTIMO_ADMINISTRADOR`).
+- **Por qué:** W-11i (Figma 165:18887) necesita saberlo **antes** de dibujar: «Cambiar rol» va
+  deshabilitado y una alerta explica por qué (RF-U07 CA 6, RF-U08 CA 4). El detalle no trae nada
+  que lo diga, y esperar al 409 significaría ofrecer una acción que siempre va a fallar.
+- **Solicitud propuesta:** ningún parámetro nuevo; un campo más en la respuesta del detalle, por
+  ejemplo `es_ultimo_administrador: boolean`, calculado con la misma regla que ya usa el servidor
+  para rechazar la acción (rol `ADMINISTRADOR`, estado `ACTIVO` y ningún otro administrador
+  activo). Sirve igual `otros_administradores_activos: int`.
+- **Errores:** ninguno nuevo.
+- **Qué hace el frontend mientras tanto:** `hayOtroAdministradorActivo` en
+  `src/services/usuariosAdmin.ts` hace una segunda consulta,
+  `GET /admin/usuarios?rol=ADMINISTRADOR&estado=ACTIVO&excluir={id}&por_pagina=1`, y mira
+  `paginacion.total`. Es una consulta que el contrato ya contempla (es la misma que se usa para
+  elegir el doctor de destino de un traslado), pero son dos viajes para pintar una pantalla.
+- **Nota:** la pantalla sigue atendiendo el 409 aunque el botón esté deshabilitado, porque entre
+  la carga y el clic otra pestaña puede haber cambiado las cosas (RF-U03 CA 4). El campo nuevo no
+  reemplaza esa comprobación: solo evita ofrecer lo imposible.
+
+### Motivo de la desactivación en `GET /api/v1/admin/usuarios/{id}` · W-11c (consulta U-20)
+
+- **Estado:** propuesto. Prioridad baja.
+- **Por qué:** la nota de W-11c (Figma 99:3055) pide que la pantalla explique «desde cuándo y por
+  qué» se desactivó la cuenta. El detalle trae `desactivado_en` y `ultimo_traslado`, que dan el
+  cuándo y cuántos casos se reasignaron, pero no hay ningún motivo guardado.
+- **Solicitud propuesta:** si el equipo quiere el «por qué», haría falta guardarlo al desactivar
+  (un `motivo` opcional en `POST /{id}/desactivar`, que volvería en el detalle como
+  `desactivado_motivo: string | null`). Implica cambiar también D-01, que hoy no pide motivo.
+- **Qué hace el frontend mientras tanto:** W-11c dice desde cuándo y, si el último traslado fue el
+  de la desactivación, cuántos casos se reasignaron. El motivo no se inventa.
+- **Nota:** mientras no exista, la bitácora sigue siendo el lugar donde se ve quién desactivó la
+  cuenta y cuándo, que es casi siempre lo que se busca.

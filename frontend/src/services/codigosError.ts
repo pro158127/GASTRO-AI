@@ -30,9 +30,16 @@ export const CodigoErrorApi = {
   CORREO_YA_REGISTRADO: "CORREO_YA_REGISTRADO",
   /**
    * 409 · La acción no aplica al estado de la cuenta (por ejemplo, reenviar la credencial de una
-   * cuenta que ya se activó).
+   * cuenta que ya se activó, o restablecer la contraseña de una cuenta inactiva).
    */
   TRANSICION_INVALIDA: "TRANSICION_INVALIDA",
+  /**
+   * 409 · Desactivar, eliminar o quitarle el rol al último administrador activo (RF-U07 CA 6,
+   * RF-U08 CA 4) → D-05. El servidor lo rechaza aunque la interfaz ya deshabilite la acción.
+   */
+  ULTIMO_ADMINISTRADOR: "ULTIMO_ADMINISTRADOR",
+  /** 409 · Pasar a administrador a un doctor que todavía tiene casos activos (W-11, D-04). */
+  CASOS_SIN_REASIGNAR: "CASOS_SIN_REASIGNAR",
   DATOS_INVALIDOS: "DATOS_INVALIDOS",
   /** 422 · W-02b: trae `campos` y `requisitos`. */
   CONTRASENA_NO_CUMPLE_POLITICA: "CONTRASENA_NO_CUMPLE_POLITICA",
