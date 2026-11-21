@@ -68,6 +68,23 @@ Para probar una temporal vencida (W-01e):
 UPDATE "Usuario" SET temporal_expira_en = now() - interval '1 minute' WHERE correo = 'doctor@gastroia.local';
 ```
 
+### Casos de prueba (solo desarrollo)
+
+Para probar lo que necesita un doctor con casos activos (reasignación W-25 y el 409
+`DESTINO_REQUERIDO`, «Casos recibidos», historial, dashboards):
+
+```bash
+python -m scripts.sembrar_casos --correo doctor@gastroia.local                      # 3 casos
+python -m scripts.sembrar_casos --correo doctor@gastroia.local --casos 5 --analisis-por-caso 2
+docker compose exec api python -m scripts.sembrar_casos --correo doctor@gastroia.local
+```
+
+El doctor tiene que estar ACTIVO: entra una vez con él. El script usa los mismos servicios
+que `POST /imagenes` y `POST /analisis`, con una imagen sintética, e imprime los documentos
+ficticios (CC desde 9000000000) para buscar el historial. Con el worker arriba y
+`HF_SIMULADO=true`, los análisis terminan COMPLETADOS en unos segundos. Solo corre con
+`ENVIRONMENT=development`.
+
 ## Variables de entorno
 
 Todas están en `.env.example` con un valor de ejemplo y un comentario. Las que se generan
