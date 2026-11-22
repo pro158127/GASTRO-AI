@@ -9,144 +9,98 @@ pinned: false
 license: cc-by-nc-4.0
 ---
 
-# Gastro-AI: Inferencia y Explicabilidad Grad-CAM
+# Gastro-AI: API experimental de inferencia
 
-Modelo de clasificación multi-etiqueta de imágenes endoscópicas del tracto
-gastrointestinal superior, con explicabilidad visual Grad-CAM.
+API FastAPI para clasificar imágenes endoscópicas del tracto gastrointestinal superior y generar mapas Grad-CAM. Es un prototipo académico experimental; no es un dispositivo médico y no debe usarse para tomar decisiones clínicas.
 
-## Propósito
+## Modelo que carga esta API
 
-Detección y localización de hallazgos endoscópicos sobre la cascada de Pelayo
-Correa (progresión gástrica), prediciendo **cuatro clases simultáneas**
-(multi-etiqueta, no excluyentes):
+- Arquitectura: EfficientNet-B1 con tres salidas sigmoid, en este orden: gastritis (índice 0), atrofia (1) y signos de *H. pylori* (2).
+- Checkpoint incluido: `best_gastroai_efficientnet_b1_3cat_fold2_v8.pth`, fold 2 del entrenamiento v8.
+- SHA-256 esperado del checkpoint: `9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4`.
+- El checkpoint contiene metadatos y los pesos bajo `model_state_dict`; al cargarlo se valida `class_order` y `fold=2`.
+- Entrada: imagen convertida a RGB, redimensionada a 240 × 240 y normalizada con estadísticas ImageNet.
+- Formatos admitidos: JPEG, PNG y BMP, hasta 20 MiB. DICOM no está soportado.
+- Umbral inicial de integración: 0.50 para las tres clases, coherente con la evaluación OOF reportada. No representa un umbral clínico validado.
 
-| Índice | Clase técnica | Etiqueta clínica |
+El informe OOF v8.1 resume cinco checkpoints de tres clases. El fold 2 obtuvo macro F1 de 0.8656 en sus pacientes OOF; esa partición se usó en la selección de checkpoint y no es una cohorte externa. No atribuir al fold 2 el promedio agregado de los cinco folds. El resultado es experimental y no está validado para decisiones clínicas.
+
+## Preparar el Space
+
+Crear un Space privado con SDK Docker y subir al directorio raíz `README.md`, `Dockerfile`, `app.py`, `requirements.txt` y `best_gastroai_efficientnet_b1_3cat_fold2_v8.pth`. El README declara `app_port: 7860`, que coincide con Uvicorn.
+
+En Settings → Variables and secrets, configurar:
+
+| Nombre | Tipo | Valor |
 |---|---|---|
-| 0 | `normal_mucosa` | Mucosa Normal |
-| 1 | `erythematous_gastritis` | Gastritis Eritematosa |
-| 2 | `gastric_atrophy` | Atrofia Gástrica |
-| 3 | `h_pylori_signs` | Signos H. Pylori |
+| `GASTROAI_API_KEY` | Secret | Clave aleatoria para autenticar a la API cliente. Obligatoria. |
+| `GASTROAI_REVISION_SHA` | Variable | SHA Git de 40 caracteres del commit publicado en este Space. Obligatoria en el Space. |
+| `HF_SHA256` | Variable | SHA-256 esperado de los pesos. Puede omitirse porque el código verifica el hash del fold 2 incluido en esta versión. |
+| `GASTROAI_CORS_ORIGINS` | Variable | Orígenes exactos separados por coma, solo si un navegador llamará directamente a la API. Para llamadas backend-a-backend puede dejarse vacía. |
 
-> **Carácter experimental.** Este modelo se ofrece exclusivamente con fines de
-> investigación y docencia. **No constituye un dispositivo médico** y no debe
-> usarse para tomar decisiones clínicas. Todo resultado debe ser revisado por
-> un profesional de la salud.
+El Space falla al iniciar si se despliega sin API key o sin SHA de revisión, o si la huella del checkpoint no coincide. No guardar secretos en Git ni en el frontend. La llamada debe realizarse desde el backend usando HTTPS y el header `X-API-Key`.
 
-## Arquitectura
+Al ser privado, Hugging Face exige además que el backend consumidor se autentique ante el Hub con un token de lectura que tenga acceso al Space. El backend debe guardar ese token como secreto propio (`HF_TOKEN`) y enviar `Authorization: Bearer $HF_TOKEN` junto con `X-API-Key: $GASTROAI_API_KEY`. `HF_TOKEN` no se configura dentro del contenedor del Space.
 
-- Backbone: **EfficientNet-B1** (pre-entrenado en ImageNet).
-- Cabecera: `Dropout(0.3)` + capa lineal de 4 salidas (logits).
-- Entrenamiento: **BCEWithLogitsLoss con pérdida enmascarada (Masked Loss)**,
-  optimizador AdamW (`lr=1e-3`, `weight_decay=1e-4`) y
-  `ReduceLROnPlateau`.
-- Entrada: imagen RGB redimensionada a **240×240** con normalización
-  ImageNet (`mean=[0.485, 0.456, 0.406]`, `std=[0.229, 0.224, 0.225]`).
-- Tamaño de los pesos: ~30 MB. Inferencia en CPU: 150–300 ms por imagen
-  (incluyendo los 4 mapas Grad-CAM).
+## Endpoints
 
-## Datos de origen
+- `GET /` o `GET /health`: estado, commit configurado, huella del checkpoint y clases publicadas.
+- `POST /clasificar`: recibe `multipart/form-data` con el campo `imagen`; requiere header `X-API-Key`.
 
-Entrenado sobre tres datasets públicos de imágenes endoscópicas. Cada dataset
-mantiene sus propios términos de uso; ver las fuentes originales antes de
-redistribuir sus imágenes:
-
-- **EGID** (Endoscopic Gastric Image Dataset) — anotaciones de H. pylori y
-  atrofia gástrica.
-- **GastroHUN** — imágenes de mucosa gástrica.
-- **HyperKvasir** (tracto GI superior) — hallazgos anatómicos y patológicos.
-
-Partición **aislada por paciente** (`GroupKFold`, 5 pliegues) para garantizar
-cero fuga de datos. Conjunto de validación: 4,811 imágenes.
-
-## Métricas de desempeño
-
-Evaluación clínica con umbrales óptimos calibrados (maximización de F1) sobre
-muestras reales anotadas (excluyendo ceros imputados de EGID).
-
-| Clase | Umbral | ROC-AUC | Sensibilidad | Precisión | F1 |
-|---|---|---|---|---|---|
-| Mucosa Normal | 0.335 | 0.9996 | 0.9982 | 0.9790 | 0.9885 |
-| Gastritis Eritematosa | 0.499 | 0.9992 | 0.9695 | 0.9939 | 0.9815 |
-| Atrofia Gástrica | 0.946 | 0.9998 | 0.9918 | 1.0000 | 0.9959 |
-| Signos H. Pylori | 0.982 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-
-Entrenamiento (Masked Loss): Train Loss `0.0727`, Val Loss `0.0314`,
-ROC-AUC enmascarado `0.9992`, F1 enmascarado `0.9774`.
-
-> **Umbrales en producción (RF-A01):** los umbrales quedan acotados al rango
-> 10%–90%. Atrofia y H. Pylori se despliegan en `0.900` (no `0.946`/`0.982`),
-> lo que prioriza sensibilidad sobre precisión respecto a la calibración F1.
-
-> Ver el reporte completo de evaluación y calibración en
-> `Documentacion/Data-documentation/reports/Reporte_Metricas_Calibracion_GastroAI.md`.
-
-## Limitaciones y sesgos
-
-- El modelo opera sobre la **imagen completa redimensionada a 240×240**, sin
-  etapa de detección/recorte de ROI; los mapas Grad-CAM ayudan a interpretar
-  dónde enfoca el modelo.
-- Los conjuntos de entrenamiento provienen de cohortes específicas (EGID,
-  GastroHUN, HyperKvasir); el desempeño puede variar en otras poblaciones,
-  dispositivos de captura o condiciones de iluminación.
-- Clases con anotación incompleta en EGID se trataron con pérdida enmascarada;
-  no deben interpretarse como ausencia de patología en dichas clases.
-- No es un producto validado clínicamente. Requiere supervisión profesional.
-
-## Uso de la API
-
-Endpoints expuestos en el Space (puerto 7860):
-
-- `GET /` → estado del servicio (incluye `revision_sha`).
-- `POST /clasificar` → recibe una imagen (`multipart/form-data`, campo
-  `imagen`) y devuelve `revision_sha`, `latencia_ms` y tres `caracteristicas`
-  con `codigo`, `probabilidad` y `regiones`. Cada región incluye coordenadas
-  normalizadas del ROI, `area_pct` y el mapa de calor Grad-CAM en PNG Base64.
-  La respuesta no incluye el umbral ni un indicador booleano de detección.
-
-El endpoint requiere `Authorization: Bearer <token>`. Configura
-`GASTROAI_API_KEY` como secreto del Space y `HF_TOKEN` con el mismo valor en
-el backend. El backend envía esta cabecera.
-
-`GASTROAI_REVISION_SHA` debe ser el SHA hexadecimal de 40 caracteres del
-commit del Space desplegado. Hugging Face proporciona `SPACE_COMMIT_HASH`; la
-app lo usa si no se define explícitamente `GASTROAI_REVISION_SHA`. Configura
-el mismo SHA en `HF_REVISION` del backend. Para CORS, el Space no permite
-orígenes por defecto; si se necesita acceso desde navegador, define
-`GASTROAI_ALLOWED_ORIGINS` con una lista separada por comas de orígenes
-exactos.
-
-Respuesta (3 patologías, `normal_mucosa` no se reporta):
+Ejemplo de estructura (los valores de predicción son placeholders; los mapas se acortan en este documento):
 
 ```json
 {
-  "revision_sha": "<40-character commit SHA>",
-  "latencia_ms": 1840,
-  "caracteristicas": [
-    {"codigo": "GASTRITIS", "probabilidad": 0.8123, "regiones": [
-      {"x": 0.0417, "y": 0.0833, "ancho": 0.4167, "alto": 0.5,
-       "area_pct": 20.83, "mapa_calor_base64": "<PNG base64>"}
-    ]}
-  ]
+  "revision_sha": "<SHA de 40 caracteres del commit del Space>",
+  "checkpoint_sha256": "9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4",
+  "predicciones": {
+    "GASTRITIS": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    },
+    "ATROFIA": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    },
+    "HPYLORI": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    }
+  }
 }
 ```
 
+El placeholder del `revision_sha` debe sustituirse por la variable real del Space; los placeholders de los mapas representan cadenas PNG Base64 completas en la respuesta HTTP. El ejemplo de probabilidades no se debe usar como evidencia de métricas ni de una predicción del checkpoint desplegado.
+
+Llamada de ejemplo:
+
 ```bash
-curl -X POST "https://<tu-usuario>-gastroai-space.hf.space/clasificar" \
-     -H "Authorization: Bearer $GASTROAI_API_KEY" \
-     -F "imagen=@imagen_endoscopia.bmp"
+curl -X POST "https://<usuario>-<space>.hf.space/clasificar" \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  -H "X-API-Key: $GASTROAI_API_KEY" \
+  -F "imagen=@imagen_endoscopia.jpg"
 ```
 
-## Licencia
+## Verificación local
 
-Código y pesos bajo **CC BY-NC 4.0** (uso no comercial). Las imágenes de
-origen mantienen las licencias de sus autores; las atribuciones de los
-subconjuntos EGID y GastroHUN incluidos en las imágenes de verificación están
-en `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/CREDITOS.md`.
+```bash
+export GASTROAI_API_KEY="<clave-local>"
+export GASTROAI_REVISION_SHA="<sha-git-real-de-40-caracteres>"
+export HF_SHA256="9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4"
+uvicorn app:app --host 0.0.0.0 --port 7860
+```
 
-## Reproducibilidad
+La API devuelve errores HTTP claros para credenciales ausentes/incorrectas, imágenes inválidas, formatos no admitidos y cargas mayores a 20 MiB. No escribe nombres de archivo, imágenes ni predicciones en logs propios de la aplicación.
 
-- Split fijo por paciente (`patient_splits_5fold.csv`, `random_state=42`).
-- Semillas fijas en entrenamiento (`torch.manual_seed(42)`,
-  `np.random.seed(42)`, `random.seed(42)`).
-- Nota: el modelo publicado queda fijado a un commit SHA inmutable (RNF-29);
-  un nuevo modelo es un nuevo despliegue.
+## Licencia y limitaciones
+
+El código y los pesos se publican bajo CC BY-NC 4.0. Los datasets mantienen sus licencias originales. La salida Grad-CAM muestra activaciones del modelo, no demuestra una lesión ni constituye segmentación clínica. Los resultados requieren revisión profesional y no están validados para uso clínico.

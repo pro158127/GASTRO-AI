@@ -1,15 +1,21 @@
 """El enchufe con el Space privado de Hugging Face (patrón Adaptador, RF-M01, RNF-29, RNF-30).
 
-Contrato con el Space (lo implementa el equipo de ML):
+Contrato actual del Space privado de Hugging Face (checkpoint Fold 2):
 
     POST {HF_SPACE_URL}/clasificar
     Authorization: Bearer {HF_TOKEN}
+    X-API-Key: {GASTROAI_API_KEY}
     multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
 
-    200 {"revision_sha": "3e1f9c0…", "latencia_ms": 1840,
-         "caracteristicas": [{"codigo": "ATROFIA", "probabilidad": 0.8734,
-             "regiones": [{"x": 0.31, "y": 0.22, "ancho": 0.18, "alto": 0.20,
-                           "area_pct": 14.2, "mapa_calor_base64": "iVBORw0KGgo…"}]}]}
+    200 {"revision_sha": "d58d56d…", "checkpoint_sha256": "9e68072…",
+         "predicciones": {"ATROFIA": {"probabilidad": 0.8734, "umbral": 0.5,
+             "detectado": true, "region_roi": {"x": 74, "y": 52,
+             "ancho": 43, "alto": 48, "area_pct": 14.2},
+             "mapa_calor_png_b64": "iVBORw0KGgo…"}, ...}}
+
+El adaptador traduce el contrato del Space al dominio interno. Las coordenadas del Space
+son píxeles en su tensor 240×240; aquí se normalizan a fracciones 0–1. El backend vuelve
+a aplicar el umbral vigente de RF-A01 y persiste los PNG en MinIO.
 
 Todo lo que es del proveedor (httpx, Base64, nombres de campos) se queda aquí. El resto del
 sistema recibe una `SalidaModelo` ya validada, con Decimal y los PNG en bytes.
@@ -148,6 +154,45 @@ def _mapa(texto: str) -> bytes:
 
 def traducir(datos: object) -> SalidaModelo:
     """JSON del Space → SalidaModelo. Cualquier cosa fuera del contrato: RESPUESTA_INVALIDA."""
+    # Contrato publicado por la API Fold 2. Se conserva el formato anterior debajo para
+    # que los fixtures históricos y otros adaptadores del dominio sigan siendo compatibles.
+    if isinstance(datos, dict) and "predicciones" in datos:
+        predicciones = datos.get("predicciones")
+        if not isinstance(predicciones, dict):
+            raise ErrorInferencia("RESPUESTA_INVALIDA")
+        caracteristicas = []
+        for codigo, prediccion in predicciones.items():
+            if not isinstance(prediccion, dict):
+                raise ErrorInferencia("RESPUESTA_INVALIDA")
+            roi = prediccion.get("region_roi")
+            if not isinstance(roi, dict):
+                raise ErrorInferencia("RESPUESTA_INVALIDA")
+            try:
+                caracteristicas.append(
+                    {
+                        "codigo": codigo,
+                        "probabilidad": prediccion["probabilidad"],
+                        "regiones": [
+                            {
+                                "x": roi["x"] / 240,
+                                "y": roi["y"] / 240,
+                                "ancho": roi["ancho"] / 240,
+                                "alto": roi["alto"] / 240,
+                                "area_pct": roi["area_pct"],
+                                "mapa_calor_base64": prediccion[
+                                    "mapa_calor_png_b64"
+                                ],
+                            }
+                        ],
+                    }
+                )
+            except (KeyError, TypeError, ZeroDivisionError):
+                raise ErrorInferencia("RESPUESTA_INVALIDA") from None
+        datos = {
+            "revision_sha": datos.get("revision_sha"),
+            "latencia_ms": None,
+            "caracteristicas": caracteristicas,
+        }
     try:
         respuesta = _Respuesta.model_validate(datos)
     except ValidationError:
@@ -186,14 +231,18 @@ class AdaptadorHuggingFace:
         token: str,
         timeout: float = 30.0,
         transporte: httpx.BaseTransport | None = None,  # pa las pruebas (MockTransport)
+        api_key: str = "",
+        sha256_esperado: str = "",
     ) -> None:
         self._url = url.rstrip("/")
         self._token = token
         self._timeout = timeout
         self._transporte = transporte
+        self._api_key = api_key
+        self._sha256_esperado = sha256_esperado.lower()
 
     def clasificar(self, imagen: bytes, formato: FormatoImagen) -> SalidaModelo:
-        if not self._url.startswith("https://") or not self._token:
+        if not self._url.startswith("https://") or not self._token or not self._api_key:
             raise ErrorInferencia("SIN_CONFIGURAR")  # RNF-30: sin HTTPS y token, ni lo intentamos
         nombre, tipo = (
             ("imagen.png", "image/png")
@@ -207,7 +256,10 @@ class AdaptadorHuggingFace:
             ) as cliente:
                 respuesta = cliente.post(
                     f"{self._url}/clasificar",
-                    headers={"Authorization": f"Bearer {self._token}"},
+                    headers={
+                        "Authorization": f"Bearer {self._token}",
+                        "X-API-Key": self._api_key,
+                    },
                     files={"imagen": (nombre, imagen, tipo)},
                 )
         except httpx.TimeoutException:
@@ -220,6 +272,10 @@ class AdaptadorHuggingFace:
             datos = respuesta.json()
         except ValueError:
             raise ErrorInferencia("RESPUESTA_INVALIDA") from None
+        if self._sha256_esperado:
+            sha_recibido = datos.get("checkpoint_sha256") if isinstance(datos, dict) else None
+            if not isinstance(sha_recibido, str) or sha_recibido.lower() != self._sha256_esperado:
+                raise ErrorInferencia("RESPUESTA_INVALIDA")
         return traducir(datos)
 
 
@@ -278,5 +334,9 @@ def crear_inferencia(settings: Settings, codigos: tuple[str, ...]) -> ServicioIn
             raise RuntimeError("HF_SIMULADO solo se permite con ENVIRONMENT=development")
         return InferenciaSimulada(settings.hf_revision, codigos)
     return AdaptadorHuggingFace(
-        settings.hf_space_url, settings.hf_token.get_secret_value(), settings.http_timeout_seconds
+        settings.hf_space_url,
+        settings.hf_token.get_secret_value(),
+        settings.http_timeout_seconds,
+        api_key=settings.gastroai_api_key.get_secret_value(),
+        sha256_esperado=settings.hf_sha256,
     )

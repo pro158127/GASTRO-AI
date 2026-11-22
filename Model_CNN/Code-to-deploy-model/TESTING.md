@@ -1,41 +1,115 @@
-# Pruebas locales del servicio Gastro-AI
+# Validación local de la API Gastro-AI antes de publicar en Hugging Face
 
-Esta guía describe una prueba técnica local del servicio de inferencia. No equivale a una evaluación clínica ni a un reporte RM-06. La carpeta `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/` contiene 50 imágenes para comprobaciones de entrada y salida.
+Este procedimiento comprueba el contenedor y la respuesta HTTP local. No sube
+archivos ni configura el Space remoto.
 
-## Preparar e iniciar
+## 1. Configurar y levantar el servicio
 
-Se requiere Python 3.11 y las dependencias de `requirements.txt`. Define una clave sintética para el test local y una revisión SHA de 40 caracteres. El valor de revisión de ejemplo es solo local; nunca lo uses como la revisión publicada en Hugging Face.
+La API exige una clave incluso en local. No se debe subir la clave a Git.
 
 ```bash
 cd Model_CNN/Code-to-deploy-model
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-export GASTROAI_API_KEY=clave-sintetica-local
-export GASTROAI_REVISION_SHA=0123456789abcdef0123456789abcdef01234567
-export HF_SHA256=d4b264bf0a954cad5b2c26f834ec8a02eb07eeac41eed14b6e65e4f46b41fc76
-uvicorn app:app --host 127.0.0.1 --port 7860
+export GASTROAI_API_KEY="<clave-local-aleatoria>"
+docker build -t gastroai-hf .
+docker run --rm -p 7860:7860 \
+  -e GASTROAI_API_KEY="$GASTROAI_API_KEY" \
+  -e HF_SHA256="9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4" \
+  gastroai-hf
 ```
 
-La app falla al iniciar si falta `GASTROAI_API_KEY`, si la revisión no contiene 40 caracteres hexadecimales o si los pesos no están presentes o no coinciden con su SHA-256. En Hugging Face usa el `SPACE_COMMIT_HASH` real (o define `GASTROAI_REVISION_SHA`) y configura el mismo SHA como `HF_REVISION` en el backend.
+En local se puede dejar `GASTROAI_REVISION_SHA` sin configurar; el endpoint
+de estado devolverá `null`. En el Space de Hugging Face sí es obligatoria y
+debe ser el SHA Git real de 40 caracteres del commit publicado. El servicio
+falla al iniciar si no coinciden los pesos con su SHA-256 esperado.
 
-## Pruebas de API
-
-`GET /` debe responder `status=ready` y un `revision_sha` hexadecimal de 40 caracteres. `POST /clasificar` requiere `Authorization: Bearer <GASTROAI_API_KEY>` y un archivo `imagen`.
+## 2. Verificar el estado
 
 ```bash
-curl http://127.0.0.1:7860/
-curl -X POST http://127.0.0.1:7860/clasificar \
-  -H "Authorization: Bearer $GASTROAI_API_KEY" \
-  -F "imagen=@imagenes_reales-20261112T211804Z-1-001/imagenes_reales/sample_001.bmp"
+curl http://localhost:7860/health
 ```
 
-Una respuesta correcta tiene `revision_sha`, `latencia_ms` y `caracteristicas` con códigos `GASTRITIS`, `ATROFIA` y `HPYLORI`. Cada característica contiene una probabilidad entre 0 y 1 y `regiones`; sus coordenadas son fracciones entre 0 y 1 y `mapa_calor_base64` debe decodificar a PNG. Una solicitud sin bearer debe responder 401 y una imagen inválida, 400.
+La respuesta indica `status`, `revision_sha`, `checkpoint_sha256` y las tres
+clases expuestas. Se espera el SHA-256 `9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4`.
 
-## Alcance de las 50 imágenes
+## 3. Clasificar una imagen
 
-El índice conserva el nombre neutro, el dataset de origen, las etiquetas disponibles y `clases_con_anotacion_verificable`. Las celdas vacías significan **sin etiqueta verificable**, no clase negativa. Para el subconjunto EGID solo se marca la clase cuyo directorio fuente aporta etiqueta: `HPYLORI` o `ATROFIA`. Las imágenes de GastroHUN e HyperKvasir de esta carpeta no aportan etiquetas de las patologías que predice este modelo.
+El endpoint es `POST /clasificar`; usa `multipart/form-data`, campo `imagen`,
+y header `X-API-Key`. Formatos admitidos: JPEG, PNG y BMP, máximo 20 MiB.
+DICOM no está soportado.
 
-No calcules sensibilidad, especificidad, F1, AUC, Brier o ECE con este conjunto. Es una selección local y no acredita una partición de prueba independiente por paciente. Para RM-06 se necesita un reporte reproducible sobre el cohort de prueba acordado, con la revisión real de HF y métricas válidas por clase. Las atribuciones y licencias están en `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/CREDITOS.md`.
+```bash
+curl -X POST http://localhost:7860/clasificar \
+  -H "X-API-Key: $GASTROAI_API_KEY" \
+  -F "imagen=@imagenes_reales-20261112T211804Z-1-001/imagenes_reales/egid_val_04_009(21).bmp"
+```
 
-Las imágenes no se copian a la imagen Docker del Space (`.dockerignore`); se usan únicamente en validación local.
+Se espera HTTP 401 para clave ausente/incorrecta, HTTP 400 para una imagen
+ilegible, HTTP 413 si excede el tamaño máximo y HTTP 415 para formato no
+admitido.
+
+## 4. Campos de respuesta
+
+```json
+{
+  "revision_sha": "<commit SHA de 40 caracteres; null solo en local sin configurar>",
+  "checkpoint_sha256": "9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4",
+  "predicciones": {
+    "GASTRITIS": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    },
+    "ATROFIA": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    },
+    "HPYLORI": {
+      "probabilidad": 0.0,
+      "umbral": 0.5,
+      "detectado": false,
+      "region_roi": {"x": 0, "y": 0, "ancho": 0, "alto": 0, "area_pct": 0.0},
+      "mapa_calor_png_b64": "<PNG Base64 generado por Grad-CAM>"
+    }
+  }
+}
+```
+
+Los valores son placeholders para documentar el contrato; no representan una
+inferencia real. El PNG Base64 es completo en la respuesta HTTP. Este checkpoint
+contiene tres salidas en el orden GASTRITIS, ATROFIA, HPYLORI.
+
+## 5. Imágenes locales de validación
+
+La carpeta `imagenes_reales-20261112T211804Z-1-001/imagenes_reales/`
+contiene 50 imágenes (23 `.bmp` de EGID, 27 `.jpg` de GastroHUN/HyperKvasir)
+y un `index_imagenes_reales.csv` con ground truth por imagen.
+
+Columnas del CSV:
+
+| Columna | Significado |
+|---|---|
+| `nombre_archivo_test` | Archivo de imagen. |
+| `patient_id` | Identificador seudónimo del paciente. |
+| `mucosa_normal` | 1 = mucosa normal. |
+| `gastritis_eritematosa` | 1 = gastritis eritematosa. |
+| `astrofia_gastrica` | 1 = atrofia gástrica (el nombre contiene un typo en el CSV original). |
+| `h_pylori` | 1 = signos de *H. pylori*. |
+| `ruta_original` | Ruta de origen en el dataset. |
+
+### Anotaciones enmascaradas de EGID
+
+- En `1.H_pylori_infection_status`, el estado de H. pylori proviene del
+  subdirectorio (`1.positive` o `2.negative`); atrofia no está anotada.
+- En `2.Presence_of_atrophy`, el estado de atrofia proviene del subdirectorio
+  (`1.atrophic` o `2.non-atrophic`); gastritis y H. pylori no están anotados.
+- La columna correspondiente del CSV puede contener etiquetas imputadas; para
+  evaluar una clase, deriva el ground truth de `ruta_original` y aplica la
+  máscara de anotación correcta.
+
+Esta muestra sirve para una comprobación de integración; no reemplaza la
+evaluación OOF ni una prueba externa del modelo.

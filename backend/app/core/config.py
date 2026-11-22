@@ -46,10 +46,10 @@ class Settings(BaseSettings):
     # todo mundo vuelve a vincular su autenticador y te van a querer muchísimo.
     totp_clave_cifrado: SecretStr = SecretStr("")
 
-    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30). Todavía nadie nos pasa
-    # estos datos, así que por ahora andan vacíos y el worker usa un adaptador falso.
+    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30).
     hf_space_url: str = ""
     hf_token: SecretStr = SecretStr("")
+    gastroai_api_key: SecretStr = SecretStr("")
     hf_repo: str = ""
     hf_revision: str = ""  # SHA fijo, nunca «main»: luego cambian el modelo y nadie sabe qué pasó
     hf_sha256: str = ""  # huella de los pesos, pa que no nos den gato por liebre

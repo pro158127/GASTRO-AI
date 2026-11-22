@@ -41,6 +41,37 @@ def respuesta():
              "mapa_calor_base64": base64.b64encode(png()).decode()}]}]}
 
 
+def respuesta_fold2():
+    mapa = base64.b64encode(png()).decode()
+    return {
+        "revision_sha": "d58d56d7fd24a3760779e15d98413d276cb77ad0",
+        "checkpoint_sha256": "9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4",
+        "predicciones": {
+            codigo: {
+                "probabilidad": 0.75,
+                "umbral": 0.5,
+                "detectado": True,
+                "region_roi": {"x": 24, "y": 48, "ancho": 72, "alto": 96, "area_pct": 12.0},
+                "mapa_calor_png_b64": mapa,
+            }
+            for codigo in ("GASTRITIS", "ATROFIA", "HPYLORI")
+        },
+    }
+
+
+def test_traduce_contrato_real_del_space_fold2():
+    salida = traducir(respuesta_fold2())
+    assert salida.revision_sha == "d58d56d7fd24a3760779e15d98413d276cb77ad0"
+    assert {c.codigo for c in salida.caracteristicas} == {"GASTRITIS", "ATROFIA", "HPYLORI"}
+    atrofia = next(c for c in salida.caracteristicas if c.codigo == "ATROFIA")
+    assert atrofia.probabilidad == Decimal("0.7500")
+    assert atrofia.regiones[0].x == Decimal("0.1000")
+    assert atrofia.regiones[0].y == Decimal("0.2000")
+    assert atrofia.regiones[0].ancho == Decimal("0.3000")
+    assert atrofia.regiones[0].alto == Decimal("0.4000")
+    assert atrofia.regiones[0].mapa_png == png()
+
+
 @pytest.mark.parametrize("probabilidad", [0, 0.5, 1])
 def test_traduce_respuesta_valida_y_limites(probabilidad):
     datos = respuesta()
@@ -103,11 +134,13 @@ def test_adaptador_solicitud_y_respuesta(formato, mime, nombre):
         assert request.method == "POST"
         assert str(request.url) == "https://modelo.invalid/clasificar"
         assert request.headers["authorization"] == "Bearer credencial-sintetica"
+        assert request.headers["x-api-key"] == "clave-sintetica"
         assert mime.encode() in request.content
         assert nombre.encode() in request.content
         return httpx.Response(200, json=respuesta())
     salida = AdaptadorHuggingFace("https://modelo.invalid/", "credencial-sintetica",
-        transporte=httpx.MockTransport(responder)).clasificar(b"imagen-sintetica", formato)
+        transporte=httpx.MockTransport(responder), api_key="clave-sintetica").clasificar(
+            b"imagen-sintetica", formato)
     assert len(peticiones) == 1
     assert salida.caracteristicas[0].probabilidad == Decimal("0.5")
 
@@ -127,7 +160,7 @@ def test_adaptador_fallos_y_no_sigue_redirecciones(caso, codigo):
             return httpx.Response(200, content=b"no-json")
         return httpx.Response(int(caso), headers={"location": "https://otro.invalid"})
     adaptador = AdaptadorHuggingFace("https://modelo.invalid", "credencial-sintetica",
-        transporte=httpx.MockTransport(responder))
+        transporte=httpx.MockTransport(responder), api_key="clave-sintetica")
     with pytest.raises(ErrorInferencia) as error:
         adaptador.clasificar(png(), FormatoImagen.PNG)
     assert error.value.codigo == codigo
@@ -139,7 +172,8 @@ def test_adaptador_fallos_y_no_sigue_redirecciones(caso, codigo):
 def test_configuracion_insegura_no_envia(url, token):
     responder = Mock(side_effect=AssertionError("No debe enviar"))
     with pytest.raises(ErrorInferencia, match="SIN_CONFIGURAR"):
-        AdaptadorHuggingFace(url, token, transporte=httpx.MockTransport(responder)).clasificar(
+        AdaptadorHuggingFace(url, token, transporte=httpx.MockTransport(responder),
+            api_key="clave-sintetica").clasificar(
             png(), FormatoImagen.PNG)
     responder.assert_not_called()
 
