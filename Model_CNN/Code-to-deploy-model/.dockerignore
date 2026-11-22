@@ -2,6 +2,9 @@
 imagenes_reales-*/
 respuestas_endpoint/
 
+# Checkpoint previo de cuatro salidas; el Space usa exclusivamente fold 2 v8.
+best_gastroai_masked_loss.pth
+
 # Documentación de pruebas
 TESTING.md
 

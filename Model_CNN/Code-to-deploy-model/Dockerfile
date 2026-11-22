@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Instalar librerías de sistema para OpenCV
-RUN apt-get update && apt-get install -y \
+# Dependencias de sistema de OpenCV en Debian slim.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -12,6 +12,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+ENV PYTHONUNBUFFERED=1
 
 # Hugging Face expone el puerto 7860 por defecto
 EXPOSE 7860

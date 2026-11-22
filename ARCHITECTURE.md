@@ -110,7 +110,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | Base de datos y cola | `DATABASE_URL`, `REDIS_URL` |
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
-| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
+| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `GASTROAI_API_KEY`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
 | Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
 | Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
 | Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |
@@ -473,23 +473,28 @@ etapa:
 Cada inferencia deja un renglón en `LogInferencia` (estado `EXITO`, `ERROR` o
 `TIEMPO_AGOTADO`, latencia y el motivo técnico), sin datos clínicos (RF-M03).
 
-**Contrato con el Space de Hugging Face** (lo implementa el equipo de ML):
+**Contrato con el Space privado de Hugging Face** (checkpoint Fold 2):
 
 ```
 POST {HF_SPACE_URL}/clasificar
 Authorization: Bearer {HF_TOKEN}
+X-API-Key: {GASTROAI_API_KEY}
 multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
 
-200 {"revision_sha": "<40 hex>", "latencia_ms": 1840,
-     "caracteristicas": [{"codigo": "ATROFIA", "probabilidad": 0.8734,
-       "regiones": [{"x": 0.31, "y": 0.22, "ancho": 0.18, "alto": 0.20,
-                     "area_pct": 14.2, "mapa_calor_base64": "<PNG en Base64>"}]}]}
+200 {"revision_sha": "d58d56d7fd24a3760779e15d98413d276cb77ad0",
+     "checkpoint_sha256": "9e680720f6feb7f81aa66fdc89a28471bb3e1a6e8772598d5b0890cc817f42c4",
+     "predicciones": {"ATROFIA": {"probabilidad": 0.8734, "umbral": 0.5,
+       "detectado": true, "region_roi": {"x": 74, "y": 52, "ancho": 43,
+       "alto": 48, "area_pct": 14.2}, "mapa_calor_png_b64": "<PNG Base64>"}, ...}}
 ```
 
 - Códigos de característica iguales a los del catálogo (`ATROFIA`, `GASTRITIS`, `HPYLORI`).
-- Probabilidades y caja de 0 a 1 (caja relativa a la imagen), `area_pct` de 0 a 100,
-  hasta 10 regiones por característica, mapas en PNG.
+- El Space entrega ROI en píxeles sobre el tensor de entrada 240×240; el adaptador los
+  normaliza a caja de 0 a 1 y valida el PNG antes de persistirlo en MinIO.
+- El backend vuelve a aplicar el umbral vigente de RF-A01; no toma `detectado` ni `umbral`
+  del Space como fuente de configuración.
 - `revision_sha` = el commit cargado en el Space; debe ser igual a `HF_REVISION`.
+- `checkpoint_sha256` debe coincidir con `HF_SHA256`.
 - El Space debe ser privado y no guardar ni registrar las imágenes (RNF-30).
 
 ### 3.9 Tiempo real (SSE) y seguimiento del análisis
