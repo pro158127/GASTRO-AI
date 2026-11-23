@@ -1,5 +1,16 @@
 // Cliente HTTP de la API (../ARCHITECTURE.md § 3.5). La sesión viaja en la cookie HttpOnly
 // `gastro_sesion`: el frontend nunca la lee ni la guarda, y no hay header Authorization.
+//
+// **Este módulo solo entiende respuestas JSON.** Los dos transportes (`solicitarCompleta` con
+// fetch y `enviarMultipart` con XMLHttpRequest) leen el cuerpo como JSON antes de pasárselo a
+// `atenderRespuesta`, y un 2xx que no es 204 y no trae JSON se trata como error inesperado
+// (W-31). El envío sí puede no ser JSON: por eso existe `enviarMultipart`.
+//
+// Consecuencia para quien venga después: un endpoint que devuelva otra cosa —el reporte en
+// PDF (`/analisis/{id}/reporte`) o el CSV de la auditoría son los candidatos— necesita un
+// transporte propio. Ese transporte debe seguir usando `atenderRespuesta` para los errores
+// (el cuerpo de error sí es JSON) y quedarse solo con la lectura del cuerpo bueno; si no,
+// se pierde el manejo global de sesión y permisos.
 import type {
   CampoConError,
   EdicionPerfil,
