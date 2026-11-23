@@ -15,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PRODUCCION = "production"
 S3_SECRETO_DESARROLLO = "gastroia_dev_secret"
 _SHA = re.compile(r"[0-9a-f]{40}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
 def _llave_aes(clave: SecretStr) -> bool:
@@ -67,10 +68,12 @@ class Settings(BaseSettings):
     # todo mundo vuelve a vincular su autenticador y te van a querer muchísimo.
     totp_clave_cifrado: SecretStr = SecretStr("")
 
-    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30). Todavía nadie nos pasa
-    # estos datos, así que por ahora andan vacíos y el worker usa un adaptador falso.
+    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30). En desarrollo, sin estos
+    # datos, se usa HF_SIMULADO.
     hf_space_url: str = ""
     hf_token: SecretStr = SecretStr("")
+    # Clave compartida con el Space (cabecera X-API-Key); la misma configurada en HF
+    gastroai_api_key: SecretStr = SecretStr("")
     hf_repo: str = ""
     hf_revision: str = ""  # SHA fijo, nunca «main»: luego cambian el modelo y nadie sabe qué pasó
     hf_sha256: str = ""  # huella de los pesos, pa que no nos den gato por liebre
@@ -152,7 +155,9 @@ class Settings(BaseSettings):
             ("HF_SIMULADO (debe ser false)", self.hf_simulado),
             ("HF_SPACE_URL (https)", not self.hf_space_url.startswith("https://")),
             ("HF_TOKEN", not self.hf_token.get_secret_value()),
+            ("GASTROAI_API_KEY", not self.gastroai_api_key.get_secret_value()),
             ("HF_REVISION (SHA de 40 caracteres)", not _SHA.fullmatch(self.hf_revision)),
+            ("HF_SHA256 (64 caracteres hex)", not _SHA256.fullmatch(self.hf_sha256.lower())),
             ("S3_SECRET_KEY", self.s3_secret_key in ("", S3_SECRETO_DESARROLLO)),
             (
                 "S3_PUBLIC_ENDPOINT_URL (https)",
