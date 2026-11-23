@@ -329,6 +329,22 @@ export interface OpcionesMultipart {
 }
 
 /**
+ * Tiempo límite de una subida, de principio a fin: `XMLHttpRequest.timeout` no mide inactividad,
+ * mide la petición entera, así que tiene que cubrir el caso lento legítimo.
+ *
+ * Cinco minutos. El tope de subida son 10 MB, que por una conexión móvil mala de unos 300 kbps
+ * tardan algo más de cuatro minutos; cortar antes sería cortar subidas válidas. Y pasarse
+ * tampoco sirve: la sesión se cierra por inactividad a los 10 minutos y una subida solo cuenta
+ * como actividad cuando termina, así que esperar más llevaría a una sesión que ya no existe.
+ *
+ * Lo que esto evita es el cuelgue eterno: sin `timeout`, el valor por omisión de XHR es 0 —sin
+ * límite— y una subida que se queda a medias deja la pantalla en «Subiendo… N %» para siempre.
+ * Al agotarse, `ontimeout` lanza el mismo `ErrorApi(null)` que un fallo de red, que las
+ * pantallas muestran como W-30 con su «intente de nuevo».
+ */
+const TIEMPO_LIMITE_SUBIDA_MS = 5 * 60 * 1000;
+
+/**
  * POST multipart con la cookie de sesión, para `POST /imagenes` (W-06f).
  *
  * Va por `XMLHttpRequest` y no por `fetch` por una sola razón: `fetch` no informa del avance
@@ -354,6 +370,8 @@ export function enviarMultipart<T>(
     const peticion = new XMLHttpRequest();
     peticion.open("POST", `${BASE}${ruta}`);
     peticion.responseType = "text";
+    // Después de `open`: antes, algunos navegadores lo descartan.
+    peticion.timeout = TIEMPO_LIMITE_SUBIDA_MS;
 
     if (alProgreso) {
       peticion.upload.onprogress = (evento) => {
