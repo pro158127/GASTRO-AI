@@ -740,6 +740,16 @@ multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
   de 240 × 240 (el Space redimensiona sin recortar) y el adaptador la pasa a fracciones de
   0 a 1. Una caja de 0 × 0 (el Grad-CAM no marcó nada) no se guarda como región.
 - `umbral` y `detectado` del Space no se usan: el backend aplica el umbral vigente (RF-A01).
+  Para el Fold 2 el umbral inicial es **0,50 global para las tres clases** (el mismo del
+  PR #296). Umbrales distintos por clase solo con una calibración documentada de esta
+  versión del modelo.
+- La región y su mapa de calor se guardan **solo si la característica supera el umbral** y
+  la caja es válida (más de 0 × 0 y dentro de la imagen). Por debajo se conservan la
+  probabilidad y el resultado, pero no se muestra ninguna región como hallazgo. El umbral
+  interno del Grad-CAM (0,5 sobre el mapa normalizado) solo recorta activaciones: no
+  decide si la característica está detectada.
+- Grad-CAM es una visualización experimental, no una segmentación clínica: la API manda
+  ese aviso en `mapa_calor.aviso` y el PDF lo imprime junto al mapa.
 - `revision_sha` = el commit cargado en el Space; debe ser igual a `HF_REVISION`.
 - `checkpoint_sha256` = la huella de los pesos; debe ser igual a `HF_SHA256` (si no,
   `HUELLA_DISTINTA` en `LogInferencia`).

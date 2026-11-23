@@ -37,7 +37,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from app.schemas.analisis import AVISO_EXPERIMENTAL
+from app.schemas.analisis import AVISO_EXPERIMENTAL, AVISO_GRAD_CAM
 from app.services.analisis import ZONA_COLOMBIA
 from app.services.logo_pdf import isotipo, palabra
 
@@ -538,6 +538,8 @@ class ConstructorReporte:
         )
         bloques = [_p("Imagen y explicación visual (RF-R03, RF-P04)", "seccion"), imagenes]
         bloques.append(Spacer(1, 4))
+        if d.mapa_calor is not None:
+            bloques.append(_p(AVISO_GRAD_CAM, "nota"))
         for r in d.regiones:
             bloques.append(
                 _p(
@@ -547,7 +549,12 @@ class ConstructorReporte:
                 )
             )
         if not d.regiones:
-            bloques.append(_p("El modelo no señaló regiones de interés en esta imagen."))
+            bloques.append(
+                _p(
+                    "Sin regiones de interés: solo se muestran para las características que "
+                    "superan el umbral."
+                )
+            )
         return bloques
 
     def _caracteristicas(self, d: DatosAnalisisReporte, ancho: float) -> list:
