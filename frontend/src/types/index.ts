@@ -467,3 +467,150 @@ export interface EstadoAnalisisRespuesta {
    */
   resultado_url?: string | null;
 }
+
+// --------------------------------------------- Detalle del resultado (W-08, W-08b, W-17b)
+// `GET /analisis/{id}` → `AnalisisSalida` (../ARCHITECTURE.md § 3.5).
+//
+// **Dos escalas distintas en la misma respuesta.** `probabilidad`, `umbral_aplicado`,
+// `confianza` y las cuatro medidas de `caja` van de 0 a 1; `area_porcentaje` va de 0 a 100
+// (la base de datos lo obliga: `caja_* BETWEEN 0 AND 1` y `area_porcentaje BETWEEN 0 AND
+// 100`). Por eso `src/utils/numeros.ts` tiene dos funciones y no una.
+
+/** Modelo que produjo el resultado. `revision_corta` son los 7 primeros del sha (RNF-25). */
+export interface ModeloUsado {
+  repositorio_hf: string;
+  revision_sha: string;
+  revision_corta: string;
+}
+
+/** La imagen del análisis, ya anonimizada. `url` es firmada y vence a los 5 minutos. */
+export interface ImagenAnalisis {
+  url: string;
+  formato: string;
+  ancho: number;
+  alto: number;
+}
+
+/**
+ * Mapa de calor principal: el de la primera región de la característica más probable. Llega
+ * `null` exactamente cuando `regiones` está vacío, que es el caso de W-08b.
+ */
+export interface MapaCalor {
+  url: string;
+  /**
+   * Texto del servidor que aclara que Grad-CAM es una visualización y no una segmentación
+   * clínica. Hoy la pantalla muestra el texto de Figma (`CLAUDE.md` § 7) y este campo no se
+   * usa; la fuente se cambia en un solo sitio, `textoAvisoGradCam` de `ResultadoAnalisis`.
+   */
+  aviso: string;
+}
+
+/** Una característica evaluada, con la probabilidad y el umbral que se le aplicó. */
+export interface CaracteristicaResultado {
+  id: number;
+  codigo: string;
+  nombre: string;
+  /** 0 a 1. */
+  probabilidad: number;
+  /**
+   * 0 a 1. **Es el umbral del momento en que se hizo el análisis, no el de hoy**
+   * (RF-A01 CA 2): nunca se presenta como «el umbral actual».
+   */
+  umbral_aplicado: number;
+  supera_umbral: boolean;
+}
+
+/** Caja normalizada (0 a 1) de una región. Figma no la dibuja sobre la imagen. */
+export interface CajaRegion {
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+}
+
+/** Una región de interés. Solo llegan las de las características que superan el umbral. */
+export interface RegionInteres {
+  orden: number;
+  caracteristica_id: number;
+  caja: CajaRegion;
+  /** 0 a 100. */
+  area_porcentaje: number;
+  /**
+   * 0 a 1. **Es la misma `probabilidad` de su característica, copiada por el servidor**, no
+   * una segunda medición. No se muestra: repetir el número con otro nombre haría creer que
+   * son dos medidas que coinciden.
+   */
+  confianza: number;
+  mapa_calor_url: string;
+}
+
+/** Explicación del LLM. Se tipa aquí; la dibuja W-08c / W-08d (tarea 6b). */
+export interface ExplicacionAnalisis {
+  estado: string;
+  texto: string | null;
+  generada_en: string | null;
+  intentos: number;
+}
+
+/** Observación de un profesional. Se tipa aquí; la dibuja W-08e y siguientes (tarea 6b). */
+export interface ObservacionAnalisis {
+  id: string;
+  es_mia: boolean;
+  valoracion: string;
+  texto: string | null;
+  autor: { nombre: string; apellido: string };
+  registrada_en: string;
+}
+
+/** Quién hizo el análisis. No está dibujado en W-08 (es de W-17b). */
+export interface RealizadoPor {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+  es_propio: boolean;
+}
+
+/** De quién llegó el caso por traslado. No está dibujado en W-08 (es de W-17b). */
+export interface TrasladoAnalisis {
+  desde: { nombre: string; apellido: string };
+  cuenta_eliminada: boolean;
+  fecha: string;
+}
+
+/** El aviso experimental de RF-R04 tal como lo manda la API. */
+export interface AvisoApi {
+  etiqueta: string;
+  texto: string;
+}
+
+/**
+ * Respuesta de `GET /analisis/{id}`. Se tipa completa aunque W-08 no dibuje todo, para que
+ * la tarea 6b (explicación y observaciones) no tenga que tocar los tipos.
+ *
+ * `caracteristicas` viene ordenada por probabilidad descendente y `regiones` por la
+ * probabilidad de su característica: el frontend no reordena.
+ */
+export interface AnalisisDetalle {
+  id: string;
+  codigo: string;
+  estado: EstadoAnalisis;
+  solicitado_en: string;
+  completado_en: string | null;
+  codigo_error: string | null;
+  modelo: ModeloUsado;
+  imagen: ImagenAnalisis;
+  mapa_calor: MapaCalor | null;
+  calidad: CalidadImagen;
+  caracteristicas: CaracteristicaResultado[];
+  /**
+   * Activa el aviso de W-08b. Ojo: es `false` cuando `caracteristicas` llega vacía, así que
+   * «lista vacía» no es W-08b y se atiende aparte.
+   */
+  ninguna_supera_umbral: boolean;
+  regiones: RegionInteres[];
+  explicacion: ExplicacionAnalisis | null;
+  observaciones: ObservacionAnalisis[];
+  realizado_por: RealizadoPor;
+  trasladado: TrasladoAnalisis | null;
+  aviso: AvisoApi;
+}

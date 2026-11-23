@@ -1,0 +1,64 @@
+/* Marco de imagen de W-08 (Figma 47:870): caja gris con radio, pie debajo. La proporción
+   la pone el componente con `aspect-ratio`, para que la página no salte al cargar. */
+
+.figura {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  margin: 0;
+}
+
+.marco {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie-sutil);
+  color: var(--color-texto-terciario);
+}
+
+/* `contain`: una endoscopia no se recorta para que cuadre con el marco. */
+.imagen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.vencida {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espacio-2);
+  padding: var(--espacio-3);
+  text-align: center;
+}
+
+.iconoVencida {
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex: none;
+  color: var(--color-texto-terciario);
+}
+
+.textoVencida {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.pie {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* El aviso de Grad-CAM: pegado a su imagen, no al pie de la página. */
+.nota {
+  display: block;
+  margin-top: var(--espacio-1);
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+}

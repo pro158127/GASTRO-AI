@@ -12,6 +12,7 @@ import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import ProgresoAnalisis from "../pages/ProgresoAnalisis";
 import ReasignarCasos from "../pages/ReasignarCasos";
+import ResultadoAnalisis from "../pages/ResultadoAnalisis";
 import SinPermisos from "../pages/SinPermisos";
 import Usuarios from "../pages/Usuarios";
 import type { RolInterfaz } from "./menus";
@@ -56,7 +57,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/analisis/:idAnalisis",
     titulo: "Resultado del análisis",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-08)
+    elemento: (titulo) => <ResultadoAnalisis titulo={titulo} />, // W-08, W-08b
   },
   {
     ruta: "/historial",

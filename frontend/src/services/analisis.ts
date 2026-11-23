@@ -4,7 +4,13 @@
 // HTTP, consultando `GET /analisis/{id}/estado`. Esa consulta es automática, no una acción de
 // la persona, así que va con `pasiva: true` (header `X-Actividad-Pasiva: 1`) para no renovar la
 // inactividad de la sesión: si no, tener W-07 abierta mantendría la sesión viva para siempre.
-import type { AnalisisCreado, AnalisisResumen, EstadoAnalisisRespuesta, SolicitudAnalisis } from "../types";
+import type {
+  AnalisisCreado,
+  AnalisisDetalle,
+  AnalisisResumen,
+  EstadoAnalisisRespuesta,
+  SolicitudAnalisis,
+} from "../types";
 import { solicitar } from "./api";
 
 /**
@@ -34,6 +40,24 @@ export function obtenerEstadoAnalisis(id: string): Promise<EstadoAnalisisRespues
   return solicitar<EstadoAnalisisRespuesta>(`/analisis/${encodeURIComponent(id)}/estado`, {
     pasiva: true,
   });
+}
+
+/**
+ * `GET /analisis/{id}`. El resultado completo que dibuja W-08 y W-08b.
+ *
+ * **No es pasiva.** Abrir el resultado, reintentar tras un fallo y recuperar una imagen
+ * vencida son acciones de la persona, así que sí renuevan la inactividad de la sesión; lo
+ * contrario sería castigar a quien está leyendo su resultado.
+ *
+ * Las URL de `imagen.url`, `mapa_calor.url` y `regiones[].mapa_calor_url` van firmadas y
+ * vencen a los 5 minutos (`S3_URL_FIRMADA_SEGUNDOS`): volver a llamar aquí es la forma de
+ * conseguir unas nuevas.
+ *
+ * Responde 404 NO_ENCONTRADO si el análisis no existe o no es de este doctor, y 403 si
+ * quien consulta es el administrador.
+ */
+export function obtenerAnalisis(id: string): Promise<AnalisisDetalle> {
+  return solicitar<AnalisisDetalle>(`/analisis/${encodeURIComponent(id)}`);
 }
 
 /**
