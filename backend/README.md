@@ -82,7 +82,10 @@ python -c "import base64, secrets; print(base64.b64encode(secrets.token_bytes(32
   (`{"1": "...", "2": "..."}`) y se sube `HMAC_VERSION_ACTUAL`; la anterior se conserva.
 - Si se pierde `TOTP_CLAVE_CIFRADO`, todos los usuarios deben volver a vincular su app.
 - `HF_REVISION` es un commit SHA de 40 caracteres, nunca una rama (RNF-29).
-- Mientras no exista el Space de Hugging Face, `HF_SIMULADO=true` hace que el worker
+- `HF_TOKEN` (lectura del Space privado) y `GASTROAI_API_KEY` (la clave configurada en el
+  Space) los entrega el equipo de ML por un canal privado. URL, repo, revisión y huella del
+  modelo Fold 2 ya vienen en `.env.example`.
+- Para desarrollar sin el Space, `HF_SIMULADO=true` hace que el worker
   invente resultados estables (misma imagen, mismo resultado) y un mapa de calor de prueba.
   Solo funciona con `ENVIRONMENT=development`; sin eso y sin `HF_SPACE_URL`, los análisis
   quedan `FALLIDO` con `ERR-1002`. Tras cambiarla: `docker compose up -d worker`.
@@ -102,7 +105,7 @@ backend arranca con `ENVIRONMENT=production`.
    de la raíz con la sección «Solo producción»: `POSTGRES_PASSWORD`, `S3_SECRET_KEY`,
    `S3_PUBLIC_ENDPOINT_URL` (`https://<dominio>:9000`) y `SMTP_HOST`. Con
    `ENVIRONMENT=production`, el backend **no arranca** si falta una clave (`HMAC_CLAVES`,
-   `TOTP_CLAVE_CIFRADO`, `HF_TOKEN`, `HF_REVISION`…) y dice cuál.
+   `TOTP_CLAVE_CIFRADO`, `HF_TOKEN`, `GASTROAI_API_KEY`, `HF_REVISION`…) y dice cuál.
 3. Desde la raíz:
 
    ```bash

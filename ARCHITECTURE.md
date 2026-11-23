@@ -97,7 +97,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 - **`ENVIRONMENT=production`:** el backend (API, worker y `preparar`) no arranca si falta
   o queda con valor de desarrollo alguna de: `HMAC_CLAVES` (con la versión actual),
   `TOTP_CLAVE_CIFRADO` (32 bytes en Base64), `HF_SPACE_URL` (https), `HF_TOKEN`,
-  `HF_REVISION` (SHA de 40), `S3_SECRET_KEY`, `S3_PUBLIC_ENDPOINT_URL` (https) y la
+  `GASTROAI_API_KEY`, `HF_REVISION` (SHA de 40), `HF_SHA256` (64 hex), `S3_SECRET_KEY`, `S3_PUBLIC_ENDPOINT_URL` (https) y la
   contraseña de `DATABASE_URL`. Tampoco con `HF_SIMULADO=true`. El error nombra las
   variables, nunca sus valores.
 
@@ -177,7 +177,7 @@ nueva va en `config.py` **y** en `.env.example` con un valor de ejemplo. Grupos:
 | Base de datos y cola | `DATABASE_URL`, `REDIS_URL`, `EVENTOS_INTERVALO_SEGUNDOS` (15) |
 | MinIO | `S3_ENDPOINT_URL` (interno), `S3_PUBLIC_ENDPOINT_URL` (URL firmadas), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_URL_FIRMADA_SEGUNDOS`, `IMAGEN_TEMPORAL_MINUTOS` (30) |
 | Seudónimo y TOTP | `HMAC_CLAVES` (JSON con todas las versiones), `HMAC_VERSION_ACTUAL`, `TOTP_CLAVE_CIFRADO` |
-| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HF_PESOS_ARCHIVO` (respaldo), `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
+| Modelo | `HF_SPACE_URL` (https), `HF_TOKEN`, `GASTROAI_API_KEY` (cabecera `X-API-Key`), `HF_REPO`, `HF_REVISION` (SHA fijo), `HF_SHA256`, `HF_PESOS_ARCHIVO` (respaldo), `HTTP_TIMEOUT_SECONDS` (30), `HF_SIMULADO` (solo desarrollo) |
 | Explicación | `LLM_PROVEEDOR` (gemini), `LLM_MODELO` (gemini-3.5-flash), `LLM_RAZONAMIENTO` (LOW), `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS` (15) |
 | Sesión y bloqueo | `SESION_INACTIVIDAD_MINUTOS` (10), `BLOQUEO_INTENTOS` (5), `BLOQUEO_MINUTOS` (15) |
 | Contraseñas filtradas | `CONTRASENAS_FILTRADAS_ACTIVO`, `..._URL`, `..._TIMEOUT_SECONDS` |
@@ -720,23 +720,31 @@ etapa:
 Cada inferencia deja un renglón en `LogInferencia` (estado `EXITO`, `ERROR` o
 `TIEMPO_AGOTADO`, latencia y el motivo técnico), sin datos clínicos (RF-M03).
 
-**Contrato con el Space de Hugging Face** (lo implementa el equipo de ML):
+**Contrato con el Space privado de Hugging Face** (modelo Fold 2, lo implementa el equipo
+de ML en `Model_CNN/Code-to-deploy-model/app.py`):
 
 ```
 POST {HF_SPACE_URL}/clasificar
 Authorization: Bearer {HF_TOKEN}
+X-API-Key: {GASTROAI_API_KEY}
 multipart/form-data, campo «imagen» (JPEG o PNG ya sin metadatos)
 
-200 {"revision_sha": "<40 hex>", "latencia_ms": 1840,
-     "caracteristicas": [{"codigo": "ATROFIA", "probabilidad": 0.8734,
-       "regiones": [{"x": 0.31, "y": 0.22, "ancho": 0.18, "alto": 0.20,
-                     "area_pct": 14.2, "mapa_calor_base64": "<PNG en Base64>"}]}]}
+200 {"revision_sha": "<40 hex>", "checkpoint_sha256": "<64 hex>",
+     "predicciones": {"ATROFIA": {"probabilidad": 0.8734, "umbral": 0.5, "detectado": true,
+       "region_roi": {"x": 74, "y": 52, "ancho": 43, "alto": 48, "area_pct": 14.2},
+       "mapa_calor_png_b64": "<PNG en Base64>"}, "GASTRITIS": {…}, "HPYLORI": {…}}}
 ```
 
 - Códigos de característica iguales a los del catálogo (`ATROFIA`, `GASTRITIS`, `HPYLORI`).
-- Probabilidades y caja de 0 a 1 (caja relativa a la imagen), `area_pct` de 0 a 100,
-  hasta 10 regiones por característica, mapas en PNG.
+- Probabilidades de 0 a 1 y `area_pct` de 0 a 100. La caja viene en píxeles de la entrada
+  de 240 × 240 (el Space redimensiona sin recortar) y el adaptador la pasa a fracciones de
+  0 a 1. Una caja de 0 × 0 (el Grad-CAM no marcó nada) no se guarda como región.
+- `umbral` y `detectado` del Space no se usan: el backend aplica el umbral vigente (RF-A01).
 - `revision_sha` = el commit cargado en el Space; debe ser igual a `HF_REVISION`.
+- `checkpoint_sha256` = la huella de los pesos; debe ser igual a `HF_SHA256` (si no,
+  `HUELLA_DISTINTA` en `LogInferencia`).
+- `GET {HF_SPACE_URL}/` (sin `X-API-Key`) responde la salud y la revisión: lo usa el panel
+  de supervisión (RF-A04).
 - El Space debe ser privado y no guardar ni registrar las imágenes (RNF-30).
 
 ### 3.9 Tiempo real (SSE) y seguimiento del análisis
