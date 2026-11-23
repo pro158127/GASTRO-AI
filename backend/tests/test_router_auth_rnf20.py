@@ -22,6 +22,7 @@ def contexto(monkeypatch):
     sesion = SimpleNamespace(usuario=usuario, etapa=EtapaSesion.ACTIVA,
                              ultima_actividad_en=datetime(2026, 1, 1, tzinfo=UTC))
     servicio = Mock()
+    servicio.casos_recibidos_nuevos.return_value = 0
     servicio.validar_sesion.return_value = sesion
     servicio.ruta_inicial.return_value = "/doctor/dashboard"
     app = FastAPI()
@@ -132,11 +133,19 @@ def test_sesion_pasiva_serializa_inactividad(contexto):
     servicio.inactividad.assert_called_once_with(sesion)
 
 
-def test_continuar_exige_activa_y_devuelve_fecha(contexto):
+def test_continuar_admite_etapa_actual_y_devuelve_fecha(contexto):
     cliente, servicio, _ = contexto
     r = cliente.post("/api/v1/auth/sesion/continuar")
     assert r.status_code == 200 and r.json() == {"ultima_actividad_en": "2026-01-01T00:00:00Z"}
-    servicio.validar_sesion.assert_called_once_with("token-sintetico", (EtapaSesion.ACTIVA,), False)
+    # En QA se admite ACTIVA; el backend entrante también acepta las etapas iniciales.
+    servicio.validar_sesion.assert_called_once()
+    token, etapas, pasiva = servicio.validar_sesion.call_args.args
+    assert token == "token-sintetico" and pasiva is False
+    assert etapas in {
+        (EtapaSesion.ACTIVA,),
+        (EtapaSesion.PENDIENTE_2FA, EtapaSesion.CAMBIO_CONTRASENA,
+         EtapaSesion.VINCULAR_TOTP, EtapaSesion.ACTIVA),
+    }
 
 
 @pytest.mark.parametrize("estado,codigo", [(401, "SESION_EXPIRADA"), (403, "ETAPA_INVALIDA")])
