@@ -40,20 +40,25 @@ import { useAnalisis } from "./useAnalisis";
 import estilos from "./ResultadoAnalisis.module.css";
 
 /**
- * Texto del aviso de Grad-CAM, el que va junto al mapa.
+ * Texto del aviso de Grad-CAM, el que va junto al mapa: **el que manda el servidor**, tal
+ * cual, sin reescribirlo.
  *
- * Hoy sale de Figma, como manda `CLAUDE.md` § 7 (los textos que ve el usuario los pone el
- * frontend y el `mensaje` del servidor no se muestra). Mónica pidió el del servidor
- * (`mapa_calor.aviso`, que siempre llega) y está en consulta: **para cambiar la fuente se
- * edita solo esta función**, nada del marcado ni de los estilos.
+ * Es la excepción a `CLAUDE.md` § 7, y decidida así por Mónica: esto no es texto de
+ * interfaz sino una advertencia sobre el modelo. Si una revisión del modelo cambia lo que
+ * hay que advertir, el texto cambia en el servidor y el frontend no se toca. Por eso aquí
+ * no se adapta ni se recorta.
+ *
+ * La red: `aviso` tiene valor por omisión en el esquema y siempre debería llegar, pero una
+ * respuesta sin él dejaría el mapa de calor sin ninguna advertencia, que es justo lo que no
+ * puede pasar. Si llega vacío o en blanco se pinta el texto de respaldo.
  */
-const AVISO_GRAD_CAM_FIGMA =
+const AVISO_GRAD_CAM_DE_RESPALDO =
   "El mapa de calor Grad-CAM es una visualización experimental de las zonas que más " +
   "influyeron en el modelo. No es una segmentación clínica ni delimita una lesión.";
 
 export function textoAvisoGradCam(mapa: MapaCalor): string {
-  void mapa; // ← devolver `mapa.aviso` cuando Mónica responda
-  return AVISO_GRAD_CAM_FIGMA;
+  const delServidor = typeof mapa.aviso === "string" ? mapa.aviso.trim() : "";
+  return delServidor || AVISO_GRAD_CAM_DE_RESPALDO;
 }
 
 /** Una fila de «Características identificadas». */

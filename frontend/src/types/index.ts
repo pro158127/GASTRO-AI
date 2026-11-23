@@ -499,8 +499,9 @@ export interface MapaCalor {
   url: string;
   /**
    * Texto del servidor que aclara que Grad-CAM es una visualización y no una segmentación
-   * clínica. Hoy la pantalla muestra el texto de Figma (`CLAUDE.md` § 7) y este campo no se
-   * usa; la fuente se cambia en un solo sitio, `textoAvisoGradCam` de `ResultadoAnalisis`.
+   * clínica. **Se pinta tal cual**, junto al mapa: es una advertencia sobre el modelo, no
+   * texto de interfaz, y si cambia con una revisión cambia en el servidor sin tocar el
+   * frontend. Es la excepción a `CLAUDE.md` § 7; lo decidió Mónica.
    */
   aviso: string;
 }
