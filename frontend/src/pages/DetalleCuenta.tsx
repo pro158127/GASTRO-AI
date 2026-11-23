@@ -995,4 +995,3 @@ function avisoCorreoNoEnviado(nombre: string, correo: string | null, pendiente: 
     mensaje: `${hecho}, pero el correo a ${destino} no salió. Reintente el envío cuando el correo vuelva a funcionar.`,
   };
 }
-
