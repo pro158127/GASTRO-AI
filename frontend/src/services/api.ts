@@ -30,6 +30,8 @@ interface DetalleError {
   motivo?: string | null;
   /** `etapa` de ETAPA_INVALIDA: la etapa actual de la sesión. */
   etapa?: EtapaSesion | null;
+  /** `casos_activos` de DESTINO_REQUERIDO: cuántos casos activos tiene el doctor (D-02). */
+  casosActivos?: number | null;
   /** Campos con error (por ejemplo `contrasena_nueva` o `confirmacion`). */
   campos?: CampoConError[];
   /** Requisitos de la política de contraseñas (CONTRASENA_NO_CUMPLE_POLITICA). */
@@ -51,6 +53,12 @@ export class ErrorApi extends Error {
   readonly idSolicitud: string | null;
   readonly motivo: string | null;
   readonly etapa: EtapaSesion | null;
+  /**
+   * Cuántos casos activos tiene el doctor, en el 409 DESTINO_REQUERIDO. Lo manda el servidor
+   * junto al código para no tener que preguntarlo otra vez: es el número que dice D-02, y es el
+   * número **de ahora**, que puede no ser el que se vio al abrir el detalle (RF-A06).
+   */
+  readonly casosActivos: number | null;
   readonly campos: CampoConError[];
   readonly requisitos: RequisitoContrasena[];
 
@@ -62,6 +70,7 @@ export class ErrorApi extends Error {
     this.idSolicitud = detalle.idSolicitud ?? null;
     this.motivo = detalle.motivo ?? null;
     this.etapa = detalle.etapa ?? null;
+    this.casosActivos = detalle.casosActivos ?? null;
     this.campos = detalle.campos ?? [];
     this.requisitos = detalle.requisitos ?? [];
   }
@@ -122,6 +131,11 @@ function textoONulo(valor: unknown): string | null {
   return typeof valor === "string" ? valor : null;
 }
 
+/** Entero finito o `null`: un conteo que llegue como texto o como `NaN` no sirve para contar. */
+function numeroONulo(valor: unknown): number | null {
+  return typeof valor === "number" && Number.isFinite(valor) ? valor : null;
+}
+
 function listaDe<T>(valor: unknown, esElemento: (x: unknown) => x is T): T[] {
   return Array.isArray(valor) ? valor.filter(esElemento) : [];
 }
@@ -143,6 +157,7 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     idSolicitud: textoONulo(detalle.id_solicitud),
     motivo: textoONulo(detalle.motivo),
     etapa: esEtapaSesion(detalle.etapa) ? detalle.etapa : null,
+    casosActivos: numeroONulo(detalle.casos_activos),
     campos: listaDe(detalle.campos, esCampoConError),
     requisitos: listaDe(detalle.requisitos, esRequisito),
   });

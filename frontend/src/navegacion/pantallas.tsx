@@ -9,6 +9,7 @@ import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import MiPerfil from "../pages/MiPerfil";
 import PantallaPendiente from "../pages/PantallaPendiente";
+import ReasignarCasos from "../pages/ReasignarCasos";
 import SinPermisos from "../pages/SinPermisos";
 import Usuarios from "../pages/Usuarios";
 import type { RolInterfaz } from "./menus";
@@ -77,6 +78,14 @@ export const pantallas: Pantalla[] = [
     titulo: "Detalle de cuenta",
     roles: SOLO_ADMINISTRADOR,
     elemento: (titulo) => <DetalleCuenta titulo={titulo} />, // W-11
+  },
+  {
+    // No tiene ítem de menú: se entra desde W-11 (D-02) o escribiendo la ruta. `matchPath` exige
+    // que la ruta coincida entera, así que no se confunde con `/usuarios/:id`.
+    ruta: "/usuarios/:id/reasignar-casos",
+    titulo: "Reasignar casos activos",
+    roles: SOLO_ADMINISTRADOR,
+    elemento: (titulo) => <ReasignarCasos titulo={titulo} />, // W-25
   },
   {
     ruta: "/cuentas-pendientes",

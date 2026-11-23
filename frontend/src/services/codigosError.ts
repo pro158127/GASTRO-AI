@@ -40,7 +40,29 @@ export const CodigoErrorApi = {
   ULTIMO_ADMINISTRADOR: "ULTIMO_ADMINISTRADOR",
   /** 409 · Pasar a administrador a un doctor que todavía tiene casos activos (W-11, D-04). */
   CASOS_SIN_REASIGNAR: "CASOS_SIN_REASIGNAR",
+  /**
+   * 409 · Desactivar o eliminar a un doctor con casos activos sin mandar `destino_id` (RF-A06)
+   * → D-02. Trae `campos` con `{campo: "destino_id"}` y, además, `casos_activos` con cuántos son
+   * (ver `ErrorApi.casosActivos`): ese número es el que dice D-02, sin volver a consultar.
+   */
+  DESTINO_REQUERIDO: "DESTINO_REQUERIDO",
+  /**
+   * 409 · Reasignar los casos de un doctor que ya no tiene ninguno (W-25): se los reasignaron
+   * desde otra sesión mientras esta pantalla estaba abierta.
+   */
+  SIN_CASOS_ACTIVOS: "SIN_CASOS_ACTIVOS",
   DATOS_INVALIDOS: "DATOS_INVALIDOS",
+  /**
+   * 422 · El destino no es otro doctor con la cuenta activa (también si es el propio origen).
+   * Trae `campos` con `{campo: "destino_id"}`, así que se pinta en el desplegable de destino.
+   */
+  DESTINO_INVALIDO: "DESTINO_INVALIDO",
+  /**
+   * 422 · Algún `caso_id` no es un caso activo de ese doctor. Trae `campos` con
+   * `{campo: "caso_ids"}`. W-25 reasigna siempre todos (`caso_ids: null`), así que solo puede
+   * aparecer si el envío deja de hacerlo.
+   */
+  CASOS_INVALIDOS: "CASOS_INVALIDOS",
   /** 422 · W-02b: trae `campos` y `requisitos`. */
   CONTRASENA_NO_CUMPLE_POLITICA: "CONTRASENA_NO_CUMPLE_POLITICA",
   /** 429 · Límite por IP en login y códigos (10/min); trae `Retry-After`. */

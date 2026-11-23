@@ -1,16 +1,22 @@
-// Pantalla W-11 · Detalle de cuenta (Figma 48:1161). RF-U07, RF-U08, RF-U09, RF-U12; flujo F5.
-// Estados: W-11b bloqueada (99:2887), W-11c desactivada (99:3055), W-11d pendiente de activación
-// (99:3220), W-11i último administrador activo (165:18887), W-11f editar información (99:3552),
-// W-11g cuenta activada con un clic (164:47343) y W-11h cuenta desbloqueada con un clic
-// (164:47517). Diálogos: D-04 cambiar rol (100:3379), D-05 último administrador (100:3484) y D-06
-// con el texto propio de esta pantalla (el de W-20 dice otra cosa).
+// Pantalla W-11 · Detalle de cuenta (Figma 48:1161). RF-U07, RF-U08, RF-U09, RF-U11, RF-U12;
+// flujo F5. Estados: W-11b bloqueada (99:2887), W-11c desactivada (99:3055), W-11d pendiente de
+// activación (99:3220), W-11i último administrador activo (165:18887), W-11f editar información
+// (99:3552), W-11g cuenta activada con un clic (164:47343) y W-11h cuenta desbloqueada con un
+// clic (164:47517). Diálogos: D-04 cambiar rol (100:3379), D-05 último administrador (100:3484),
+// D-06 con el texto propio de esta pantalla (el de W-20 dice otra cosa), D-01 desactivar
+// (100:3085), D-02 doctor con casos activos (100:3186), D-08 eliminar (100:3847) y D-09
+// eliminación en curso (100:3940). D-10b es la notificación con la que se vuelve de W-25.
 //
-// Alcance: esta tarea no incluye desactivar, eliminar ni reasignar casos (W-25, D-01, D-02, D-08,
-// D-09, D-10). Figma los dibuja en W-11, pero aquí **no se pintan botones que no hacen nada**: no
-// existen la tarjeta «Acción irreversible» ni el botón «Desactivar cuenta». La tarjeta «Estado de
-// la cuenta» solo aparece cuando la acción que ofrece sí existe, es decir «Activar cuenta» en una
-// cuenta inactiva (W-11c → W-11g). Por lo mismo, la alerta de W-11i menciona solo el cambio de
-// rol. Todo esto entra con la tarea de desactivar y eliminar.
+// **Las bajas y el rebote del 409.** El detalle ya sabe cuántos casos activos tiene la cuenta, así
+// que si es un doctor con casos no se intenta la baja: se abre D-02, que lleva a W-25. Pero entre
+// reasignar y dar de baja le pueden asignar un caso nuevo, y entonces el servidor responde 409
+// DESTINO_REQUERIDO con el número de ahora (`ErrorApi.casosActivos`): se vuelve a abrir D-02 con
+// ese número y se vuelve a W-25, que llega con el destino que ya se había elegido
+// (`utils/reasignacionPendiente.ts`). El bucle solo se repite si el administrador lo decide:
+// cancelar está en todos los pasos y deja el detalle intacto.
+//
+// **Nunca se manda `destino_id` en la baja**, aunque el endpoint lo acepte: reasignar es un paso
+// propio y visible (W-25), no un efecto secundario de desactivar o eliminar.
 //
 // Decisiones del equipo sobre lo que Figma dibuja y la API entrega:
 // - La IP del bloqueo (W-11b, «desde la IP 203.0.113.45») **no viene** en el detalle: el contrato
@@ -39,6 +45,18 @@
 //   va en el h1, como en el cuerpo de Figma. Pendiente de hablar con diseño.
 // - El botón «Desbloquear cuenta» va sin el ícono de candado abierto (12:622): ese ícono todavía
 //   no existe en `components/iconos`. La etiqueta sola dice qué hace. Pendiente.
+// - D-05 en Figma dice «Para desactivarla, eliminarla o cambiar su rol»: está escrito en femenino
+//   porque el ejemplo es una mujer. El código no sabe el género de nadie, así que la frase se
+//   escribe sin marcarlo.
+// - Figma no dibuja qué pasa si un administrador se desactiva o se elimina a sí mismo. El
+//   servidor solo protege al último administrador activo, así que aquí no se inventa una regla:
+//   la acción se ofrece, el botón no se deshabilita y el servidor decide. Lo que sí se hace es
+//   **decirlo**: cuando la cuenta del diálogo es la de quien está usando la aplicación, D-01 y
+//   D-08 lo dicen en su mensaje. No es una regla nueva, es un hecho que el frontend conoce
+//   (`useSesion`) y que cambia lo que va a pasar al confirmar. Pendiente de hablar con diseño.
+// - W-11i no dibuja una razón bajo las tarjetas de estado y de acción irreversible, solo la
+//   alerta de arriba. Se deshabilitan igual y se explica al lado, como ya se hacía con el cambio
+//   de rol: el componente «Botón» pide que un botón deshabilitado diga por qué.
 // - **Vacío de diseño, no descuido del código:** el detalle no muestra los casos activos ni si la
 //   aplicación autenticadora está vinculada, aunque `UsuarioDetalle` trae `casos_activos` y
 //   `totp_vinculado`. La tarjeta «Datos de la cuenta» de Figma tiene exactamente siete filas en
@@ -52,12 +70,13 @@
 // nombre, el correo y el teléfono solo viven en el estado de esta pantalla; el id va en la URL
 // (es un UUID, no un dato personal) y nada se guarda en el navegador ni en la consola.
 import { useEffect, useId, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import Alerta from "../components/Alerta";
 import Boton from "../components/Boton";
 import DialogoAviso from "../components/DialogoAviso";
 import DialogoCambiarRol from "../components/DialogoCambiarRol";
 import DialogoConfirmacion from "../components/DialogoConfirmacion";
+import DialogoProgreso from "../components/DialogoProgreso";
 import EncabezadoPagina from "../components/EncabezadoPagina";
 import EnlaceBoton from "../components/EnlaceBoton";
 import Esqueleto from "../components/Esqueleto";
@@ -69,7 +88,9 @@ import { CodigoErrorApi } from "../services/codigosError";
 import {
   activarUsuario,
   cambiarRol,
+  desactivarUsuario,
   desbloquearUsuario,
+  eliminarUsuario,
   hayOtroAdministradorActivo,
   obtenerUsuario,
   reenviarCredencial,
@@ -80,6 +101,9 @@ import type { RolUsuario, UsuarioDetalle } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
 import { fechaHoraCorta } from "../utils/fechas";
+import { leerNotificacion, limpiarNotificacion } from "../utils/notificacionPendiente";
+import { dejarBajaPendiente, leerBajaPendiente, limpiarBajaPendiente } from "../utils/reasignacionPendiente";
+import type { TipoBaja } from "../utils/reasignacionPendiente";
 import { insigniaDeEstado, nombreCompleto } from "../utils/presentacionUsuario";
 import FormularioDatosCuenta from "./DetalleCuentaFormulario";
 import estilos from "./DetalleCuenta.module.css";
@@ -87,7 +111,7 @@ import estilos from "./DetalleCuenta.module.css";
 const RUTA_USUARIOS = "/usuarios";
 
 /** Acción en curso: solo puede haber una a la vez. */
-type AccionCuenta = "rol" | "contrasena" | "activar" | "desbloquear";
+type AccionCuenta = "rol" | "contrasena" | "activar" | "desbloquear" | "desactivar" | "eliminar";
 
 /** Lo que una acción deja en la pantalla: una notificación de éxito o una alerta persistente. */
 export interface ResultadoAccion {
@@ -221,17 +245,27 @@ interface PropiedadesCuentaCargada {
 }
 
 function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: PropiedadesCuentaCargada) {
-  const { autenticado } = useSesion();
+  const { autenticado, usuario: usuarioEnSesion } = useSesion();
+  const navegar = useNavigate();
   const [editando, setEditando] = useState(false);
   const [enviando, setEnviando] = useState<AccionCuenta | null>(null);
-  const [dialogo, setDialogo] = useState<"rol" | "contrasena" | null>(null);
+  const [dialogo, setDialogo] = useState<"rol" | "contrasena" | "desactivar" | "eliminar" | null>(null);
   /** Rol elegido en D-04. Vacío = todavía no eligió nada; el diálogo abre así a propósito. */
   const [rolElegido, setRolElegido] = useState<RolUsuario | "">("");
   const [avisoUltimoAdministrador, setAvisoUltimoAdministrador] = useState(false);
-  const [notificacion, setNotificacion] = useState<{ titulo: string; mensaje: string } | null>(null);
+  /** D-02: la baja que no puede seguir hasta reasignar, con cuántos casos hay que mover. */
+  const [bajaConCasos, setBajaConCasos] = useState<{ tipo: TipoBaja; casos: number } | null>(null);
+  // D-10b: la notificación que dejó W-25 al volver. El inicializador tiene que ser puro, porque
+  // <React.StrictMode> lo llama dos veces (ver utils/notificacionPendiente.ts).
+  const [notificacion, setNotificacion] = useState<{ titulo: string; mensaje: string } | null>(leerNotificacion);
   const [errorAccion, setErrorAccion] = useState<AvisoError | null>(null);
 
   const contenedorRef = useRef<HTMLDivElement>(null);
+
+  // Ya se leyó: se borra para que no vuelva a salir al entrar otra vez a este detalle.
+  useEffect(() => {
+    limpiarNotificacion();
+  }, []);
 
   // Tras una acción la tarjeta que tenía el foco puede desaparecer (por ejemplo «Activar cuenta»,
   // cuya tarjeta solo existe mientras la cuenta está inactiva). Si el foco cayó en <body>, se
@@ -245,6 +279,8 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
   const eliminada = usuario.estado === "ELIMINADO";
   const insignia = insigniaDeEstado(usuario);
   const hayAccionEnCurso = enviando !== null;
+  /** La cuenta que se está mirando es la de quien tiene la sesión abierta (D-01 y D-08 lo dicen). */
+  const esSuPropiaCuenta = usuarioEnSesion?.id === usuario.id;
 
   /** Muestra lo que pasó y vuelve a pedir el detalle (las acciones no lo devuelven completo). */
   function terminarAccion(resultado: ResultadoAccion) {
@@ -357,6 +393,67 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
     });
   }
 
+  // --- Bajas: desactivar y eliminar (D-01, D-02, D-08, D-09) ------------------------------------
+
+  /**
+   * Primer paso de una baja. Si la cuenta es un doctor con casos activos no se intenta siquiera:
+   * el servidor la rechazaría y el camino es D-02 → W-25. El número sale del detalle, que ya lo
+   * trae; si para cuando se confirme ya no fuera cierto, el 409 lo corrige.
+   */
+  function pedirBaja(tipo: TipoBaja) {
+    if (hayAccionEnCurso) return;
+    setErrorAccion(null);
+    if (usuario.rol === "DOCTOR" && usuario.casos_activos > 0) {
+      setBajaConCasos({ tipo, casos: usuario.casos_activos });
+      return;
+    }
+    setDialogo(tipo === "DESACTIVACION" ? "desactivar" : "eliminar");
+  }
+
+  /** D-02 confirmado: se guarda qué baja quedó a medias y se va a W-25. */
+  function irAReasignar(tipo: TipoBaja) {
+    dejarBajaPendiente({
+      usuarioId: usuario.id,
+      tipo,
+      // Lo que ya había elegido en un intento anterior, para no hacérselo repetir.
+      destinoId: leerBajaPendiente(usuario.id)?.destinoId,
+    });
+    setBajaConCasos(null);
+    navegar(`${RUTA_USUARIOS}/${encodeURIComponent(usuario.id)}/reasignar-casos`);
+  }
+
+  /**
+   * D-01 y D-08 confirmados. No usa `ejecutar` porque tiene una salida propia: el 409
+   * DESTINO_REQUERIDO no es un fallo que contar, sino el paso que falta, así que en vez de una
+   * alerta abre D-02 con el número de casos que acaba de dar el servidor.
+   */
+  async function ejecutarBaja(tipo: TipoBaja) {
+    const accion: AccionCuenta = tipo === "DESACTIVACION" ? "desactivar" : "eliminar";
+    if (hayAccionEnCurso) return;
+    setEnviando(accion);
+    setErrorAccion(null);
+    setNotificacion(null);
+    try {
+      if (tipo === "DESACTIVACION") await desactivarUsuario(usuario.id);
+      else await eliminarUsuario(usuario.id);
+      // La baja se completó: ya no queda nada pendiente de reasignar.
+      limpiarBajaPendiente();
+      terminarAccion({ notificacion: notificacionDeBaja(tipo, nombre) });
+    } catch (causa: unknown) {
+      if (esErrorGlobal(causa)) return;
+      if (causa instanceof ErrorApi && causa.codigo === CodigoErrorApi.DESTINO_REQUERIDO) {
+        // El rebote: le asignaron casos entre la reasignación y la baja, o los tenía desde antes.
+        setBajaConCasos({ tipo, casos: causa.casosActivos ?? usuario.casos_activos });
+        recargar();
+        return;
+      }
+      terminarAccion({ aviso: avisoDeAccion(causa) ?? undefined });
+    } finally {
+      setEnviando(null);
+      setDialogo(null);
+    }
+  }
+
   // --- Razones por las que una acción no está disponible ---------------------------------------
 
   let razonRol: string | undefined;
@@ -370,6 +467,11 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
   if (eliminada) razonContrasena = "La cuenta está eliminada: ya no admite cambios.";
   else if (usuario.estado === "INACTIVO") razonContrasena = "Active la cuenta para poder restablecer su contraseña.";
   else if (correo === null) razonContrasena = "La cuenta no tiene un correo registrado al que enviarla.";
+
+  // Desactivar y eliminar: el servidor protege al último administrador activo (RF-U07 CA 6), así
+  // que la acción se deshabilita y se explica, igual que el cambio de rol. El 409 se atiende de
+  // todas formas: la autoridad es el servidor (RF-U03 CA 4).
+  const razonBaja = esUltimoAdministrador ? "Es la única cuenta de administrador activa." : undefined;
 
   const razonDesbloqueo = eliminada
     ? "La cuenta está eliminada: ya no admite cambios."
@@ -396,11 +498,11 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
       />
 
       <div ref={contenedorRef} tabIndex={-1} className={estilos.contenido}>
-        {/* W-11i. Se nombra solo el cambio de rol: desactivar y eliminar todavía no existen. */}
+        {/* W-11i */}
         {esUltimoAdministrador && (
           <Alerta tipo="info" titulo="Única cuenta de administrador activa">
-            Para cambiar el rol de esta cuenta, primero cree o active otro administrador. Siempre debe
-            existir al menos un administrador activo.
+            Para cambiar el rol, desactivar o eliminar esta cuenta, primero cree o active otro
+            administrador. Siempre debe existir al menos un administrador activo.
           </Alerta>
         )}
 
@@ -483,8 +585,8 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
                 onAccion={desbloquear}
               />
 
-              {/* W-11c → W-11g. Solo cuando la acción existe: desactivar es de la tarea siguiente. */}
-              {usuario.estado === "INACTIVO" && (
+              {/* W-11c → W-11g cuando está inactiva; W-11 → D-01 en cualquier otro estado. */}
+              {usuario.estado === "INACTIVO" ? (
                 <TarjetaAccion
                   titulo="Estado de la cuenta"
                   descripcion={textoDesactivacion(usuario)}
@@ -496,7 +598,33 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
                   etiquetaCargando="Activando…"
                   onAccion={activar}
                 />
+              ) : (
+                <TarjetaAccion
+                  titulo="Estado de la cuenta"
+                  descripcion="Una cuenta desactivada no puede iniciar sesión. Se puede volver a activar."
+                  leyenda="RF-U07"
+                  etiqueta="Desactivar cuenta"
+                  nombreCuenta={nombre}
+                  razonNoDisponible={razonBaja}
+                  ocupado={hayAccionEnCurso}
+                  cargando={enviando === "desactivar"}
+                  etiquetaCargando="Desactivando…"
+                  onAccion={() => pedirBaja("DESACTIVACION")}
+                />
               )}
+
+              {/* Zona de acción irreversible → D-08 y D-09. */}
+              <TarjetaAccion
+                variante="irreversible"
+                titulo="Acción irreversible"
+                descripcion="Elimina la cuenta. Sus registros históricos se conservan vinculados mediante la tabla de traslado. Si tiene casos activos, primero se deben reasignar a otro doctor."
+                leyenda="RF-U11, RF-A06"
+                etiqueta="Eliminar usuario"
+                nombreCuenta={nombre}
+                razonNoDisponible={razonBaja}
+                ocupado={hayAccionEnCurso}
+                onAccion={() => pedirBaja("ELIMINACION")}
+              />
             </div>
           )}
         </div>
@@ -546,11 +674,61 @@ function CuentaCargada({ usuario, esUltimoAdministrador, recargar }: Propiedades
         />
       )}
 
+      {/* D-01 */}
+      {dialogo === "desactivar" && (
+        <DialogoConfirmacion
+          confirmarEsDestructivo
+          titulo={`¿Desactivar la cuenta de ${nombre}?`}
+          mensaje={mensajeBaja("DESACTIVACION", esSuPropiaCuenta)}
+          etiquetaConfirmar="Desactivar cuenta"
+          etiquetaCancelar="Cancelar"
+          enviando={enviando === "desactivar"}
+          etiquetaEnviando="Desactivando…"
+          onConfirmar={() => void ejecutarBaja("DESACTIVACION")}
+          onCancelar={() => setDialogo(null)}
+        />
+      )}
+
+      {/* D-08. D-09 lo reemplaza en cuanto sale la petición: el borrado no se puede cancelar. */}
+      {dialogo === "eliminar" && enviando !== "eliminar" && (
+        <DialogoConfirmacion
+          confirmarEsDestructivo
+          titulo={`¿Eliminar la cuenta de ${nombre}?`}
+          mensaje={mensajeBaja("ELIMINACION", esSuPropiaCuenta)}
+          etiquetaConfirmar="Eliminar cuenta"
+          etiquetaCancelar="Cancelar"
+          onConfirmar={() => void ejecutarBaja("ELIMINACION")}
+          onCancelar={() => setDialogo(null)}
+        />
+      )}
+
+      {/* D-09 */}
+      {enviando === "eliminar" && (
+        <DialogoProgreso
+          titulo={`Eliminando la cuenta de ${nombre}…`}
+          mensaje="Trasladando las referencias de sus registros históricos. No cierre esta ventana."
+          textoProgreso="Eliminando…"
+        />
+      )}
+
+      {/* D-02: la baja no sigue hasta que los casos tengan otro doctor (RF-A06). */}
+      {bajaConCasos && (
+        <DialogoConfirmacion
+          confirmarEsPrimario
+          titulo={`${nombre} tiene ${textoCasos(bajaConCasos.casos)}`}
+          mensaje="Antes de desactivar o eliminar esta cuenta, reasigne sus casos activos a otro doctor activo (RF-A06). Los registros históricos se conservan."
+          etiquetaConfirmar="Reasignar casos"
+          etiquetaCancelar="Cancelar"
+          onConfirmar={() => irAReasignar(bajaConCasos.tipo)}
+          onCancelar={() => setBajaConCasos(null)}
+        />
+      )}
+
       {/* D-05: el servidor rechazó la acción aunque la pantalla ya la deshabilitaba. */}
       {avisoUltimoAdministrador && (
         <DialogoAviso
           titulo="No se puede completar esta acción"
-          mensaje={`${nombre} es el último administrador activo. Para cambiar su rol, primero asigne el rol de administrador a otra cuenta activa.`}
+          mensaje={`${nombre} es el último administrador activo. Para desactivar esta cuenta, eliminarla o cambiar su rol, primero asigne el rol de administrador a otra cuenta activa.`}
           onCerrar={() => setAvisoUltimoAdministrador(false)}
         />
       )}
@@ -625,6 +803,12 @@ interface PropiedadesTarjetaAccion {
   ocupado?: boolean;
   cargando?: boolean;
   etiquetaCargando?: string;
+  /**
+   * «irreversible»: la tarjeta va enmarcada en rojo y su botón se dibuja destructivo, como la
+   * «Zona de acción irreversible» de Figma. El componente «Botón» reserva esa jerarquía para
+   * acciones que no se pueden deshacer, y exige que vayan con confirmación (D-08).
+   */
+  variante?: "normal" | "irreversible";
   onAccion: () => void;
 }
 
@@ -643,18 +827,20 @@ function TarjetaAccion({
   ocupado = false,
   cargando = false,
   etiquetaCargando,
+  variante = "normal",
   onAccion,
 }: PropiedadesTarjetaAccion) {
   const idRazon = useId();
   const noDisponible = razonNoDisponible !== undefined;
+  const irreversible = variante === "irreversible";
 
   return (
-    <section className={estilos.tarjeta}>
+    <section className={[estilos.tarjeta, irreversible ? estilos.tarjetaIrreversible : ""].filter(Boolean).join(" ")}>
       <h2 className={estilos.tituloAccion}>{titulo}</h2>
       <p className={estilos.descripcionAccion}>{descripcion}</p>
       <div>
         <Boton
-          jerarquia="secundario"
+          jerarquia={irreversible ? "destructivo" : "secundario"}
           cargando={cargando}
           etiquetaCargando={etiquetaCargando}
           aria-disabled={noDisponible || ocupado || undefined}
@@ -680,6 +866,41 @@ function TarjetaAccion({
 /** «12 casos activos» / «1 caso activo». */
 function textoCasos(cantidad: number): string {
   return cantidad === 1 ? "1 caso activo" : `${cantidad} casos activos`;
+}
+
+/**
+ * Mensaje de D-01 y D-08: la consecuencia que dibuja Figma y, si la cuenta es la de quien está
+ * usando la aplicación, la consecuencia que solo se puede decir aquí.
+ *
+ * No deshabilita nada ni añade una regla que el servidor no tenga (solo protege al último
+ * administrador activo): dice un hecho que el frontend conoce y el diálogo callaba, que es
+ * justo lo que RNF-08 le pide a un diálogo de confirmación: decir qué va a pasar.
+ */
+function mensajeBaja(tipo: TipoBaja, esSuPropiaCuenta: boolean): string {
+  const consecuencia =
+    tipo === "DESACTIVACION"
+      ? "No podrá iniciar sesión hasta que un administrador la active de nuevo. Sus análisis y registros se conservan. Quedará registrado en la bitácora."
+      : "La cuenta se eliminará de forma permanente y no podrá volver a iniciar sesión. Sus registros históricos (historial, bitácora y reportes) se conservan vinculados mediante la tabla de traslado. Esta acción no se puede deshacer.";
+  if (!esSuPropiaCuenta) return consecuencia;
+  const propia =
+    tipo === "DESACTIVACION"
+      ? " Esta es su propia cuenta: perderá el acceso a la plataforma y necesitará que otro administrador la vuelva a activar."
+      : " Esta es su propia cuenta: perderá el acceso a la plataforma de forma permanente.";
+  return consecuencia + propia;
+}
+
+/** Lo que se anuncia al terminar una baja. Figma no dibuja estas dos notificaciones. */
+function notificacionDeBaja(tipo: TipoBaja, nombre: string): { titulo: string; mensaje: string } {
+  if (tipo === "DESACTIVACION") {
+    return {
+      titulo: "Cuenta desactivada",
+      mensaje: `${nombre} ya no puede iniciar sesión. Sus análisis y registros se conservan, y la cuenta se puede volver a activar.`,
+    };
+  }
+  return {
+    titulo: "Cuenta eliminada",
+    mensaje: `La cuenta de ${nombre} se eliminó de forma permanente. Sus registros históricos se conservan vinculados mediante la tabla de traslado.`,
+  };
 }
 
 /** Fila «Primer ingreso (activación)»: la fecha, o en qué va la contraseña temporal (W-11d). */

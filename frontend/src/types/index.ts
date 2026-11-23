@@ -231,6 +231,59 @@ export interface RespuestaEdicion {
 }
 
 /**
+ * El `traslado` que devuelven una baja y una reasignación (../ARCHITECTURE.md § 3.5): el
+ * identificador del movimiento, su tipo y cuántos **casos** se movieron. No trae el destino ni la
+ * fecha; eso es `ultimo_traslado` del detalle.
+ */
+export interface TrasladoResumen {
+  id: string;
+  tipo: TipoTraslado;
+  casos_trasladados: number;
+}
+
+/**
+ * Respuesta de `POST /{id}/desactivar` y `POST /{id}/eliminar` (D-01, D-08). `traslado` es `null`
+ * cuando la cuenta no tenía casos activos, que desde el frontend es siempre: nunca se manda
+ * `destino_id` en una baja, porque reasignar es un paso propio y visible (W-25).
+ */
+export interface RespuestaBaja {
+  usuario: UsuarioResumen;
+  traslado?: TrasladoResumen | null;
+}
+
+/** Respuesta de `POST /{id}/reasignar-casos` (W-25 → D-10). Aquí el traslado siempre existe. */
+export interface RespuestaTraslado {
+  traslado: TrasladoResumen;
+}
+
+/**
+ * Un análisis de un caso activo (W-25, paso 2). Solo el código y la fecha: nada clínico ni del
+ * paciente (RF-A06 CA 2). El servidor no entrega nada más.
+ */
+export interface AnalisisCasoActivo {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+}
+
+/** Un caso activo del doctor, con sus análisis. */
+export interface CasoActivoDoctor {
+  caso_id: string;
+  analisis: AnalisisCasoActivo[];
+}
+
+/**
+ * Respuesta de `GET /admin/usuarios/{id}/casos-activos` (W-25). Sin paginación: vienen todos.
+ * `total_casos` es el mismo número que `UsuarioDetalle.casos_activos` y que el `casos_activos` del
+ * 409 DESTINO_REQUERIDO; `total_analisis` puede ser mayor, porque un caso puede tener varios.
+ */
+export interface CasosActivosDoctor {
+  total_casos: number;
+  total_analisis: number;
+  casos: CasoActivoDoctor[];
+}
+
+/**
  * Cuerpo de `POST /admin/usuarios` (RF-U05). `telefono` es opcional: se omite cuando está vacío.
  * El servidor normaliza el correo a minúsculas y el teléfono sin separadores.
  */

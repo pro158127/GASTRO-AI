@@ -65,6 +65,13 @@
   color: var(--color-texto-secundario);
 }
 
+/* «Zona de acción irreversible» (eliminar, RF-U11): el marco rojo avisa de que lo de dentro no se
+   puede deshacer. El color no es la única señal: el título dice «Acción irreversible», la
+   descripción lo explica y el diálogo de confirmación lo repite con todas las letras. */
+.tarjetaIrreversible {
+  border-color: var(--color-estado-error-borde);
+}
+
 /* Por qué la acción no está disponible: el botón deshabilitado nunca se queda sin explicación. */
 .razon {
   margin: 0;

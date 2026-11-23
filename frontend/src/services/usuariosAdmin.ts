@@ -1,11 +1,14 @@
 // Usuarios del administrador (../ARCHITECTURE.md § 3.5, «Usuarios»). Solo el rol ADMINISTRADOR;
 // la autorización la hace el servidor (403 PERMISO_DENEGADO → W-28 por los manejadores globales).
 import type {
+  CasosActivosDoctor,
   EdicionUsuario,
   NuevoUsuario,
   PaginaUsuarios,
+  RespuestaBaja,
   RespuestaCredencial,
   RespuestaEdicion,
+  RespuestaTraslado,
   RespuestaUsuario,
   RolUsuario,
   UsuarioDetalle,
@@ -224,6 +227,92 @@ export function restablecerContrasena(id: string): Promise<RespuestaCredencial> 
   return solicitar<RespuestaCredencial>(rutaUsuario(id, "/restablecer-contrasena"), {
     metodo: "POST",
   });
+}
+
+/**
+ * POST /admin/usuarios/{id}/desactivar (W-11 → D-01, RF-U07). La cuenta no puede iniciar sesión
+ * hasta que un administrador la active; sus análisis y registros se conservan. Cierra sus sesiones
+ * abiertas. Lo admiten las cuentas ACTIVO y las PENDIENTE (una cuenta creada por error se puede
+ * desactivar sin haber entrado nunca); en una INACTIVO responde 409 TRANSICION_INVALIDA.
+ *
+ * **Nunca se manda `destino_id`**, aunque el endpoint lo acepte: reasignar los casos de un doctor
+ * es un paso propio y visible (W-25), no un efecto secundario de dar de baja. Por eso, si el
+ * doctor tiene casos activos, el servidor responde 409 DESTINO_REQUERIDO con cuántos son
+ * (`ErrorApi.casosActivos`) y la pantalla abre D-02. Como consecuencia, el `traslado` de la
+ * respuesta siempre llega `null` desde aquí.
+ *
+ * También puede responder 409 ULTIMO_ADMINISTRADOR (→ D-05) y 404 si la cuenta ya se eliminó.
+ */
+export function desactivarUsuario(id: string): Promise<RespuestaBaja> {
+  return solicitar<RespuestaBaja>(rutaUsuario(id, "/desactivar"), { metodo: "POST" });
+}
+
+/**
+ * POST /admin/usuarios/{id}/eliminar (W-11 → D-08, D-09, RF-U11). **Es irreversible**: la cuenta
+ * pasa a ELIMINADO, no vuelve a iniciar sesión y ninguna acción posterior sobre ella funciona
+ * (404). Los registros históricos se conservan vinculados mediante la tabla de traslado, y el
+ * nombre sigue disponible para el historial y la bitácora (CA 4 y 5).
+ *
+ * Mismos rechazos que `desactivarUsuario`, y por la misma razón tampoco manda `destino_id`.
+ */
+export function eliminarUsuario(id: string): Promise<RespuestaBaja> {
+  return solicitar<RespuestaBaja>(rutaUsuario(id, "/eliminar"), { metodo: "POST" });
+}
+
+/**
+ * GET /admin/usuarios/{id}/casos-activos (W-25, RF-A06 CA 2). Los casos que se pueden reasignar,
+ * con **solo** el código y la fecha de cada análisis: nada de imágenes, resultados ni datos del
+ * paciente. Vienen todos, sin paginación.
+ *
+ * Los identificadores de caso no salen de la pantalla: no se registran, no van a la URL ni al
+ * almacenamiento, y ni siquiera se devuelven al servidor (la reasignación los manda como `null`,
+ * es decir, «todos»).
+ */
+export function listarCasosActivos(id: string): Promise<CasosActivosDoctor> {
+  return solicitar<CasosActivosDoctor>(rutaUsuario(id, "/casos-activos"));
+}
+
+/**
+ * POST /admin/usuarios/{id}/reasignar-casos (W-25 → D-10, RF-A06). Pasa **todos** los casos
+ * activos del doctor al destino: `caso_ids: null` es «todos», y el diseño no dibuja casillas para
+ * elegir, así que no se manda la lista. Reasignar no da de baja a nadie: es una acción por sí
+ * misma, y también el paso previo de una baja.
+ *
+ * Rechazos propios: 409 SIN_CASOS_ACTIVOS (ya no le quedan), 409 TRANSICION_INVALIDA (el origen
+ * no es doctor), 422 DESTINO_INVALIDO (el destino no es otro doctor activo; trae `campos`) y 404
+ * si la cuenta se eliminó.
+ */
+export function reasignarCasos(id: string, destinoId: string): Promise<RespuestaTraslado> {
+  return solicitar<RespuestaTraslado>(rutaUsuario(id, "/reasignar-casos"), {
+    metodo: "POST",
+    cuerpo: { destino_id: destinoId, caso_ids: null },
+  });
+}
+
+/** Tope del servidor (`por_pagina` ≤ 100). Con más doctores activos, W-25 avisa de que faltan. */
+export const DOCTORES_DESTINO_MAXIMO = 100;
+
+/**
+ * Doctores con la cuenta activa (W-25, RF-A06 CA 3). Es la consulta que indica el contrato para
+ * elegir el destino de un traslado (../ARCHITECTURE.md § 3.5).
+ *
+ * `excluirId` es opcional porque W-25 tiene **dos** desplegables: el de destino excluye al
+ * origen, pero el de origen necesita la lista completa. Se pide una vez sin excluir a nadie y la
+ * pantalla quita al origen del destino, en lugar de salir a la red cada vez que lo cambian.
+ *
+ * Se pide una sola página con el máximo que admite el servidor. Si `paginacion.total` fuera mayor
+ * que los que llegan, el campo lo dice en lugar de callárselo; hoy el proyecto no tiene esa
+ * cantidad de doctores, y buscar dentro de la lista no está dibujado en Figma.
+ */
+export function listarDoctoresActivos(excluirId?: string): Promise<PaginaUsuarios> {
+  const parametros = new URLSearchParams({
+    rol: "DOCTOR",
+    estado: "ACTIVO",
+    pagina: "1",
+    por_pagina: String(DOCTORES_DESTINO_MAXIMO),
+  });
+  if (excluirId !== undefined) parametros.set("excluir", excluirId);
+  return solicitar<PaginaUsuarios>(`/admin/usuarios?${parametros.toString()}`);
 }
 
 /**

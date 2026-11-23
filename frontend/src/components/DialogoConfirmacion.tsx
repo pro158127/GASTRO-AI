@@ -23,11 +23,19 @@ interface PropiedadesDialogoConfirmacion {
   onConfirmar: () => void;
   onCancelar: () => void;
   /**
-   * Solo jerarquía visual. Por omisión confirmar es secundario y cancelar primario (diálogos
-   * destructivos o de descarte, como D-11). Con `true`, confirmar pasa a primario y cancelar a
-   * secundario, como dibuja D-06. **No cambia dónde empieza el foco.**
+   * Solo jerarquía visual. Por omisión confirmar es secundario y cancelar primario (diálogos de
+   * descarte, como D-11). Con `true`, confirmar pasa a primario y cancelar a secundario, como
+   * dibuja D-06. **No cambia dónde empieza el foco.**
    */
   confirmarEsPrimario?: boolean;
+  /**
+   * Solo jerarquía visual, y manda sobre `confirmarEsPrimario`: confirmar se dibuja destructivo
+   * (rojo) y cancelar secundario, como dibujan D-01 y D-08. El componente «Botón» reserva esa
+   * jerarquía para acciones irreversibles, y el sistema de diseño exige que vayan siempre con
+   * confirmación: este diálogo es esa confirmación. **Tampoco cambia dónde empieza el foco**, que
+   * sigue en «Cancelar», la acción segura.
+   */
+  confirmarEsDestructivo?: boolean;
   /**
    * La acción está en curso: confirmar muestra el indicador y la etiqueta en gerundio, cancelar
    * queda no disponible (sin perder el foco) y Esc no cierra.
@@ -45,6 +53,7 @@ export default function DialogoConfirmacion({
   onConfirmar,
   onCancelar,
   confirmarEsPrimario = false,
+  confirmarEsDestructivo = false,
   enviando = false,
   etiquetaEnviando,
 }: PropiedadesDialogoConfirmacion) {
@@ -56,10 +65,14 @@ export default function DialogoConfirmacion({
     if (!enviando) onCancelar();
   });
 
+  // El botón destructivo lleva a su lado uno secundario, nunca otro lleno: dos botones llenos
+  // competirían por la mirada justo donde más importa distinguirlos.
+  const confirmarADerecha = confirmarEsPrimario || confirmarEsDestructivo;
+
   const confirmar = (
     <Boton
       key="confirmar"
-      jerarquia={confirmarEsPrimario ? "primario" : "secundario"}
+      jerarquia={confirmarEsDestructivo ? "destructivo" : confirmarEsPrimario ? "primario" : "secundario"}
       cargando={enviando}
       etiquetaCargando={etiquetaEnviando}
       onClick={onConfirmar}
@@ -72,7 +85,7 @@ export default function DialogoConfirmacion({
   const cancelar = (
     <Boton
       key="cancelar"
-      jerarquia={confirmarEsPrimario ? "secundario" : "primario"}
+      jerarquia={confirmarADerecha ? "secundario" : "primario"}
       aria-disabled={enviando || undefined}
       onClick={onCancelar}
       data-foco-inicial=""
@@ -100,7 +113,7 @@ export default function DialogoConfirmacion({
         </p>
         {/* El botón primario va a la derecha en los dos casos, y el orden del DOM es el visual
             para que el recorrido con Tab coincida con lo que se ve (WCAG 2.4.3). */}
-        <div className={estilos.acciones}>{confirmarEsPrimario ? [cancelar, confirmar] : [confirmar, cancelar]}</div>
+        <div className={estilos.acciones}>{confirmarADerecha ? [cancelar, confirmar] : [confirmar, cancelar]}</div>
       </div>
     </div>
   );
