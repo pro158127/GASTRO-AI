@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, PlainSerializer
 
+from app.models import CodigoRol
+
 # Los Decimal salen como número (0.5), no como texto "0.5000" (contrato §1)
 Umbral = Annotated[Decimal, PlainSerializer(float, return_type=float)]
 
@@ -19,6 +21,15 @@ class TipoDocumentoSalida(BaseModel):
 
 class ListaTiposDocumento(BaseModel):
     items: list[TipoDocumentoSalida]
+
+
+class RolSalida(BaseModel):
+    codigo: CodigoRol
+    nombre: str = Field(examples=["Doctor/Gastroenterólogo"])  # el mismo de `rol_nombre`
+
+
+class ListaRoles(BaseModel):
+    items: list[RolSalida]
 
 
 class CaracteristicaSalida(BaseModel):
