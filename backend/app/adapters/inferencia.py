@@ -33,7 +33,7 @@ import cv2
 import httpx
 import numpy as np
 from PIL import Image
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.core.config import Settings
 from app.models import FormatoImagen
@@ -103,6 +103,13 @@ class _Region(BaseModel):
     area_pct: Annotated[float, Field(ge=0, le=100)]
     mapa_calor_base64: str = Field(max_length=MAPA_MAXIMO_BYTES * 4 // 3 + 4)
 
+    @model_validator(mode="after")
+    def _cabe_en_la_imagen(self) -> "_Region":
+        # Una caja que se sale de la imagen no es una región válida (margen por redondeo)
+        if self.x + self.ancho > 1 + 1e-9 or self.y + self.alto > 1 + 1e-9:
+            raise ValueError("la región se sale de la imagen")
+        return self
+
 
 class _Caracteristica(BaseModel):
     codigo: str = Field(min_length=1, max_length=40)
@@ -158,7 +165,8 @@ def _desde_fold2(datos: dict) -> dict:
     píxeles por 240 da la fracción de la imagen original. Cuando el Grad-CAM no marca nada
     manda una caja de 0 × 0: eso no es una región y no se guarda (si no, el doctor vería
     «Región 1» con 0 % de área). Su `umbral` y `detectado` se ignoran: el umbral que vale
-    es el de RF-A01, que aplica el backend.
+    es el de RF-A01, que aplica el backend (ServicioClasificacion guarda la región solo si
+    la característica lo supera).
     """
     predicciones = datos.get("predicciones")
     if not isinstance(predicciones, dict):

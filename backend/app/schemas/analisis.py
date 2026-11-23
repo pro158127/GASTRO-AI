@@ -21,6 +21,13 @@ AVISO_EXPERIMENTAL = {
     ),
 }
 
+# Va con cada mapa de calor (API y PDF). Las regiones solo se muestran para las
+# características que superan el umbral vigente.
+AVISO_GRAD_CAM = (
+    "El mapa de calor Grad-CAM es una visualización experimental de las zonas que más "
+    "influyeron en el modelo. No es una segmentación clínica ni delimita una lesión."
+)
+
 
 class ImagenCargada(BaseModel):
     imagen_id: str = Field(examples=["tmp_01J9ZK3M4N5P6Q7R8S9T0V1W2X"])
@@ -93,6 +100,8 @@ class ImagenAnalisis(BaseModel):
 
 class MapaCalor(BaseModel):
     url: str
+    # Para mostrar junto al mapa: Grad-CAM es una visualización, no una segmentación
+    aviso: str = AVISO_GRAD_CAM
 
 
 class CaracteristicaResultado(BaseModel):
