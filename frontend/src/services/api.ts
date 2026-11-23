@@ -22,6 +22,15 @@ function esEtapaSesion(valor: unknown): valor is EtapaSesion {
   return typeof valor === "string" && ETAPAS.includes(valor);
 }
 
+/**
+ * Tamaño de una imagen en píxeles. Lo trae `minimo` en IMAGEN_RESOLUCION_INSUFICIENTE: el
+ * lado mínimo lo dice el servidor, no una constante escrita en el frontend.
+ */
+export interface TamanoImagen {
+  ancho: number;
+  alto: number;
+}
+
 /** Datos del cuerpo de error `{error: {codigo, mensaje, id_solicitud, ...}}` que usa el frontend. */
 interface DetalleError {
   codigo?: string | null;
@@ -36,6 +45,12 @@ interface DetalleError {
   campos?: CampoConError[];
   /** Requisitos de la política de contraseñas (CONTRASENA_NO_CUMPLE_POLITICA). */
   requisitos?: RequisitoContrasena[];
+  /** `max_bytes` de IMAGEN_DEMASIADO_PESADA: el peso máximo que acepta el servidor. */
+  maxBytes?: number | null;
+  /** `permitidos` de IMAGEN_FORMATO_NO_PERMITIDO: los formatos que sí se aceptan. */
+  permitidos?: string[];
+  /** `minimo` de IMAGEN_RESOLUCION_INSUFICIENTE: el tamaño mínimo en píxeles. */
+  minimo?: TamanoImagen | null;
 }
 
 /**
@@ -61,6 +76,15 @@ export class ErrorApi extends Error {
   readonly casosActivos: number | null;
   readonly campos: CampoConError[];
   readonly requisitos: RequisitoContrasena[];
+  /**
+   * Peso máximo en bytes del 413 IMAGEN_DEMASIADO_PESADA (W-06d). Lo dice el servidor para
+   * que el texto no repita un «10 MB» escrito aquí que mañana puede no ser cierto.
+   */
+  readonly maxBytes: number | null;
+  /** Formatos aceptados del 415 IMAGEN_FORMATO_NO_PERMITIDO (W-06c); vacío si no vinieron. */
+  readonly permitidos: string[];
+  /** Tamaño mínimo del 422 IMAGEN_RESOLUCION_INSUFICIENTE, en píxeles. */
+  readonly minimo: TamanoImagen | null;
 
   constructor(estado: number | null, detalle: DetalleError = {}) {
     super(detalle.codigo ?? "Error de la API");
@@ -73,6 +97,9 @@ export class ErrorApi extends Error {
     this.casosActivos = detalle.casosActivos ?? null;
     this.campos = detalle.campos ?? [];
     this.requisitos = detalle.requisitos ?? [];
+    this.maxBytes = detalle.maxBytes ?? null;
+    this.permitidos = detalle.permitidos ?? [];
+    this.minimo = detalle.minimo ?? null;
   }
 
   /**
@@ -150,6 +177,18 @@ function esRequisito(x: unknown): x is RequisitoContrasena {
   return typeof r?.codigo === "string" && typeof r?.cumple === "boolean";
 }
 
+function esTexto(x: unknown): x is string {
+  return typeof x === "string";
+}
+
+/** `{ancho, alto}` con los dos lados numéricos, o `null` si falta alguno o no son números. */
+function tamanoONulo(valor: unknown): TamanoImagen | null {
+  const t = valor as Partial<TamanoImagen> | null;
+  const ancho = numeroONulo(t?.ancho);
+  const alto = numeroONulo(t?.alto);
+  return ancho === null || alto === null ? null : { ancho, alto };
+}
+
 function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
   const detalle = (cuerpo as { error?: Record<string, unknown> } | null)?.error ?? {};
   return new ErrorApi(estado, {
@@ -160,6 +199,11 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     casosActivos: numeroONulo(detalle.casos_activos),
     campos: listaDe(detalle.campos, esCampoConError),
     requisitos: listaDe(detalle.requisitos, esRequisito),
+    // Los datos propios de cada error van al mismo nivel que `codigo`: el servidor hace
+    // `cuerpo.update(extra)` (backend/app/core/errores.py), no los anida bajo `extra`.
+    maxBytes: numeroONulo(detalle.max_bytes),
+    permitidos: listaDe(detalle.permitidos, esTexto),
+    minimo: tamanoONulo(detalle.minimo),
   });
 }
 
@@ -170,6 +214,61 @@ interface RespuestaCompleta<T> {
   fechaServidorMs: number | null;
   /** `performance.now()` al recibir la respuesta. */
   instanteRecibido: number;
+}
+
+/**
+ * Lo que cualquier transporte entrega cuando el servidor respondió, sea `fetch` o
+ * `XMLHttpRequest`. Lo único que los diferencia es cómo llegan hasta aquí.
+ */
+interface RespuestaCruda {
+  estado: number;
+  ok: boolean;
+  /** Cuerpo ya leído como JSON, o `null` si venía vacío o no era JSON (un 502 de nginx, un 204). */
+  cuerpo: unknown;
+  /** Cabecera `Date` tal cual la mandó el servidor, o `null` si no vino. */
+  fechaCabecera: string | null;
+  /** `performance.now()` en cuanto llegó la respuesta, antes de leer el cuerpo. */
+  instanteRecibido: number;
+}
+
+/**
+ * Único lugar donde una respuesta se convierte en datos o en `ErrorApi`. Lo usan los dos
+ * transportes a propósito: así ningún camino nuevo puede saltarse los manejadores globales
+ * (un 401 a mitad de una subida lleva al inicio de sesión igual que cualquier otra petición)
+ * ni equivocarse sobre si la petición renueva la inactividad de la sesión.
+ */
+function atenderRespuesta<T>(
+  cruda: RespuestaCruda,
+  opciones: { pasiva: boolean; global: boolean },
+  instanteEnvio: number
+): RespuestaCompleta<T> {
+  if (!cruda.ok) {
+    const error = errorDesdeCuerpo(cruda.estado, cruda.cuerpo);
+    if (opciones.global) {
+      if (error.codigo === CodigoErrorApi.SESION_EXPIRADA) {
+        manejadores?.alSinSesion?.(error.motivo);
+      } else if (error.codigo === CodigoErrorApi.PERMISO_DENEGADO) {
+        manejadores?.alSinPermiso?.();
+      } else if (error.codigo === CodigoErrorApi.ETAPA_INVALIDA) {
+        manejadores?.alEtapaInvalida?.(error.etapa);
+      }
+    }
+    throw error;
+  }
+
+  const fecha = Date.parse(cruda.fechaCabecera ?? "");
+  if (!opciones.pasiva) manejadores?.alActividadRenovada?.(instanteEnvio);
+
+  // Un 2xx que no es 204 y cuyo cuerpo no se pudo leer como JSON está fuera del contrato:
+  // se trata como error inesperado (W-31) en vez de devolver `null` y romper a quien llamó.
+  if (cruda.estado !== 204 && cruda.cuerpo === null) throw new ErrorApi(cruda.estado);
+
+  const datos = cruda.estado === 204 ? (undefined as T) : (cruda.cuerpo as T);
+  return {
+    datos,
+    fechaServidorMs: Number.isNaN(fecha) ? null : fecha,
+    instanteRecibido: cruda.instanteRecibido,
+  };
 }
 
 async function solicitarCompleta<T>(
@@ -193,27 +292,105 @@ async function solicitarCompleta<T>(
   } catch {
     throw new ErrorApi(null);
   }
-
-  if (!respuesta.ok) {
-    const error = errorDesdeCuerpo(respuesta.status, await leerCuerpoJson(respuesta));
-    if (global) {
-      if (error.codigo === CodigoErrorApi.SESION_EXPIRADA) {
-        manejadores?.alSinSesion?.(error.motivo);
-      } else if (error.codigo === CodigoErrorApi.PERMISO_DENEGADO) {
-        manejadores?.alSinPermiso?.();
-      } else if (error.codigo === CodigoErrorApi.ETAPA_INVALIDA) {
-        manejadores?.alEtapaInvalida?.(error.etapa);
-      }
-    }
-    throw error;
-  }
-
   const instanteRecibido = performance.now();
-  const fecha = Date.parse(respuesta.headers.get("Date") ?? "");
-  if (!pasiva) manejadores?.alActividadRenovada?.(instanteEnvio);
 
-  const datos = respuesta.status === 204 ? (undefined as T) : ((await respuesta.json()) as T);
-  return { datos, fechaServidorMs: Number.isNaN(fecha) ? null : fecha, instanteRecibido };
+  return atenderRespuesta<T>(
+    {
+      estado: respuesta.status,
+      ok: respuesta.ok,
+      cuerpo: await leerCuerpoJson(respuesta),
+      fechaCabecera: respuesta.headers.get("Date"),
+      instanteRecibido,
+    },
+    { pasiva, global },
+    instanteEnvio
+  );
+}
+
+export interface OpcionesMultipart {
+  /**
+   * Avance de la subida, de 0 a 1. Solo se llama cuando el navegador puede calcular el
+   * total: sin eso no se inventa un porcentaje y la pantalla muestra el texto sin número.
+   */
+  alProgreso?: (fraccion: number) => void;
+  /** Si es `false`, el error no dispara los manejadores globales (lo atiende quien llama). */
+  global?: boolean;
+}
+
+/**
+ * POST multipart con la cookie de sesión, para `POST /imagenes` (W-06f).
+ *
+ * Va por `XMLHttpRequest` y no por `fetch` por una sola razón: `fetch` no informa del avance
+ * de la subida, y W-06f muestra el porcentaje. **El transporte es lo único que cambia**: la
+ * respuesta la trata `atenderRespuesta`, igual que las peticiones JSON, así que un 401 a
+ * mitad de la subida lleva al inicio de sesión como cualquier otra petición y el 2xx renueva
+ * la inactividad (subir una imagen es una acción del usuario, nunca una consulta automática:
+ * por eso aquí no hay `pasiva`).
+ *
+ * No se fija `Content-Type`: lo pone el navegador con el `boundary` del FormData. Tampoco se
+ * toca `withCredentials`, que solo afecta a peticiones de otro origen; la cookie
+ * `gastro_sesion` viaja sola por ser del mismo origen, igual que con `credentials:
+ * "same-origin"`.
+ */
+export function enviarMultipart<T>(
+  ruta: string,
+  formulario: FormData,
+  opciones: OpcionesMultipart = {}
+): Promise<T> {
+  const { alProgreso, global = true } = opciones;
+  return new Promise<T>((resolver, rechazar) => {
+    const instanteEnvio = performance.now();
+    const peticion = new XMLHttpRequest();
+    peticion.open("POST", `${BASE}${ruta}`);
+    peticion.responseType = "text";
+
+    if (alProgreso) {
+      peticion.upload.onprogress = (evento) => {
+        if (evento.lengthComputable && evento.total > 0) alProgreso(evento.loaded / evento.total);
+      };
+    }
+
+    // Sin respuesta del servidor (red caída, tiempo agotado, cancelado): el mismo error que
+    // lanza el `catch` del `fetch`, para que `avisoDeError` lo lea como W-30.
+    const alFallar = () => rechazar(new ErrorApi(null));
+    peticion.onerror = alFallar;
+    peticion.ontimeout = alFallar;
+    peticion.onabort = alFallar;
+
+    peticion.onload = () => {
+      const instanteRecibido = performance.now();
+      // `status === 0` es «no hubo respuesta», no un código HTTP.
+      if (peticion.status === 0) {
+        alFallar();
+        return;
+      }
+      let cuerpo: unknown = null;
+      try {
+        cuerpo = JSON.parse(peticion.responseText) as unknown;
+      } catch {
+        cuerpo = null;
+      }
+      try {
+        resolver(
+          atenderRespuesta<T>(
+            {
+              estado: peticion.status,
+              ok: peticion.status >= 200 && peticion.status < 300,
+              cuerpo,
+              fechaCabecera: peticion.getResponseHeader("Date"),
+              instanteRecibido,
+            },
+            { pasiva: false, global },
+            instanteEnvio
+          ).datos
+        );
+      } catch (error) {
+        rechazar(error);
+      }
+    };
+
+    peticion.send(formulario);
+  });
 }
 
 /**
