@@ -8,7 +8,9 @@ import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import MiPerfil from "../pages/MiPerfil";
+import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
+import ProgresoAnalisis from "../pages/ProgresoAnalisis";
 import ReasignarCasos from "../pages/ReasignarCasos";
 import SinPermisos from "../pages/SinPermisos";
 import Usuarios from "../pages/Usuarios";
@@ -38,7 +40,23 @@ export const pantallas: Pantalla[] = [
     ruta: "/nuevo-analisis",
     titulo: "Nuevo análisis",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-06)
+    elemento: (titulo) => <NuevoAnalisis titulo={titulo} />, // W-06
+  },
+  {
+    // Progreso del análisis recién solicitado. Va bajo `/nuevo-analisis` para que el ítem del
+    // menú siga marcado (`incluyeSubrutas`) y el título de la pestaña no cambie a mitad del
+    // flujo. El identificador del análisis sí puede ir en la URL; el documento del paciente no.
+    ruta: "/nuevo-analisis/:idAnalisis",
+    titulo: "Nuevo análisis",
+    roles: SOLO_DOCTOR,
+    elemento: (titulo) => <ProgresoAnalisis titulo={titulo} />, // W-07
+  },
+  {
+    // Destino de un análisis completado. No tiene ítem de menú: se llega desde W-07.
+    ruta: "/analisis/:idAnalisis",
+    titulo: "Resultado del análisis",
+    roles: SOLO_DOCTOR,
+    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-08)
   },
   {
     ruta: "/historial",

@@ -1,0 +1,183 @@
+/* Pantalla W-07 · Procesando (Figma 47:797), con W-07b y W-07c. Tarjeta centrada; Figma no
+   dibuja versiones de tableta ni de celular, así que se adapta sola y a 320 px no hay
+   desplazamiento horizontal (WCAG 1.4.10). */
+
+.tarjeta {
+  display: flex;
+  width: 100%;
+  max-width: 640px;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  gap: var(--espacio-5);
+  padding: var(--espacio-10);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+/* TOPOLOGO es decorativo (alt=""): el mensaje siempre va en texto real. Se escala en múltiplos
+   enteros del dibujo original, como pide la descripción del componente: aquí ×4. */
+.mascota {
+  width: 108px;
+  height: 124px;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h2);
+  color: var(--color-texto-primario);
+  text-align: center;
+}
+
+/* Recibe el foco cuando el análisis termina en fallo, para que el lector anuncie el cambio. */
+.titulo:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.descripcion {
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+  text-align: center;
+}
+
+/* ---------- Etapas ---------- */
+
+.etapas {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* `flex-start` y texto flexible: «Generando el mapa de calor (Grad-CAM) · no se realizó» cabe
+   en dos líneas sin desbordar a 320 px. */
+.etapa {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-3);
+}
+
+.iconoEtapa {
+  flex: none;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  margin-top: 2px;
+  color: var(--color-texto-terciario);
+}
+
+.textoEtapa {
+  min-width: 0;
+  flex: 1 1 0;
+  font: var(--texto-cuerpo-base);
+  overflow-wrap: anywhere;
+  color: var(--color-texto-primario);
+}
+
+.etapa[data-estado="LISTO"] .iconoEtapa {
+  color: var(--color-estado-exito-icono);
+}
+
+.etapa[data-estado="EN_CURSO"] .iconoEtapa {
+  color: var(--color-texto-primario);
+}
+
+.etapa[data-estado="EN_CURSO"] .textoEtapa {
+  font: var(--texto-cuerpo-base-enfasis);
+}
+
+.etapa[data-estado="ERROR"] .iconoEtapa,
+.etapa[data-estado="ERROR"] .textoEtapa {
+  color: var(--color-estado-error-icono);
+}
+
+.etapa[data-estado="ERROR"] .textoEtapa {
+  font: var(--texto-cuerpo-base-enfasis);
+}
+
+.etapa[data-estado="PENDIENTE"] .textoEtapa {
+  color: var(--color-texto-terciario);
+}
+
+/* ---------- Consejo de TOPOLOGO ---------- */
+
+.consejo {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-seleccion);
+}
+
+.mascotaConsejo {
+  width: 54px;
+  height: 62px;
+  flex: none;
+}
+
+.textoConsejo {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tituloConsejo {
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-marca-primario);
+}
+
+.cuerpoConsejo {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+/* ---------- Acciones y avisos ---------- */
+
+.acciones {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--espacio-2);
+}
+
+.avisoSondeo {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .tarjeta {
+    padding: var(--espacio-5);
+  }
+
+  /* `column` y no `column-reverse`: al apilarlos, el foco baja por donde se ve (WCAG 2.4.3). */
+  .acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
