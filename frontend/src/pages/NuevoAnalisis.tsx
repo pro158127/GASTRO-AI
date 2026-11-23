@@ -17,12 +17,21 @@
 // área temporal que vence, y `POST /analisis` la consume junto con el documento. El documento
 // solo vive en el estado de este componente: no va a la URL, ni a `sessionStorage`, ni a la
 // consola.
+//
+// **Diferencia con Figma, pendiente de agregar al diseño** (igual que pasó con W-11f): Figma no
+// dibuja ningún aviso al salir con el formulario a medias. Aquí sí lo hay, porque salir de esta
+// pantalla con una imagen ya cargada descarta trabajo real —la imagen se subió y se queda en el
+// área temporal del servidor hasta vencer— y porque el mismo gesto ya pregunta en W-10, W-11f y
+// W-18: que en una pantalla pregunte y en otra se pierda todo en silencio es la inconsistencia
+// que se corrigió en la tarea 4.
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useBlocker, useNavigate } from "react-router";
+import type { BlockerFunction } from "react-router";
 import Alerta from "../components/Alerta";
 import Boton from "../components/Boton";
 import CampoLista from "../components/CampoLista";
 import CampoTexto from "../components/CampoTexto";
+import DialogoConfirmacion from "../components/DialogoConfirmacion";
 import EncabezadoPagina from "../components/EncabezadoPagina";
 import IndicadorCarga from "../components/iconos/IndicadorCarga";
 import ZonaCargaImagen, { idBotonSeleccionar } from "../components/ZonaCargaImagen";
@@ -33,6 +42,7 @@ import { obtenerTiposDocumento } from "../services/catalogos";
 import { CodigoErrorApi } from "../services/codigosError";
 import { cargarImagen } from "../services/imagenes";
 import { consultarPaciente } from "../services/pacientes";
+import { useSesion } from "../sesion/ProveedorSesion";
 import type { HistorialPaciente, ImagenCargada, TipoDocumento } from "../types";
 import type { AvisoError } from "../utils/avisosError";
 import { avisoDeError, esDemasiadosIntentos, esErrorGlobal, AVISO_DEMASIADOS_INTENTOS } from "../utils/avisosError";
@@ -161,6 +171,7 @@ interface CargaEnCurso {
 
 export default function NuevoAnalisis({ titulo }: { titulo: string }) {
   const navegar = useNavigate();
+  const { autenticado } = useSesion();
   const idBase = useId();
   const idZona = `${idBase}-imagen`;
   const idNumero = `${idBase}-numero`;
@@ -204,6 +215,60 @@ export default function NuevoAnalisis({ titulo }: { titulo: string }) {
     consultaAlDia &&
     (consulta.fase === "fallo" || (consulta.fase === "listo" && !consulta.historial.tiene_historial));
   const confirmacionCoincide = documentosCoinciden(numero, confirmacion);
+
+  // ---------- Aviso al salir con el análisis a medias ----------
+  // Hay algo que perder si ya se subió una imagen (o se está subiendo) o si se escribió algo del
+  // documento. El tipo de documento no cuenta: viene elegido de fábrica, nadie lo escribió.
+  const hayImagen = imagen !== null || carga !== null;
+  const hayDocumento = numero.trim() !== "" || confirmacion.trim() !== "";
+  // Con la sesión cerrada no se pregunta: las guardas están llevando al inicio de sesión y un
+  // diálogo encima solo estorbaría.
+  const avisarAlSalir = (hayImagen || hayDocumento) && autenticado;
+  const avisarAlSalirRef = useRef(avisarAlSalir);
+  avisarAlSalirRef.current = avisarAlSalir;
+
+  const debeBloquear = useCallback<BlockerFunction>(
+    ({ currentLocation, nextLocation }) =>
+      avisarAlSalirRef.current && currentLocation.pathname !== nextLocation.pathname,
+    []
+  );
+  const bloqueo = useBlocker(debeBloquear);
+
+  // Recargar o cerrar la pestaña con el análisis a medias: aviso nativo del navegador.
+  useEffect(() => {
+    if (!avisarAlSalir) return;
+    function alSalir(evento: BeforeUnloadEvent) {
+      evento.preventDefault();
+      evento.returnValue = "";
+    }
+    window.addEventListener("beforeunload", alSalir);
+    return () => window.removeEventListener("beforeunload", alSalir);
+  }, [avisarAlSalir]);
+
+  /**
+   * Única salida que se salta el aviso: la que hace esta misma pantalla al recibir el 202. No es
+   * una salida de la persona, es el paso siguiente del flujo, y ahí ya no queda nada que
+   * descartar porque el análisis está en el servidor.
+   *
+   * **No se reutiliza para nada más.** En la tarea 4, compartir una función entre «salir» y
+   * «cancelar» hizo que «Cancelar» dejara de preguntar: cualquier otra salida tiene que pasar
+   * por `useBlocker` sin tocar `avisarAlSalirRef`.
+   */
+  function irAlProgreso(idAnalisis: string) {
+    avisarAlSalirRef.current = false;
+    navegar(`/nuevo-analisis/${encodeURIComponent(idAnalisis)}`);
+  }
+
+  /** Texto del diálogo según lo que de verdad se va a perder. */
+  function mensajeDescarte(): string {
+    if (hayImagen && hayDocumento) {
+      return "Cargó una imagen y escribió los datos del paciente, pero todavía no solicitó el análisis. Si sale ahora, se perderán los dos y tendrá que cargar la imagen de nuevo.";
+    }
+    if (hayImagen) {
+      return "Cargó una imagen pero todavía no solicitó el análisis. Si sale ahora, se perderá y tendrá que cargarla de nuevo.";
+    }
+    return "Escribió los datos del paciente pero todavía no solicitó el análisis. Si sale ahora, se perderán.";
+  }
 
   function enfocarZona() {
     document.getElementById(idBotonSeleccionar(idZona))?.focus();
@@ -364,7 +429,7 @@ export default function NuevoAnalisis({ titulo }: { titulo: string }) {
         // Solo se manda cuando el paciente no tiene análisis con este doctor (RF-D01 CA 12).
         ...(requiereConfirmacion ? { confirmacion_documento: normalizarDocumento(confirmacion) } : {}),
       });
-      navegar(`/nuevo-analisis/${encodeURIComponent(analisis.id)}`);
+      irAlProgreso(analisis.id);
     } catch (causa) {
       if (esErrorGlobal(causa)) return;
       atenderFalloSolicitud(causa);
@@ -594,6 +659,19 @@ export default function NuevoAnalisis({ titulo }: { titulo: string }) {
           </div>
         </div>
       </section>
+
+      {/* Mismo patrón que D-11 en W-10 (RNF-08). Sale al salir desde el menú, con «atrás» o con
+          cualquier otra navegación; nunca al pasar a W-07 tras el 202. */}
+      {bloqueo.state === "blocked" && (
+        <DialogoConfirmacion
+          titulo="¿Descartar este análisis sin solicitarlo?"
+          mensaje={mensajeDescarte()}
+          etiquetaConfirmar="Descartar"
+          etiquetaCancelar="Seguir con el análisis"
+          onConfirmar={() => bloqueo.proceed()}
+          onCancelar={() => bloqueo.reset()}
+        />
+      )}
     </>
   );
 }
