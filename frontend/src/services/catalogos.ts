@@ -1,6 +1,6 @@
 // Catálogos de solo lectura de la API (../ARCHITECTURE.md § 3.5). Los puede pedir cualquier
 // sesión activa, sin importar el rol.
-import type { ListaRoles, RolCatalogo } from "../types";
+import type { ListaRoles, ListaTiposDocumento, RolCatalogo, TipoDocumento } from "../types";
 import { solicitar } from "./api";
 
 /**
@@ -37,4 +37,33 @@ export function obtenerRoles(): Promise<RolCatalogo[]> {
     });
 
   return consultaEnCurso;
+}
+
+/**
+ * Tipos de documento con su nombre visible y su longitud máxima (W-06a).
+ *
+ * Mismo trato que los roles, y por las mismas razones: son tres filas iguales para todo el
+ * mundo, sin datos personales, que se piden una sola vez por sesión del navegador y solo se
+ * guardan si la consulta salió bien.
+ *
+ * `longitud_maxima` viene del servidor a propósito: la validación del cliente es ayuda, y el
+ * largo por tipo (CC 10, TI 11, CE 6) lo decide el backend, no una constante escrita aquí.
+ */
+let tiposDocumentoEnMemoria: TipoDocumento[] | null = null;
+let consultaTiposEnCurso: Promise<TipoDocumento[]> | null = null;
+
+export function obtenerTiposDocumento(): Promise<TipoDocumento[]> {
+  if (tiposDocumentoEnMemoria !== null) return Promise.resolve(tiposDocumentoEnMemoria);
+  if (consultaTiposEnCurso !== null) return consultaTiposEnCurso;
+
+  consultaTiposEnCurso = solicitar<ListaTiposDocumento>("/catalogos/tipos-documento")
+    .then(({ items }) => {
+      tiposDocumentoEnMemoria = items;
+      return items;
+    })
+    .finally(() => {
+      consultaTiposEnCurso = null;
+    });
+
+  return consultaTiposEnCurso;
 }

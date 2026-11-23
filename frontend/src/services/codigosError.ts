@@ -24,6 +24,36 @@ export const CodigoErrorApi = {
   TOTP_NO_INICIADO: "TOTP_NO_INICIADO",
   ARCHIVO_DEMASIADO_GRANDE: "ARCHIVO_DEMASIADO_GRANDE",
   /**
+   * 410 · `POST /analisis`: la imagen temporal venció o ese `imagen_id` ya se usó. Lo único que
+   * destraba el flujo es volver a cargarla; el documento escrito se conserva.
+   */
+  IMAGEN_EXPIRADA: "IMAGEN_EXPIRADA",
+  /** 413 · `POST /imagenes`: más de 10 MB. Trae `max_bytes` → W-06d. */
+  IMAGEN_DEMASIADO_PESADA: "IMAGEN_DEMASIADO_PESADA",
+  /** 415 · `POST /imagenes`: no es JPEG ni PNG (DICOM incluido). Trae `permitidos` → W-06c. */
+  IMAGEN_FORMATO_NO_PERMITIDO: "IMAGEN_FORMATO_NO_PERMITIDO",
+  /** 422 · `POST /imagenes`: archivo dañado o imagen desmesurada. */
+  IMAGEN_ILEGIBLE: "IMAGEN_ILEGIBLE",
+  /** 422 · `POST /imagenes`: menos de 224 × 224 px. Trae `minimo` con los dos lados. */
+  IMAGEN_RESOLUCION_INSUFICIENTE: "IMAGEN_RESOLUCION_INSUFICIENTE",
+  /**
+   * 422 · Tipo o número de documento mal escrito. Trae `campos` (`tipo_documento` o
+   * `numero_documento`), así que el error se pinta en ese campo → W-06e.
+   */
+  DOCUMENTO_INVALIDO: "DOCUMENTO_INVALIDO",
+  /**
+   * 422 · Paciente sin análisis con este doctor: falta `confirmacion_documento` o no coincide
+   * con el número. El error se pinta en el campo de confirmación → W-06k.
+   */
+  DOCUMENTO_NO_COINCIDE: "DOCUMENTO_NO_COINCIDE",
+  /** 503 · `POST /analisis`: no hay modelo vigente o la cola no responde. */
+  SERVICIO_NO_DISPONIBLE: "SERVICIO_NO_DISPONIBLE",
+  /**
+   * 409 · `POST /analisis/{id}/reintento` sobre un análisis que no está FALLIDO, o que falló
+   * por calidad (`ERR-1001`): ahí no se reintenta, se carga otra imagen.
+   */
+  NO_REINTENTABLE: "NO_REINTENTABLE",
+  /**
    * 409 · Crear una cuenta (o cambiarle el correo) con un correo que ya usa otra. Trae `campos`
    * con `{campo: "correo"}`, así que el error se pinta en ese campo → W-10c.
    */
@@ -86,3 +116,21 @@ export const MotivoSesionExpirada = {
 } as const;
 
 export type MotivoSesionExpirada = (typeof MotivoSesionExpirada)[keyof typeof MotivoSesionExpirada];
+
+/**
+ * `codigo_error` de un análisis FALLIDO (`GET /analisis/{id}/estado`, ../ARCHITECTURE.md § 3.5).
+ * No son errores HTTP: la petición responde 200 y el análisis es el que falló. Tienen forma de
+ * `ERR-xxxx` igual que los 5xx, pero estos sí están documentados uno por uno.
+ */
+export const CodigoFalloAnalisis = {
+  /** Calidad insuficiente → W-07b. No se reintenta: hay que cargar otra imagen. */
+  CALIDAD_INSUFICIENTE: "ERR-1001",
+  /** El servicio de inferencia no respondió o contestó fuera del contrato → W-07c. */
+  INFERENCIA_NO_DISPONIBLE: "ERR-1002",
+  /** La cola no respondió al encolar el análisis. Figma no lo dibuja: se trata como W-07c. */
+  COLA_NO_DISPONIBLE: "ERR-1003",
+  /** Error interno del worker. Figma no lo dibuja: se trata como W-07c. */
+  ERROR_INTERNO: "ERR-1004",
+} as const;
+
+export type CodigoFalloAnalisis = (typeof CodigoFalloAnalisis)[keyof typeof CodigoFalloAnalisis];

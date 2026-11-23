@@ -345,3 +345,125 @@ export interface HealthResponse {
 export interface ResumenCasosRecibidos {
   sin_revisar: number;
 }
+
+// ---------------------------------------------------- Imagen, paciente y análisis (W-06, W-07)
+// ../ARCHITECTURE.md § 3.5, «Paciente y documento» e «Imagen y análisis». Ningún tipo de salida
+// lleva el documento ni el seudónimo del paciente: el documento solo viaja en el cuerpo de un
+// POST y en el frontend vive únicamente en el estado de la pantalla.
+
+/** Un tipo de documento de `GET /catalogos/tipos-documento` (W-06a). */
+export interface TipoDocumento {
+  codigo: string;
+  /** Nombre visible, como lo da el servidor («Cédula de ciudadanía»). */
+  nombre: string;
+  /** Dígitos que acepta el servidor para este tipo (CC 10, TI 11, CE 6). */
+  longitud_maxima: number;
+}
+
+/** Respuesta de `GET /catalogos/tipos-documento`. */
+export interface ListaTiposDocumento {
+  items: TipoDocumento[];
+}
+
+/**
+ * Respuesta de `POST /pacientes/consulta` (W-06h). Solo cuenta los casos **de quien pregunta**
+ * (propios o recibidos por traslado): no revela si el paciente tiene análisis con otro doctor
+ * (RF-H01 CA 5). Por eso los textos dicen «con usted» y no «en el sistema».
+ */
+export interface HistorialPaciente {
+  tiene_historial: boolean;
+  caso_id: string | null;
+  total_analisis: number;
+  ultimo_analisis_en: string | null;
+}
+
+/**
+ * Respuesta 201 de `POST /imagenes` (W-06g). La imagen queda en un área temporal que **vence**
+ * (`expira_en`) y cada `imagen_id` sirve una sola vez: después, `POST /analisis` responde 410
+ * IMAGEN_EXPIRADA y hay que cargarla de nuevo.
+ */
+export interface ImagenCargada {
+  imagen_id: string;
+  /** Nombre del archivo que mandó el navegador; el servidor lo devuelve pero no lo guarda. */
+  nombre: string;
+  formato: string;
+  ancho: number;
+  alto: number;
+  peso_bytes: number;
+  sha256: string;
+  expira_en: string;
+}
+
+/** Cuerpo de `POST /analisis` (W-06). */
+export interface SolicitudAnalisis {
+  imagen_id: string;
+  tipo_documento: string;
+  numero_documento: string;
+  /**
+   * El número escrito por segunda vez. Solo hace falta cuando `/pacientes/consulta` dijo
+   * `tiene_historial: false` (RF-D01 CA 12, W-06i a W-06k); con historial se omite.
+   */
+  confirmacion_documento?: string;
+}
+
+/** Estado de un análisis (`EstadoAnalisis` del backend). */
+export type EstadoAnalisis = "PROCESANDO" | "COMPLETADO" | "FALLIDO";
+
+/** `analisis` del 202 de `POST /analisis` y de `POST /analisis/{id}/reintento`. */
+export interface AnalisisResumen {
+  id: string;
+  /** `A-AAAA-NNNNNN`, el código que ve la persona. */
+  codigo: string;
+  estado: EstadoAnalisis;
+  solicitado_en: string;
+}
+
+/** Respuesta de `POST /analisis` y de `POST /analisis/{id}/reintento`. */
+export interface AnalisisCreado {
+  analisis: AnalisisResumen;
+}
+
+/** Las cuatro etapas que pinta W-07 (`EtapaProceso` del backend). */
+export type CodigoEtapa = "ANONIMIZAR" | "CALIDAD" | "CLASIFICAR" | "GRAD_CAM";
+
+/** Estado de una etapa. W-07 lo dice siempre en texto, no solo con el ícono (WCAG 1.4.1). */
+export type EstadoEtapa = "LISTO" | "EN_CURSO" | "PENDIENTE" | "ERROR";
+
+/** Una entrada de `etapas`. `codigo` llega como texto: el servidor puede añadir etapas. */
+export interface EtapaAnalisis {
+  codigo: string;
+  estado: EstadoEtapa;
+}
+
+/** Causas de calidad insuficiente (`CausaCalidad` del backend) → los tres textos de W-07b. */
+export type CausaCalidad = "BORROSA" | "OSCURA" | "MUY_CLARA_O_REFLEJOS";
+
+/**
+ * `calidad` del análisis FALLIDO por `ERR-1001`. Las medidas las calcula el servidor con los
+ * umbrales de RF-D02 CA 8; el frontend solo nombra las `causas`, nunca recalcula nada.
+ */
+export interface CalidadImagen {
+  suficiente: boolean | null;
+  causas: string[];
+  nitidez?: number | null;
+  brillo?: number | null;
+  saturados_pct?: number | null;
+}
+
+/** Respuesta de `GET /analisis/{id}/estado` (W-07). Lo que no aplica al estado no se manda. */
+export interface EstadoAnalisisRespuesta {
+  estado: EstadoAnalisis;
+  etapas: EtapaAnalisis[];
+  /**
+   * Solo en FALLIDO: `ERR-1001` calidad insuficiente (W-07b), `ERR-1002` servicio de inferencia
+   * no disponible (W-07c), `ERR-1003` cola no disponible, `ERR-1004` error interno.
+   */
+  codigo_error?: string | null;
+  /** Solo en FALLIDO por calidad (`ERR-1001`) → W-07b. */
+  calidad?: CalidadImagen | null;
+  /**
+   * Solo en COMPLETADO. Es la ruta **de la API** (`/api/v1/analisis/{id}`), no una ruta de la
+   * interfaz: la navegación del frontend no sale de aquí.
+   */
+  resultado_url?: string | null;
+}

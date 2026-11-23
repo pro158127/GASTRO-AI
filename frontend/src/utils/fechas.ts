@@ -13,6 +13,12 @@ const FORMATO_COMPLETO = new Intl.DateTimeFormat("es-CO", {
   hourCycle: "h23",
 });
 
+const FORMATO_SOLO_FECHA = new Intl.DateTimeFormat("es-CO", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
 const FORMATO_SIN_ANIO = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
   month: "2-digit",
@@ -34,6 +40,17 @@ export function fechaHoraCorta(iso: string | null | undefined): string {
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return "";
   return sinComa(FORMATO_COMPLETO.format(fecha));
+}
+
+/**
+ * «18/10/2026», sin hora. Lo usa el aviso de paciente con historial de W-06b, donde Figma
+ * escribe solo el día: la hora del último análisis no aporta nada ahí.
+ */
+export function fechaCorta(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return "";
+  return FORMATO_SOLO_FECHA.format(fecha);
 }
 
 /** «20/10 14:02»: el año se omite dentro de la frase de vigencia, como en Figma. */
