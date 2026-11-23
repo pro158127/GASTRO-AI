@@ -1,0 +1,175 @@
+/* Componente «Zona de carga de imagen» (Figma 16:671). El ancho de Figma son 560 px fijos;
+   aquí es un máximo, para que a 320 px la zona se encoja en vez de desbordar (WCAG 1.4.10). */
+
+.envoltura {
+  display: flex;
+  width: 100%;
+  max-width: 560px;
+  flex-direction: column;
+  gap: var(--espacio-3);
+}
+
+.zona {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-6);
+  border: 2px dashed var(--color-borde-campo);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* Con imagen (cargada o subiendo) el borde pasa a continuo: ya no es una zona que espera algo. */
+.zona[data-fase="cargada"],
+.zona[data-fase="ocupada"] {
+  border-style: solid;
+}
+
+.zona[data-arrastrando] {
+  border-color: var(--color-accion-primaria);
+  background: var(--color-fondo-seleccion);
+}
+
+.zona[data-fase="error"] {
+  border-color: var(--color-estado-error-borde);
+  background: var(--color-estado-error-fondo);
+}
+
+/* El control real queda fuera de la vista y del orden de tabulación; lo abre el botón. */
+.entradaArchivo {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.iconoGrande {
+  width: 32px;
+  height: 32px;
+  color: var(--color-texto-terciario);
+}
+
+.zona[data-fase="error"] .iconoGrande {
+  color: var(--color-estado-error-icono);
+}
+
+.titulo {
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+  text-align: center;
+}
+
+.detalleError {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-error-texto);
+  text-align: center;
+}
+
+.separador {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.requisitos {
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+  text-align: center;
+}
+
+.iconoBoton {
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+}
+
+/* ---------- Fila del archivo (variantes Cargada y en proceso) ---------- */
+
+.archivo {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.miniatura {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--color-fondo-superficie-sutil);
+}
+
+.iconoMiniatura {
+  width: 28px;
+  height: 28px;
+  color: var(--color-texto-terciario);
+}
+
+.datosArchivo {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Un nombre largo se parte en vez de empujar el botón fuera de la tarjeta. */
+.nombreArchivo {
+  font: var(--texto-cuerpo-base-enfasis);
+  overflow-wrap: anywhere;
+  color: var(--color-texto-primario);
+}
+
+.detalleValido {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-exito-texto);
+}
+
+.detalleOcupada {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+/* ---------- Estado de la carga, bajo la zona ---------- */
+
+.estadoCarga {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.indicador {
+  flex: none;
+  color: var(--color-texto-secundario);
+}
+
+.textoEstado {
+  font: var(--texto-cuerpo-pequeno);
+  overflow-wrap: anywhere;
+  color: var(--color-texto-secundario);
+}
+
+/* A 320 px la fila del archivo se apila: la miniatura y el botón no caben al lado del nombre. */
+@media (max-width: 479px) {
+  .zona {
+    padding: var(--espacio-4);
+  }
+
+  .archivo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .miniatura {
+    width: 100%;
+  }
+}
