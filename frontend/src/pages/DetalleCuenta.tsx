@@ -971,11 +971,16 @@ function textoDialogoContrasena(correo: string | null, pendiente: boolean): stri
       "dejará de funcionar, se cerrarán las sesiones abiertas de esa cuenta y deberá cambiarla al ingresar."
     );
   }
+  // El secreto TOTP nuevo no convive con el viejo: la app autenticadora no deja crear una segunda
+  // entrada con el mismo nombre de cuenta, así que si no se borra la anterior la persona sigue
+  // leyendo códigos de un secreto que ya no existe y nunca logra validar. Por eso el diálogo dice
+  // qué hay que hacer en la app, no solo que se desvincula.
   return (
     `Se generará una contraseña temporal válida por 72 horas y se enviará a ${destino}. La contraseña ` +
-    "actual dejará de funcionar, se cerrarán las sesiones abiertas, se desvinculará su aplicación " +
-    "autenticadora (tendrá que vincularla otra vez al ingresar) y se quitará el bloqueo por intentos " +
-    "fallidos si lo había."
+    "actual dejará de funcionar, se cerrarán las sesiones abiertas y se quitará el bloqueo por " +
+    "intentos fallidos si lo había. También se desvinculará su aplicación autenticadora: antes de " +
+    "volver a vincularla deberá borrar en la app la entrada anterior de esta cuenta, porque sus " +
+    "códigos dejan de servir."
   );
 }
 
