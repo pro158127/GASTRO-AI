@@ -1,4 +1,4 @@
-"""Catálogos de solo lectura: tipos de documento y características del modelo."""
+"""Catálogos de solo lectura: tipos de documento, roles y características del modelo."""
 
 from fastapi import APIRouter
 
@@ -7,7 +7,9 @@ from app.core.seudonimo import LONGITUD_MAXIMA, NOMBRES_TIPO, TipoDocumento
 from app.schemas.catalogo import (
     CaracteristicaSalida,
     ListaCaracteristicas,
+    ListaRoles,
     ListaTiposDocumento,
+    RolSalida,
     TipoDocumentoSalida,
 )
 from app.schemas.errores import RespuestaError
@@ -28,6 +30,15 @@ def tipos_documento(sesion: SesionActiva):
             for t in TipoDocumento
         ]
     )
+
+
+@router.get("/catalogos/roles", response_model=ListaRoles, responses=ERRORES)
+def roles(sesion: SesionActiva, catalogo: Catalogo):
+    """Los roles con su nombre visible (U-16), pa el selector de W-10 antes de crear la cuenta.
+
+    El nombre es el mismo que viaja como `rol_nombre` en `/admin/usuarios`: sale de la base.
+    """
+    return ListaRoles(items=[RolSalida(codigo=r.codigo, nombre=r.nombre) for r in catalogo.roles()])
 
 
 @router.get("/caracteristicas", response_model=ListaCaracteristicas, responses=ERRORES)

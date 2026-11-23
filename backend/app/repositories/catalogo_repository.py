@@ -1,14 +1,17 @@
-"""Características del modelo y la fila única de configuración de inferencia."""
+"""Roles, características del modelo y la fila única de configuración de inferencia."""
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Caracteristica, ConfiguracionInferencia
+from app.models import Caracteristica, ConfiguracionInferencia, Rol
 
 
 class RepositorioCatalogo:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def roles(self) -> list[Rol]:
+        return list(self.db.scalars(select(Rol).order_by(Rol.id)))
 
     def caracteristicas_activas(self) -> list[Caracteristica]:
         return list(

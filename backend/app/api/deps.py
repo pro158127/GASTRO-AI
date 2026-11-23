@@ -6,9 +6,11 @@ LA MISMA sesión de base (FastAPI la cachea), así la acción y su bitácora van
 """
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
@@ -17,34 +19,50 @@ from app.adapters.almacen import Almacen, crear_almacen
 from app.adapters.cola import Cola, ColaCelery
 from app.adapters.correo import EnviadorCorreo, crear_enviador
 from app.adapters.filtraciones import VerificadorFiltraciones, crear_verificador
+from app.adapters.salud import armar_chequeos
+from app.adapters.tiempo_real import Broker
 from app.core.config import Settings, get_settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.core.errores import ErrorApi
 from app.core.seguridad import CifradorTotp
 from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion, Sesion
+from app.repositories import dashboard_tecnico_repository as repo_tecnico
+from app.repositories import reportes_repository as repo_reportes
 from app.repositories.analisis_repository import RepositorioAnalisis
 from app.repositories.bitacora_repository import RepositorioBitacora
+from app.repositories.casos_recibidos_repository import RepositorioCasosRecibidos
 from app.repositories.catalogo_repository import RepositorioCatalogo
 from app.repositories.credenciales_repository import RepositorioCredenciales
+from app.repositories.dashboard_repository import RepositorioDashboard
 from app.repositories.health_repository import HealthRepository
 from app.repositories.historial_repository import RepositorioHistorial
+from app.repositories.monitoreo_repository import RepositorioMonitoreo
 from app.repositories.pacientes_repository import RepositorioPacientes
+from app.repositories.resumen_cuentas_repository import RepositorioResumenCuentas
 from app.repositories.sesiones_repository import RepositorioSesiones
 from app.repositories.traslados_repository import RepositorioTraslados
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.repositories.usuarios_repository import RepositorioUsuarios
 from app.services import bitacora as servicio_bitacora
+from app.services import dashboard_tecnico as servicio_tecnico
+from app.services import estado_operativo as servicio_estado
+from app.services import eventos as servicio_eventos
+from app.services import reportes as servicio_reportes
 from app.services.analisis import ServicioAnalisis
 from app.services.auditoria import PublicadorEventos, SuscriptorBitacora
 from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
+from app.services.casos_recibidos import ServicioCasosRecibidos
 from app.services.configuracion_inferencia import ServicioConfiguracionInferencia
 from app.services.credenciales import ServicioCredenciales
+from app.services.dashboard import ServicioDashboard
 from app.services.health_service import HealthService
 from app.services.historial import ServicioHistorial
 from app.services.imagenes import ServicioImagenes
+from app.services.monitoreo import ServicioMonitoreo
 from app.services.pacientes import ServicioPacientes
 from app.services.perfil import ServicioPerfil
+from app.services.resumen_cuentas import ServicioResumenCuentas
 from app.services.usuarios import ServicioUsuarios
 from app.services.verificadores_imagen import construir_cadena
 from app.workers.celery_app import celery_app
@@ -108,6 +126,7 @@ def get_servicio_autenticacion(
             intentos=ajustes.bloqueo_intentos,
             bloqueo=timedelta(minutes=ajustes.bloqueo_minutos),
         ),
+        traslados=RepositorioTraslados(db),
     )
 
 
@@ -141,6 +160,13 @@ def get_servicio_usuarios(
 
 
 ServicioCuentas = Annotated[ServicioUsuarios, Depends(get_servicio_usuarios)]
+
+
+def get_servicio_resumen_cuentas(db: DbSession) -> ServicioResumenCuentas:
+    return ServicioResumenCuentas(RepositorioResumenCuentas(db), _ahora)
+
+
+ServicioDeResumenCuentas = Annotated[ServicioResumenCuentas, Depends(get_servicio_resumen_cuentas)]
 
 
 def get_servicio_configuracion(
@@ -201,6 +227,53 @@ def get_cola() -> Cola:
     return ColaCelery(celery_app)
 
 
+@lru_cache
+def _memoria_estado() -> servicio_estado.MemoriaEstado:
+    # La última verificación se comparte entre peticiones (y entre los admins)
+    return servicio_estado.MemoriaEstado()
+
+
+def get_servicio_estado_operativo(
+    db: DbSession,
+    ajustes: Ajustes,
+    enviador: Annotated[EnviadorCorreo, Depends(get_enviador_correo)],
+    almacen: Annotated[Almacen, Depends(get_almacen)],
+) -> servicio_estado.ServicioEstadoOperativo:
+    return servicio_estado.ServicioEstadoOperativo(
+        armar_chequeos(ajustes, almacen, enviador),
+        RepositorioMonitoreo(db),
+        _memoria_estado(),
+        ajustes.hf_revision,
+        _ahora,
+        ajustes.monitoreo_timeout_seconds,
+    )
+
+
+ServicioDeEstadoOperativo = Annotated[
+    servicio_estado.ServicioEstadoOperativo, Depends(get_servicio_estado_operativo)
+]
+
+
+def get_servicio_monitoreo(db: DbSession) -> ServicioMonitoreo:
+    return ServicioMonitoreo(RepositorioMonitoreo(db))
+
+
+ServicioDeMonitoreo = Annotated[ServicioMonitoreo, Depends(get_servicio_monitoreo)]
+
+
+def get_servicio_dashboard_tecnico(
+    db: DbSession, estado: ServicioDeEstadoOperativo
+) -> servicio_tecnico.ServicioDashboardTecnico:
+    return servicio_tecnico.ServicioDashboardTecnico(
+        repo_tecnico.RepositorioDashboardTecnico(db), estado, _ahora
+    )
+
+
+ServicioDeDashboardTecnico = Annotated[
+    servicio_tecnico.ServicioDashboardTecnico, Depends(get_servicio_dashboard_tecnico)
+]
+
+
 def get_servicio_imagenes(
     ajustes: Ajustes, almacen: Annotated[Almacen, Depends(get_almacen)]
 ) -> ServicioImagenes:
@@ -237,6 +310,17 @@ def get_servicio_historial(
 
 
 ServicioDeHistorial = Annotated[ServicioHistorial, Depends(get_servicio_historial)]
+
+
+def get_servicio_casos_recibidos(
+    db: DbSession, seudonimizador: Annotated[Seudonimizador, Depends(get_seudonimizador)]
+) -> ServicioCasosRecibidos:
+    return ServicioCasosRecibidos(
+        RepositorioCasosRecibidos(db), seudonimizador, UnidadTrabajo(db), _ahora
+    )
+
+
+ServicioDeCasosRecibidos = Annotated[ServicioCasosRecibidos, Depends(get_servicio_casos_recibidos)]
 
 
 def get_servicio_perfil(db: DbSession, publicador: Publicador) -> ServicioPerfil:
@@ -285,3 +369,74 @@ def requiere_rol(*roles: CodigoRol) -> Callable[..., Sesion]:
 
 SesionDoctor = Annotated[Sesion, Depends(requiere_rol(CodigoRol.DOCTOR))]
 SesionAdmin = Annotated[Sesion, Depends(requiere_rol(CodigoRol.ADMINISTRADOR))]
+
+
+def get_servicio_dashboard(db: DbSession) -> ServicioDashboard:
+    return ServicioDashboard(RepositorioDashboard(db), _ahora)
+
+
+ServicioDeDashboard = Annotated[ServicioDashboard, Depends(get_servicio_dashboard)]
+
+
+# ------------------------------------------------------------------ tiempo real (SSE)
+
+
+@lru_cache
+def get_broker() -> Broker:
+    # Uno por proceso: un solo suscriptor de Redis reparte a todas las conexiones
+    return Broker(get_settings().redis_url)
+
+
+BrokerEventos = Annotated[Broker, Depends(get_broker)]
+
+
+def get_fabrica_sesiones() -> Callable[[], AbstractContextManager[Session]]:
+    """Sesiones cortas pa el stream: abrirlo no deja una conexión de la base tomada."""
+    return SessionLocal
+
+
+class VerificadorStream:
+    """Valida la sesión del stream sin renovar la inactividad (RF-U10)."""
+
+    def __init__(self, fabrica, ajustes: Settings, verificador: VerificadorFiltraciones) -> None:
+        self._fabrica = fabrica
+        self._ajustes = ajustes
+        self._verificador = verificador
+
+    def _servicio(self, db: Session) -> ServicioAutenticacion:
+        return get_servicio_autenticacion(db, get_publicador(db), self._ajustes, self._verificador)
+
+    def abrir(self, token: str | None) -> UUID:
+        """Al conectar: 401/403 igual que cualquier endpoint protegido."""
+        with self._fabrica() as db:
+            etapas = (EtapaSesion.ACTIVA,)
+            return self._servicio(db).validar_sesion(token, etapas, pasiva=True).usuario_id
+
+    def comprobar(self, token: str | None) -> servicio_eventos.Comprobacion:
+        with self._fabrica() as db:
+            return servicio_eventos.comprobar_sesion(self._servicio(db), token)
+
+
+def get_verificador_stream(
+    ajustes: Ajustes,
+    verificador: Annotated[VerificadorFiltraciones, Depends(get_verificador_filtraciones)],
+    fabrica: Annotated[Callable, Depends(get_fabrica_sesiones)],
+) -> VerificadorStream:
+    return VerificadorStream(fabrica, ajustes, verificador)
+
+
+VerificadorDelStream = Annotated[VerificadorStream, Depends(get_verificador_stream)]
+
+
+# ------------------------------------------------------------------ reporte PDF (RF-H02)
+
+
+def get_servicio_reportes(
+    db: DbSession, almacen: Annotated[Almacen, Depends(get_almacen)]
+) -> servicio_reportes.ServicioReportes:
+    return servicio_reportes.ServicioReportes(
+        repo_reportes.RepositorioReportes(db), almacen, UnidadTrabajo(db), _ahora
+    )
+
+
+ServicioDeReportes = Annotated[servicio_reportes.ServicioReportes, Depends(get_servicio_reportes)]

@@ -5,8 +5,11 @@ explicación a Gemini). En Windows córrelo con --pool=solo o se pone de malas.
 """
 
 from celery import Celery
+from celery.signals import worker_init
 
+from app.adapters.tiempo_real import PublicadorRedis
 from app.core.config import get_settings
+from app.repositories import avisos_tiempo_real
 
 settings = get_settings()
 
@@ -27,3 +30,9 @@ celery_app.conf.update(
     # Un análisis a la vez por proceso: son pesados y así acks_late reparte parejo
     worker_prefetch_multiplier=1,
 )
+
+
+@worker_init.connect
+def _avisos_en_tiempo_real(**_kwargs) -> None:
+    # Etapas, fin del análisis y explicación salen al front por Redis (SSE)
+    avisos_tiempo_real.instalar(PublicadorRedis(settings.redis_url))

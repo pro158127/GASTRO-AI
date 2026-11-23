@@ -9,8 +9,8 @@ con hacer fetch con `credentials: "same-origin"` pasando por nginx.
 | CAMBIO_CONTRASENA | /auth/contrasena/cambiar                             |
 | VINCULAR_TOTP     | /auth/totp/iniciar, /auth/totp/vincular              |
 | PENDIENTE_2FA     | /auth/totp/verificar                                 |
-| cualquiera        | /auth/sesion, /auth/logout                           |
-| ACTIVA            | /auth/sesion/continuar y el resto de la API por rol  |
+| cualquiera        | /auth/sesion, /auth/sesion/continuar, /auth/logout   |
+| ACTIVA            | el resto de la API, según el rol                     |
 """
 
 from typing import Annotated
@@ -21,7 +21,6 @@ from app.api.deps import (
     COOKIE_SESION,
     IpCliente,
     ServicioAuth,
-    SesionActiva,
     sesion_en,
 )
 from app.core.errores import ErrorApi
@@ -146,12 +145,18 @@ def ver_sesion(sesion: SesionCualquiera, servicio: ServicioAuth):
         etapa=sesion.etapa,
         usuario=_usuario(sesion.usuario),
         inactividad=servicio.inactividad(sesion),
+        casos_recibidos_nuevos=servicio.casos_recibidos_nuevos(sesion),
     )
 
 
 @router.post("/sesion/continuar", response_model=RespuestaContinuar, responses=ERRORES)
-def continuar_sesion(sesion: SesionActiva):
-    """«Sigo aquí» del aviso del minuto 9 (RF-U10 CA 4). La dependencia ya renovó la sesión."""
+def continuar_sesion(sesion: SesionCualquiera):
+    """«Sigo aquí» del aviso del minuto 9 (RF-U10 CA 4). La dependencia ya renovó la sesión.
+
+    Funciona en cualquier etapa: también en el cambio de contraseña, la vinculación del TOTP
+    y el código, pa que ahí también se pueda avisar y ampliar el tiempo (WCAG 2.2.1). No
+    salta ningún paso: solo renueva la inactividad, como cualquier otra petición.
+    """
     return RespuestaContinuar(ultima_actividad_en=sesion.ultima_actividad_en)
 
 

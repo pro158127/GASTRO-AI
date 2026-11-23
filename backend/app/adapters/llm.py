@@ -121,6 +121,18 @@ class AdaptadorProveedorLLM:
             raise ErrorProveedorLLM("La explicación no está disponible.")
         return texto
 
+    def salud(self, timeout: float = 3.0) -> None:
+        """Pa el panel de supervisión (RF-A04): pide los datos del modelo, sin gastar tokens."""
+        try:
+            self._cliente.models.get(
+                model=self._modelo,
+                config=types.GetModelConfig(
+                    http_options=types.HttpOptions(timeout=int(timeout * 1000))
+                ),
+            )
+        except Exception as error:  # red, llave mala, modelo que ya no existe: todo igual
+            raise ErrorProveedorLLM("El servicio de explicación no responde.") from error
+
 
 class SinProveedorLLM:
     """Lo que se usa cuando Gemini no está configurado (sin LLM_API_KEY).
@@ -133,6 +145,9 @@ class SinProveedorLLM:
     def explicar(self, resumen: dict[str, Any]) -> str:
         verificar_sin_imagen(resumen)
         raise ErrorProveedorLLM("La explicación no está disponible.")
+
+    def salud(self, timeout: float = 3.0) -> None:
+        raise ErrorProveedorLLM("Falta configurar LLM_API_KEY.")
 
 
 def crear_adaptador_llm(settings: Settings) -> ServicioExplicacion:
