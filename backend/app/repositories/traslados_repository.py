@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import CasoPaciente, EstadoCaso, TipoTraslado, Traslado, TrasladoCaso
@@ -22,6 +22,23 @@ class RepositorioTraslados:
             consulta = consulta.where(CasoPaciente.id.in_(caso_ids))
         # FOR UPDATE: nadie más mueve estos casos mientras se trasladan
         return list(self.db.scalars(consulta.with_for_update()))
+
+    def sin_ver(self, destino_id: UUID) -> int:
+        """Traslados hacia el doctor que no ha abierto y que aún le dejan algún caso."""
+        con_casos_suyos = (
+            select(TrasladoCaso.traslado_id)
+            .join(CasoPaciente, CasoPaciente.id == TrasladoCaso.caso_id)
+            .where(CasoPaciente.doctor_asignado_id == destino_id)
+        )
+        return int(
+            self.db.scalar(
+                select(func.count(Traslado.id)).where(
+                    Traslado.destino_id == destino_id,
+                    Traslado.visto_en.is_(None),
+                    Traslado.id.in_(con_casos_suyos),
+                )
+            )
+        )
 
     def trasladar(
         self,

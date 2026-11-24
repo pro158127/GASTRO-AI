@@ -1,0 +1,149 @@
+/* Grupo de opciones (radios). W-10, «Rol (grupo de opciones)» (Figma 48:1132).
+   La opción seleccionada se distingue por el radio marcado, el borde de 2 px, el fondo y el peso
+   del texto: el color nunca es la única señal (WCAG 1.4.1). */
+
+.campo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-2);
+  /* `fieldset` trae borde, margen y relleno del navegador; aquí se anulan. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.etiqueta {
+  /* `legend` por defecto va dentro del borde del `fieldset`; sin borde se comporta como bloque. */
+  display: block;
+  padding: 0;
+  font: var(--texto-etiqueta-campo);
+  color: var(--color-texto-primario);
+}
+
+.etiquetaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+}
+
+.opcion {
+  display: flex;
+  min-height: var(--tamano-control);
+  align-items: center;
+  gap: var(--espacio-2);
+  padding: var(--espacio-2) var(--espacio-3);
+  border: var(--borde-grosor) solid var(--color-borde-campo);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+}
+
+/* El borde de 2 px se logra con borde de 1 px + sombra interior, igual que en CampoTexto, para
+   que el alto de la opción no cambie al seleccionarla. */
+.opcion[data-seleccionada] {
+  border-color: var(--color-accion-primaria);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-accion-primaria);
+  background: var(--color-fondo-seleccion);
+}
+
+.opcion[data-seleccionada] .textoOpcion {
+  font: var(--texto-cuerpo-base-enfasis);
+}
+
+.opcion[data-error] {
+  border-color: var(--color-estado-error-borde);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-estado-error-borde);
+}
+
+.opcion[data-deshabilitada] {
+  border-color: var(--color-borde-sutil);
+  background: var(--color-fondo-superficie-sutil);
+}
+
+.opcion[data-deshabilitada] .textoOpcion {
+  color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
+/* El anillo rodea toda la opción, no solo el círculo del radio (WCAG 2.4.7). Donde no haya
+   `:has()`, ninguna de las dos reglas aplica y queda el anillo propio del radio: el foco siempre
+   se ve. */
+.opcion:has(.radio:focus-visible) {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.opcion:has(.radio:focus-visible) .radio {
+  outline: none;
+}
+
+.radio {
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--color-accion-primaria);
+}
+
+.radio:not(:disabled) {
+  cursor: pointer;
+}
+
+.textoOpcion {
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-primario);
+  cursor: pointer;
+}
+
+.mensajeError {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.iconoError {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-estado-error-icono);
+}
+
+.textoError {
+  min-width: 0;
+  flex: 1 1 0;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-error-texto);
+}
+
+.ayuda {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.ayudaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+/* Celular: objetivos táctiles de 44 px (WCAG 2.5.8 y la regla del equipo).
+   Las opciones se apilan y ocupan todo el ancho, así que quedan todas iguales: en una sola
+   columna, una píldora ajustada a su texto al lado de otra más larga se ve despareja. Es el mismo
+   corte en el que se apilan los demás campos del formulario (ver CrearUsuario.module.css). */
+@media (max-width: 767px) {
+  .opciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opcion {
+    min-height: var(--tamano-control-tactil);
+  }
+}

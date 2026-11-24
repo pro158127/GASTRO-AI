@@ -89,6 +89,16 @@
   cursor: not-allowed;
 }
 
+/* No disponible pero sin salir del orden de tabulación (aria-disabled): mismo aspecto que
+   :disabled. Se usa cuando perder el foco rompería algo, como «Cancelar» dentro de un diálogo
+   que está enviando. El estado «Cargando» tiene su propio aspecto y se excluye. */
+.boton.boton[aria-disabled="true"]:not(.cargando) {
+  background: var(--color-fondo-superficie-sutil);
+  border-color: var(--color-borde-sutil);
+  color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
 /* ---------- Cargando ---------- */
 /* Conserva el aspecto del estado normal, sin cambios de color al pasar el cursor. */
 .cargando {

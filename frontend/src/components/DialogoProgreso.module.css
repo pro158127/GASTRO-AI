@@ -1,0 +1,66 @@
+/* Diálogo de progreso (Figma D-09, 100:4031). Mismas medidas y elevación que el diálogo de
+   confirmación: 480 px centrado, y a 320 px ocupa el ancho disponible sin desplazamiento
+   horizontal. Lo único distinto es que no tiene botones. */
+
+/* Misma capa que el diálogo de confirmación: por encima del menú del celular (40/50) y por debajo
+   del aviso de inactividad W-05 (60). */
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espacio-4);
+  overflow-y: auto;
+  background: var(--color-fondo-superposicion);
+}
+
+.dialogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  padding: var(--espacio-6);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-3-dialogo);
+}
+
+/* El contenedor recibe el foco al abrir (no hay ningún botón al que dárselo), pero no es un
+   control: el anillo se dibuja igual para que se vea dónde está el foco. */
+.dialogo:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.progreso {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.indicador {
+  flex-shrink: 0;
+  color: var(--color-texto-secundario);
+}
+
+.textoProgreso {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}

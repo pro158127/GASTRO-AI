@@ -8,6 +8,8 @@ Dos clientes, misma llave:
 La firma S3v4 incluye el host: por eso no sirve firmar con uno y reescribir la URL después.
 """
 
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Protocol
 
 import boto3
@@ -27,6 +29,19 @@ class ErrorAlmacen(Exception):
 # Área temporal de POST /imagenes: lo que no se usa en un día lo barre MinIO solito
 PREFIJO_TEMPORAL = "tmp/"
 DIAS_TEMPORAL = 1  # S3 cuenta el ciclo de vida en días; el vencimiento fino lo revisa la API
+
+
+@dataclass(frozen=True)
+class ObjetoGuardado:
+    clave: str
+    tamano: int
+
+
+@dataclass(frozen=True)
+class ArchivoCompleto:
+    datos: bytes
+    tipo_contenido: str
+    metadatos: dict[str, str]
 
 
 class Almacen(Protocol):
@@ -51,9 +66,18 @@ class Almacen(Protocol):
     def url_firmada(self, clave: str) -> str: ...
 
 
+def _codigo(error: ClientError) -> str:
+    return str(error.response.get("Error", {}).get("Code", ""))
+
+
 def _no_existe(error: ClientError) -> bool:
-    codigo = str(error.response.get("Error", {}).get("Code", ""))
-    return codigo in {"404", "NoSuchKey", "NotFound"}
+    """El objeto no existe (head_object / get_object)."""
+    return _codigo(error) in {"404", "NoSuchKey", "NotFound"}
+
+
+def _bucket_no_existe(error: ClientError) -> bool:
+    """El bucket no existe. Solo estos códigos autorizan crearlo; NoSuchKey es de objetos."""
+    return _codigo(error) in {"404", "NoSuchBucket", "NotFound"}
 
 
 def _cliente(endpoint: str, settings: Settings) -> BaseClient:
@@ -149,14 +173,50 @@ class AlmacenS3:
         except (BotoCoreError, ClientError):
             return False
 
+    # ------------------------------------------------------------- respaldo (RNF-26)
+
+    def listar(self) -> Iterator[ObjetoGuardado]:
+        """Todas las claves del bucket con su tamaño, en orden alfabético."""
+        try:
+            paginas = self._interno.get_paginator("list_objects_v2").paginate(Bucket=self._bucket)
+            for pagina in paginas:
+                for obj in pagina.get("Contents", []):
+                    yield ObjetoGuardado(obj["Key"], obj["Size"])
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo listar el almacén.") from error
+
+    def descargar(self, clave: str) -> ArchivoCompleto:
+        """El objeto con su tipo y sus metadatos, pa respaldarlo tal cual."""
+        try:
+            r = self._interno.get_object(Bucket=self._bucket, Key=clave)
+            return ArchivoCompleto(
+                r["Body"].read(),
+                r.get("ContentType", "application/octet-stream"),
+                dict(r.get("Metadata", {})),
+            )
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo leer el archivo.") from error
+
     def asegurar_bucket(self) -> bool:
-        """Crea el bucket si falta. Devuelve True si lo tuvo que crear."""
+        """Crea el bucket si falta. Devuelve True si lo tuvo que crear.
+
+        Solo se crea cuando S3 confirma que no existe (404). Un acceso denegado (403), un
+        error del servidor o una falla de conexión no prueban que falte: se lanza
+        ErrorAlmacen sin intentar crearlo, pa no esconder un problema de permisos.
+        """
         try:
             self._interno.head_bucket(Bucket=self._bucket)
             return False
-        except ClientError:
+        except ClientError as error:
+            if not _bucket_no_existe(error):
+                raise ErrorAlmacen("No se pudo consultar el bucket.") from error
+        except BotoCoreError as error:
+            raise ErrorAlmacen("No se pudo consultar el bucket.") from error
+        try:
             self._interno.create_bucket(Bucket=self._bucket)
-            return True
+        except (BotoCoreError, ClientError) as error:
+            raise ErrorAlmacen("No se pudo crear el bucket.") from error
+        return True
 
     def asegurar_limpieza_temporal(self) -> None:
         """Regla de ciclo de vida: lo de tmp/ se borra solo a los DIAS_TEMPORAL días.

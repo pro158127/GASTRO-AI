@@ -4,8 +4,14 @@
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
+import CrearUsuario from "../pages/CrearUsuario";
+import CuentasPendientes from "../pages/CuentasPendientes";
+import DetalleCuenta from "../pages/DetalleCuenta";
 import MiPerfil from "../pages/MiPerfil";
+import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
+import ProgresoAnalisis from "../pages/ProgresoAnalisis";
+import ReasignarCasos from "../pages/ReasignarCasos";
 import SinPermisos from "../pages/SinPermisos";
 import Usuarios from "../pages/Usuarios";
 import type { RolInterfaz } from "./menus";
@@ -34,7 +40,23 @@ export const pantallas: Pantalla[] = [
     ruta: "/nuevo-analisis",
     titulo: "Nuevo análisis",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-06)
+    elemento: (titulo) => <NuevoAnalisis titulo={titulo} />, // W-06
+  },
+  {
+    // Progreso del análisis recién solicitado. Va bajo `/nuevo-analisis` para que el ítem del
+    // menú siga marcado (`incluyeSubrutas`) y el título de la pestaña no cambie a mitad del
+    // flujo. El identificador del análisis sí puede ir en la URL; el documento del paciente no.
+    ruta: "/nuevo-analisis/:idAnalisis",
+    titulo: "Nuevo análisis",
+    roles: SOLO_DOCTOR,
+    elemento: (titulo) => <ProgresoAnalisis titulo={titulo} />, // W-07
+  },
+  {
+    // Destino de un análisis completado. No tiene ítem de menú: se llega desde W-07.
+    ruta: "/analisis/:idAnalisis",
+    titulo: "Resultado del análisis",
+    roles: SOLO_DOCTOR,
+    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-08)
   },
   {
     ruta: "/historial",
@@ -67,19 +89,27 @@ export const pantallas: Pantalla[] = [
     ruta: "/usuarios/nuevo",
     titulo: "Crear usuario",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-10)
+    elemento: (titulo) => <CrearUsuario titulo={titulo} />, // W-10
   },
   {
     ruta: "/usuarios/:id",
     titulo: "Detalle de cuenta",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-11)
+    elemento: (titulo) => <DetalleCuenta titulo={titulo} />, // W-11
+  },
+  {
+    // No tiene ítem de menú: se entra desde W-11 (D-02) o escribiendo la ruta. `matchPath` exige
+    // que la ruta coincida entera, así que no se confunde con `/usuarios/:id`.
+    ruta: "/usuarios/:id/reasignar-casos",
+    titulo: "Reasignar casos activos",
+    roles: SOLO_ADMINISTRADOR,
+    elemento: (titulo) => <ReasignarCasos titulo={titulo} />, // W-25
   },
   {
     ruta: "/cuentas-pendientes",
     titulo: "Cuentas pendientes",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <CuentasPendientes titulo={titulo} />, // W-20
   },
   {
     ruta: "/bitacora",

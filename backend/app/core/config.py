@@ -4,16 +4,36 @@ Si algo no arranca, primero revisa que la variable exista; después ya puedes ll
 Variable nueva = va aquí Y en .env.example, o el siguiente que clone el repo te odia.
 """
 
+import base64
+import binascii
+import re
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PRODUCCION = "production"
+S3_SECRETO_DESARROLLO = "gastroia_dev_secret"
+_SHA = re.compile(r"[0-9a-f]{40}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def _llave_aes(clave: SecretStr) -> bool:
+    """¿Es una llave AES-256 en Base64 (32 bytes)?"""
+    try:
+        return len(base64.b64decode(clave.get_secret_value(), validate=True)) == 32
+    except (binascii.Error, ValueError):
+        return False
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # hide_input_in_errors: si algo no valida, el error no copia los valores (ahí van claves)
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
+    )
 
     app_name: str = "Gastro-AI API"
+    # development | production. En production se exigen las claves (ver al final)
     environment: str = "development"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -23,6 +43,8 @@ class Settings(BaseSettings):
 
     # Redis: el mandadero de Celery, por aquí pasan las tareas y sus resultados
     redis_url: str = "redis://localhost:6379/0"
+    # Cada cuánto el stream SSE revisa que la sesión siga valiendo (y si no, la corta)
+    eventos_intervalo_segundos: float = 15.0
 
     # MinIO, nuestro S3 hecho en casa. Dentro de Docker el host es «minio», no localhost
     s3_endpoint_url: str = "http://localhost:9000"
@@ -30,7 +52,7 @@ class Settings(BaseSettings):
     # Truco copiado del repo del equipo: sin esto las URL salen con minio:9000 y no abren.
     s3_public_endpoint_url: str = ""
     s3_access_key: str = "gastroia"
-    s3_secret_key: str = "gastroia_dev_secret"
+    s3_secret_key: str = S3_SECRETO_DESARROLLO
     s3_bucket: str = "gastroia-imagenes"
     s3_url_firmada_segundos: int = 300  # 5 min y la URL se vuelve calabaza
     # Cuánto aguanta la imagen en el área temporal (tmp/) entre POST /imagenes y POST /analisis.
@@ -46,13 +68,18 @@ class Settings(BaseSettings):
     # todo mundo vuelve a vincular su autenticador y te van a querer muchísimo.
     totp_clave_cifrado: SecretStr = SecretStr("")
 
-    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30). Todavía nadie nos pasa
-    # estos datos, así que por ahora andan vacíos y el worker usa un adaptador falso.
+    # Space privado de Hugging Face (RF-M01, RNF-29, RNF-30). En desarrollo, sin estos
+    # datos, se usa HF_SIMULADO.
     hf_space_url: str = ""
     hf_token: SecretStr = SecretStr("")
+    # Clave compartida con el Space (cabecera X-API-Key); la misma configurada en HF
+    gastroai_api_key: SecretStr = SecretStr("")
     hf_repo: str = ""
     hf_revision: str = ""  # SHA fijo, nunca «main»: luego cambian el modelo y nadie sabe qué pasó
     hf_sha256: str = ""  # huella de los pesos, pa que no nos den gato por liebre
+    # Ruta de los pesos dentro de HF_REPO (p. ej. best_gastroai_masked_loss.pth). Solo la
+    # usa el respaldo (RNF-26) pa guardar una copia; vacía = el respaldo no los copia
+    hf_pesos_archivo: str = ""
     http_timeout_seconds: float = 30.0
     # Space de mentiras pa desarrollo mientras ML publica el de verdad. Solo funciona con
     # ENVIRONMENT=development; en cualquier otro ambiente el worker se niega a arrancar.
@@ -82,6 +109,11 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_seconds: float = 15.0  # RF-R05 CA 4: si pasa de 15 s, lo soltamos
 
+    # Panel de supervisión (RF-A04): cada servicio tiene este tiempo pa contestar. La
+    # «Aplicación web» se revisa en esta URL (por defecto, nginx dentro de Docker).
+    monitoreo_timeout_seconds: float = 3.0
+    monitoreo_app_web_url: str = "http://nginx/"
+
     # Sesión y bloqueo (RF-U10, RF-U12, RNF-03). Los valores salen de los requisitos;
     # se dejan aquí pa las pruebas, no pa que alguien los afloje en producción.
     sesion_inactividad_minutos: int = 10
@@ -94,6 +126,45 @@ class Settings(BaseSettings):
     contrasenas_filtradas_activo: bool = True
     contrasenas_filtradas_url: str = "https://api.pwnedpasswords.com/range/"
     contrasenas_filtradas_timeout_seconds: float = 3.0
+
+    @model_validator(mode="after")
+    def _produccion_completa(self) -> "Settings":
+        """Con ENVIRONMENT=production no se arranca a medias.
+
+        Sin esto la API arranca «sana» y revienta con 500 en el primer login o análisis, o
+        peor: con HF_SIMULADO le muestra resultados inventados a un doctor. Solo se nombran
+        las variables, nunca sus valores.
+        """
+        if self.environment != PRODUCCION:
+            return self
+        faltan = [nombre for nombre, falla in self._revision_produccion() if falla]
+        if faltan:
+            raise ValueError(
+                "ENVIRONMENT=production pero estas variables faltan o tienen un valor de "
+                "desarrollo: " + ", ".join(faltan)
+            )
+        return self
+
+    def _revision_produccion(self) -> list[tuple[str, bool]]:
+        return [
+            (
+                "HMAC_CLAVES (con HMAC_VERSION_ACTUAL)",
+                self.hmac_version_actual not in self.hmac_claves,
+            ),
+            ("TOTP_CLAVE_CIFRADO (32 bytes en Base64)", not _llave_aes(self.totp_clave_cifrado)),
+            ("HF_SIMULADO (debe ser false)", self.hf_simulado),
+            ("HF_SPACE_URL (https)", not self.hf_space_url.startswith("https://")),
+            ("HF_TOKEN", not self.hf_token.get_secret_value()),
+            ("GASTROAI_API_KEY", not self.gastroai_api_key.get_secret_value()),
+            ("HF_REVISION (SHA de 40 caracteres)", not _SHA.fullmatch(self.hf_revision)),
+            ("HF_SHA256 (64 caracteres hex)", not _SHA256.fullmatch(self.hf_sha256.lower())),
+            ("S3_SECRET_KEY", self.s3_secret_key in ("", S3_SECRETO_DESARROLLO)),
+            (
+                "S3_PUBLIC_ENDPOINT_URL (https)",
+                not self.s3_public_endpoint_url.startswith("https://"),
+            ),
+            ("DATABASE_URL (contraseña de desarrollo)", ":gastroia_dev@" in self.database_url),
+        ]
 
 
 @lru_cache

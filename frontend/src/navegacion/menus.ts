@@ -33,7 +33,14 @@ export interface ItemMenu {
 export const menusPorRol: Record<RolInterfaz, ItemMenu[]> = {
   doctor: [
     { id: "dashboard", etiqueta: "Dashboard", ruta: "/dashboard", Icono: IconoInicio },
-    { id: "nuevo-analisis", etiqueta: "Nuevo análisis", ruta: "/nuevo-analisis", Icono: IconoNuevoAnalisis },
+    {
+      id: "nuevo-analisis",
+      etiqueta: "Nuevo análisis",
+      ruta: "/nuevo-analisis",
+      Icono: IconoNuevoAnalisis,
+      // El ítem sigue marcado en el progreso del análisis (/nuevo-analisis/:idAnalisis, W-07).
+      incluyeSubrutas: true,
+    },
     { id: "historial", etiqueta: "Historial", ruta: "/historial", Icono: IconoHistorial },
     {
       id: "casos-recibidos",
