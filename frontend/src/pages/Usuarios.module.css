@@ -224,11 +224,6 @@
     display: grid;
   }
 
-  /* T-09 y M-09: «Crear usuario» debajo del título. */
-  .accionEncabezado {
-    flex-basis: 100%;
-  }
-
   .buscador {
     max-width: none;
   }
@@ -238,12 +233,26 @@
   }
 }
 
+/* T-09: «Crear usuario» debajo del título. Hasta 767 px el encabezado ya apila en columna
+   (EncabezadoPagina.module.css), y allí `flex-basis` mediría el alto en vez del ancho: esta regla
+   solo tiene sentido mientras el encabezado sigue siendo una fila que envuelve. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .accionEncabezado {
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 767px) {
   .tarjetas {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* M-09: «Crear usuario» de ancho completo. */
+  /* M-09: «Crear usuario» de ancho completo. El encabezado está en columna y alinea a la
+     izquierda, así que el ancho se pide con `width`; sin esto la acción se encoge al contenido. */
+  .accionEncabezado {
+    width: 100%;
+  }
+
   .accionEncabezado > a {
     width: 100%;
   }
