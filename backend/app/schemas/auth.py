@@ -58,6 +58,9 @@ class RespuestaSesion(BaseModel):
     etapa: EtapaSesion
     usuario: UsuarioSesion
     inactividad: Inactividad
+    # Insignia del menú «Casos recibidos»: traslados que el doctor no ha abierto. Solo con
+    # sesión ACTIVA y rol DOCTOR; en otro caso, null
+    casos_recibidos_nuevos: int | None = None
 
 
 class RespuestaContinuar(BaseModel):

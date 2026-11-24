@@ -1,5 +1,7 @@
 # Environment (secrets)
 .env
+# Certificados TLS de producción (la llave privada nunca va al repo)
+backend/docker/nginx/certs/
 
 # Python
 __pycache__/

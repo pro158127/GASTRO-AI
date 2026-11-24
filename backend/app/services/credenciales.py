@@ -27,6 +27,7 @@ from app.models import (
     Usuario,
 )
 from app.repositories.credenciales_repository import RepositorioCredenciales
+from app.services.analisis import ZONA_COLOMBIA
 from app.services.auditoria import EventoAuditoria, PublicadorEventos
 
 VIGENCIA_TEMPORAL = timedelta(hours=72)  # RNF-27
@@ -38,12 +39,46 @@ ASUNTOS = {
 }
 
 
-def _texto(usuario: Usuario, temporal: str, vence: datetime) -> str:
+INTRODUCCIONES = {
+    MotivoCredencial.CREACION: "Ya tienes una cuenta en Gastro-AI.",
+    MotivoCredencial.RESTABLECIMIENTO: "Se restableció tu contraseña de Gastro-AI.",
+    MotivoCredencial.CAMBIO_CORREO: "Este es ahora tu correo de acceso a Gastro-AI.",
+}
+
+# RF-U09 CA 9: al restablecer se desvincula la app. La app autenticadora no deja crear una
+# segunda entrada con el mismo nombre y los códigos de la vieja ya no validan; sin este
+# aviso la persona queda atascada en el QR sin saber por qué.
+AVISO_APP_ANTERIOR = (
+    "Tu aplicación autenticadora anterior quedó desvinculada y sus códigos ya no sirven. "
+    "Antes de escanear el código QR nuevo, borra de la aplicación la entrada de Gastro-AI "
+    "que ya tenías."
+)
+
+
+def _texto(usuario: Usuario, motivo: MotivoCredencial, temporal: str, vence: datetime) -> str:
+    """Cuerpo del correo según el motivo y lo que de verdad pedirá el sistema al entrar.
+
+    Después de cambiar la temporal, autenticacion.py pide el código si la app ya está
+    vinculada (PENDIENTE_2FA) y el QR si no (VINCULAR_TOTP). El cambio de correo no toca el
+    TOTP, así que a quien ya lo tenía no se le dice que vincule nada.
+    """
+    if usuario.totp_vinculado_en:
+        al_entrar = (
+            "Al entrar, el sistema te pedirá cambiarla y después el código de tu aplicación "
+            "autenticadora, como siempre."
+        )
+    else:
+        al_entrar = (
+            "Al entrar, el sistema te pedirá cambiarla y vincular una aplicación autenticadora "
+            "con un código QR."
+        )
+    if motivo is MotivoCredencial.RESTABLECIMIENTO and not usuario.totp_vinculado_en:
+        al_entrar += f"\n\n{AVISO_APP_ANTERIOR}"
     return (
         f"Hola, {usuario.nombre}.\n\n"
-        f"Tu contraseña temporal de Gastro-AI es:\n\n    {temporal}\n\n"
-        f"Vence el {vence:%Y-%m-%d %H:%M} (UTC), a las 72 horas de este mensaje. Al entrar, "
-        "el sistema te pedirá cambiarla y vincular una aplicación autenticadora.\n\n"
+        f"{INTRODUCCIONES[motivo]} Tu contraseña temporal es:\n\n    {temporal}\n\n"
+        f"Vence el {vence.astimezone(ZONA_COLOMBIA):%d/%m/%Y a las %H:%M} (hora de Colombia), "
+        f"72 horas después de este mensaje. {al_entrar}\n\n"
         "Si no esperabas este correo, avísale al administrador de Gastro-AI.\n"
     )
 
@@ -69,10 +104,12 @@ class ServicioCredenciales:
         usuario.hash_contrasena = hashear_contrasena(temporal)
         usuario.contrasena_temporal = True
         usuario.temporal_expira_en = vence
+        # Primero la base y después el correo: si la base falla, la temporal no sale
+        self._repositorio.guardar_hash()
 
         try:
             self._enviador.enviar(
-                usuario.correo or "", ASUNTOS[motivo], _texto(usuario, temporal, vence)
+                usuario.correo or "", ASUNTOS[motivo], _texto(usuario, motivo, temporal, vence)
             )
             estado, codigo_error = EstadoEnvio.ENVIADO, None
         except ErrorCorreo:

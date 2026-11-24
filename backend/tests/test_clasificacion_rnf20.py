@@ -1,5 +1,6 @@
 """RNF-20/#208: contratos de inferencia y clasificación, sin servicios externos."""
 import base64
+import inspect
 import io
 import socket
 from datetime import datetime, timezone
@@ -17,6 +18,16 @@ from app.models import EstadoAnalisis, EstadoInferencia, EtapaProceso, FormatoIm
 from app.models import LogInferencia, RegionInteres, ResultadoCaracteristica
 from app.services import clasificacion
 from app.services.analisis import CodigoFalla
+
+CLAVE_API_SINTETICA = "clave-api-sintetica"
+ADAPTADOR_CON_API_KEY = "api_key" in inspect.signature(AdaptadorHuggingFace).parameters
+
+
+def adaptador_de_prueba(url, token, transporte):
+    opciones = {"transporte": transporte}
+    if ADAPTADOR_CON_API_KEY:
+        opciones["api_key"] = CLAVE_API_SINTETICA
+    return AdaptadorHuggingFace(url, token, **opciones)
 
 
 @pytest.fixture(autouse=True)
@@ -103,11 +114,14 @@ def test_adaptador_solicitud_y_respuesta(formato, mime, nombre):
         assert request.method == "POST"
         assert str(request.url) == "https://modelo.invalid/clasificar"
         assert request.headers["authorization"] == "Bearer credencial-sintetica"
+        if ADAPTADOR_CON_API_KEY:
+            assert request.headers["x-api-key"] == CLAVE_API_SINTETICA
         assert mime.encode() in request.content
         assert nombre.encode() in request.content
         return httpx.Response(200, json=respuesta())
-    salida = AdaptadorHuggingFace("https://modelo.invalid/", "credencial-sintetica",
-        transporte=httpx.MockTransport(responder)).clasificar(b"imagen-sintetica", formato)
+    salida = adaptador_de_prueba(
+        "https://modelo.invalid/", "credencial-sintetica", httpx.MockTransport(responder)
+    ).clasificar(b"imagen-sintetica", formato)
     assert len(peticiones) == 1
     assert salida.caracteristicas[0].probabilidad == Decimal("0.5")
 
@@ -126,8 +140,9 @@ def test_adaptador_fallos_y_no_sigue_redirecciones(caso, codigo):
         if caso == "json":
             return httpx.Response(200, content=b"no-json")
         return httpx.Response(int(caso), headers={"location": "https://otro.invalid"})
-    adaptador = AdaptadorHuggingFace("https://modelo.invalid", "credencial-sintetica",
-        transporte=httpx.MockTransport(responder))
+    adaptador = adaptador_de_prueba(
+        "https://modelo.invalid", "credencial-sintetica", httpx.MockTransport(responder)
+    )
     with pytest.raises(ErrorInferencia) as error:
         adaptador.clasificar(png(), FormatoImagen.PNG)
     assert error.value.codigo == codigo
@@ -141,6 +156,21 @@ def test_configuracion_insegura_no_envia(url, token):
     with pytest.raises(ErrorInferencia, match="SIN_CONFIGURAR"):
         AdaptadorHuggingFace(url, token, transporte=httpx.MockTransport(responder)).clasificar(
             png(), FormatoImagen.PNG)
+    responder.assert_not_called()
+
+
+@pytest.mark.skipif(
+    not ADAPTADOR_CON_API_KEY,
+    reason="La clave compartida con el Space se integra en el backend de PR #300.",
+)
+def test_clave_api_ausente_no_envia_imagen():
+    responder = Mock(side_effect=AssertionError("No debe enviar"))
+    adaptador = AdaptadorHuggingFace(
+        "https://modelo.invalid", "token-sintetico", api_key="",
+        transporte=httpx.MockTransport(responder),
+    )
+    with pytest.raises(ErrorInferencia, match="SIN_CONFIGURAR"):
+        adaptador.clasificar(png(), FormatoImagen.PNG)
     responder.assert_not_called()
 
 
