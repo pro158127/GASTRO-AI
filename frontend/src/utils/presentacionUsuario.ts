@@ -1,16 +1,6 @@
 // Cómo se muestran el rol y el estado de una cuenta en las pantallas del administrador (W-09 y
 // las que siguen). Es el único lugar con estas reglas.
-import type { RolUsuario, UsuarioResumen } from "../types";
-
-/**
- * TEMPORAL: etiqueta del rol por código. Las rutas `/admin/usuarios` solo traen el código
- * (`DOCTOR`, `ADMINISTRADOR`); se pidió al backend que devuelvan `rol.nombre`, como `/perfil`.
- * Cuando llegue, se usa ese nombre y esta tabla se elimina.
- */
-export const ETIQUETA_ROL_USUARIO: Record<RolUsuario, string> = {
-  DOCTOR: "Doctor/Gastroenterólogo",
-  ADMINISTRADOR: "Administrador",
-};
+import type { UsuarioResumen } from "../types";
 
 /** Variantes del componente Insignia (Figma 14:574). */
 export type TipoInsignia = "exito" | "info" | "advertencia" | "error" | "neutral";
@@ -51,6 +41,29 @@ export function insigniaDeEstado(usuario: UsuarioResumen): InsigniaEstado {
       // se cubre para que la función acepte todos los estados de la API.
       return { texto: "Eliminada", tipo: "neutral" };
   }
+}
+
+/**
+ * Insignias de la columna «Estado» de W-20 (cuentas pendientes de activación).
+ *
+ * Distinta de `insigniaDeEstado`: allí se resume toda la cuenta y aquí todas son PENDIENTE, así
+ * que el texto es el corto que dibuja Figma («Expirada», «Pendiente») y cabe en la columna.
+ *
+ * Devuelve una lista porque **pueden aplicar dos a la vez**: Figma dibuja «Correo no enviado» en
+ * lugar de «Expirada»/«Pendiente», pero una cuenta puede tener la temporal vencida *y* el correo
+ * caído, y entonces una sola insignia esconde información. Se pintan las dos. Anotado para diseño.
+ */
+export function insigniasDeCuentaPendiente(usuario: UsuarioResumen): InsigniaEstado[] {
+  const insignias: InsigniaEstado[] =
+    usuario.estado_activacion === "EXPIRADA"
+      ? [{ texto: "Expirada", tipo: "advertencia" }]
+      : [{ texto: "Pendiente", tipo: "info" }];
+
+  // `CORREO_NO_ENVIADO` no es un error HTTP: viaja dentro de la respuesta, en `credencial`.
+  if (usuario.ultimo_envio?.estado === "FALLIDO") {
+    insignias.push({ texto: "Correo no enviado", tipo: "advertencia" });
+  }
+  return insignias;
 }
 
 /** «Ana Pérez». */

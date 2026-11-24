@@ -137,6 +137,16 @@ export default function VincularAplicacion() {
               <p className={estilosVinculacion.paso}>
                 2. En la app, agregue una cuenta y escanee este código.
               </p>
+              {/*
+                No dibujado en Figma (pendiente de agregar): este secreto es nuevo, y la app
+                autenticadora no deja tener dos entradas con el mismo nombre de cuenta. Quien ya
+                tenía una entrada (por un restablecimiento de contraseña) se queda leyendo códigos
+                del secreto viejo y nunca logra validar, sin forma de adivinar por qué.
+              */}
+              <p className={estilosVinculacion.avisoEntradaAnterior}>
+                Si esta cuenta ya aparecía en su aplicación autenticadora, borre esa entrada antes de
+                escanear: sus códigos ya no sirven.
+              </p>
               <p className={estilosVinculacion.paso}>
                 3. Escriba abajo el código de 6 dígitos que muestra la app.
               </p>

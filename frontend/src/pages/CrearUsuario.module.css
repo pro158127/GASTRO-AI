@@ -1,0 +1,73 @@
+/* Pantalla W-10 · Crear usuario (Figma 48:1024). Tarjeta de 640 px; a 320 px ocupa el ancho
+   disponible sin desplazamiento horizontal (WCAG 1.4.10). Figma no dibuja las versiones de
+   tableta ni de celular de esta pantalla: se sigue el mismo patrón que W-18 (Mi perfil). */
+
+.tarjeta {
+  display: flex;
+  width: 100%;
+  max-width: 640px;
+  flex-direction: column;
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-5);
+}
+
+/* Nombre y Apellido en dos columnas; en celular, uno debajo del otro. */
+.fila {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
+
+.fila > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* Los botones van en el DOM en el mismo orden en que se leen: el secundario y luego el primario
+   («Cancelar», «Crear usuario»), que es como los dibuja W-10 de izquierda a derecha. Ese orden no
+   se invierte en ningún ancho, así que el orden visual y el de tabulación siempre coinciden
+   (WCAG 2.4.3). */
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-3);
+}
+
+/* El título de la tarjeta da el nombre accesible de la sección; en pantalla ya lo dice el
+   encabezado de la página (WCAG 1.3.1 sin texto repetido). */
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .fila {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* En celular los botones ocupan el ancho: objetivos grandes y sin apretujarse. `column` y no
+     `column-reverse`: al apilarlos se conserva el orden del DOM, así que el foco baja por donde
+     se ve (WCAG 2.4.3). */
+  .acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

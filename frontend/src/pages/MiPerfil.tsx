@@ -26,6 +26,7 @@ import { useSesion } from "../sesion/ProveedorSesion";
 import type { Perfil } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
+import { esTelefonoValido, normalizarTelefono } from "../utils/validacionUsuario";
 import estilos from "./MiPerfil.module.css";
 
 type CampoEditable = "nombre" | "apellido" | "telefono";
@@ -55,13 +56,6 @@ const ORDEN_CAMPOS: CampoEditable[] = ["nombre", "apellido", "telefono"];
 const AYUDA_SOLO_ADMINISTRADOR = "Solo un administrador puede cambiarlo.";
 const AYUDA_ROL_ADMINISTRADOR = "Lo cambia otro administrador (RF-U08). Siempre debe quedar al menos uno activo.";
 
-/** Igual que el servidor: quita espacios, guiones, puntos y paréntesis («300 123-4567» → «3001234567»). */
-function normalizarTelefono(valor: string): string {
-  return valor.replace(/[\s\-().]/g, "");
-}
-
-const PATRON_TELEFONO = /^\+?[0-9]{7,15}$/;
-
 function valoresDesdePerfil(perfil: Perfil): ValoresFormulario {
   return { nombre: perfil.nombre, apellido: perfil.apellido, telefono: perfil.telefono ?? "" };
 }
@@ -71,7 +65,7 @@ function validar(valores: ValoresFormulario): ErroresFormulario {
   if (valores.nombre.trim() === "") errores.nombre = MENSAJES_ERROR.nombre;
   if (valores.apellido.trim() === "") errores.apellido = MENSAJES_ERROR.apellido;
   const telefono = normalizarTelefono(valores.telefono);
-  if (telefono !== "" && !PATRON_TELEFONO.test(telefono)) errores.telefono = MENSAJES_ERROR.telefono;
+  if (telefono !== "" && !esTelefonoValido(telefono)) errores.telefono = MENSAJES_ERROR.telefono;
   return errores;
 }
 
