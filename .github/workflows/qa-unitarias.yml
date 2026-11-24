@@ -80,6 +80,8 @@ jobs:
         pnpm install --frozen-lockfile
 
         pnpm build
+        
+        node --test test_aviso_experimental.cjs
 
         '
   cobertura-global:
