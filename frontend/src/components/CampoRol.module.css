@@ -1,0 +1,54 @@
+/* Estados de carga y de fallo del campo «Rol» (U-16). Cuando el catálogo llega, el campo lo
+   dibuja CampoOpciones y estas reglas no se usan; por eso solo están la etiqueta y el mensaje,
+   con los mismos tokens que CampoOpciones para que no se note el cambio. */
+
+.campo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+}
+
+.etiqueta {
+  margin: 0;
+  font: var(--texto-etiqueta-campo);
+  color: var(--color-texto-primario);
+}
+
+.cargando {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+}
+
+.iconoError {
+  flex-shrink: 0;
+  /* Alinea el ícono con la primera línea del texto. */
+  margin-top: 2px;
+  color: var(--color-estado-error-icono);
+}
+
+.textoError {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-error-texto);
+}
+
+.soloLector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,0 +1,124 @@
+/* Pantalla W-06 · Nuevo análisis (Figma 47:600). Dos columnas en escritorio; en tableta y
+   celular, una sola en el orden del flujo —primero la imagen, después el paciente— como dice la
+   nota de T-06. A 320 px no hay desplazamiento horizontal (WCAG 1.4.10). */
+
+/* Migas del flujo. Es una lista ordenada: el paso actual se marca con aria-current, no solo
+   con el color (WCAG 1.4.1). */
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso {
+  padding: 6px var(--espacio-3);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-completo);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.paso[data-actual] {
+  border-color: var(--color-accion-primaria);
+  background: var(--color-fondo-seleccion);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-marca-primario);
+}
+
+.tarjeta {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.columnas {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espacio-8);
+}
+
+/* `min-width: 0` para que los textos largos puedan encogerse en vez de ensanchar la columna. */
+.columnas > * {
+  min-width: 0;
+}
+
+.datos {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--espacio-5);
+}
+
+.subtitulo {
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+}
+
+.nota,
+.razon {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+/* La razón va pegada al botón al que explica: sin el hueco general de la columna. */
+.razon {
+  margin-top: calc(var(--espacio-5) * -1 + var(--espacio-2));
+}
+
+/* W-06h: indicador y texto junto al campo del número. */
+.consultando {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.indicadorConsulta {
+  flex: none;
+  color: var(--color-texto-secundario);
+}
+
+.textoConsulta {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Tableta y celular: una sola columna, en el orden del flujo (nota de T-06). */
+@media (max-width: 1279px) {
+  .columnas {
+    flex-direction: column;
+    gap: var(--espacio-6);
+  }
+
+  .columnas > * {
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .tarjeta {
+    padding: var(--espacio-4);
+  }
+}

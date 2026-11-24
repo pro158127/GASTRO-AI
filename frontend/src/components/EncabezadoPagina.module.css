@@ -15,6 +15,15 @@
   min-width: 0;
 }
 
+/* Título y, al lado, la insignia de estado (W-11). En celular pasa debajo si no cabe. */
+.lineaTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-3);
+  min-width: 0;
+}
+
 .titulo {
   margin: 0;
   font: var(--texto-titulo-h1);
@@ -28,10 +37,13 @@
   outline-offset: 2px;
 }
 
+/* `overflow-wrap` porque la descripción puede llevar una palabra que no se puede partir, como el
+   correo de la cuenta en W-11: sin esto se sale de su caja y se mete debajo de la acción. */
 .descripcion {
   margin: 0;
   font: var(--texto-cuerpo-base);
   color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1279px) {
@@ -41,5 +53,28 @@
 
   .descripcion {
     font: var(--texto-cuerpo-pequeno);
+  }
+}
+
+/* Celular: la acción pasa debajo del texto, que recupera el ancho completo. Repartir el ancho
+   entre los dos deja la descripción en unos 114 px a 320 px, donde no cabe un correo (W-11).
+
+   OJO para quien pase por aquí: aquí el encabezado cambia de eje. Las pantallas que pasan
+   `acciones` no pueden colocar su acción con `flex-basis` ni contar con que `flex-wrap` la baje
+   de línea, porque en columna `flex-basis` mide el alto y no hay líneas que envolver. Para que
+   la acción ocupe el ancho se le pone `width`, como hace W-09 en Usuarios.module.css. */
+@media (max-width: 767px) {
+  .encabezado {
+    flex-direction: column;
+    /* Explícito: en columna no hay nada que envolver y así no queda un resto de la disposición
+       en fila decidiendo dónde cae la acción. */
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  /* En columna, `flex: 1 1 0` mide el alto, no el ancho: el bloque de texto lo ocupa entero. */
+  .textos {
+    width: 100%;
+    flex: none;
   }
 }

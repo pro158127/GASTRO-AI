@@ -1,0 +1,43 @@
+/* Componente «Encabezado de tabla» (Figma 16:710): celda de encabezado que ordena la columna.
+   Fondo sutil, texto de 14 en seminegrita y el ícono de orden de 16 px al lado. */
+
+.encabezado {
+  padding: 0;
+  background: var(--color-fondo-superficie-sutil);
+  text-align: left;
+}
+
+/* El botón ocupa toda la celda: el objetivo táctil es el encabezado entero, no solo el texto. */
+.boton {
+  display: flex;
+  width: 100%;
+  min-height: var(--tamano-objetivo-minimo);
+  align-items: center;
+  gap: var(--espacio-1);
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 0;
+  background: none;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  cursor: pointer;
+  text-align: left;
+}
+
+.boton:hover {
+  background: var(--color-fondo-seleccion);
+}
+
+.boton:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: -2px;
+}
+
+/* Gris mientras la columna no ordena; del color del texto cuando sí. */
+.icono {
+  flex-shrink: 0;
+  color: var(--color-texto-terciario);
+}
+
+.ordenando .icono {
+  color: var(--color-texto-primario);
+}

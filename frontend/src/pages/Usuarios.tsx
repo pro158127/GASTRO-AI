@@ -8,7 +8,12 @@
 // - Encabezados sin ordenar: la API no tiene `orden` (propuesta en CONTRATOS_API.md). El orden
 //   es el del servidor (apellido y luego nombre).
 // - Solo la búsqueda dibujada, sin filtros de rol ni de estado; páginas de 8.
-// - Una sola insignia por cuenta y etiqueta del rol por código: ver utils/presentacionUsuario.ts.
+// - Una sola insignia por cuenta: ver utils/presentacionUsuario.ts. El rol se muestra con
+//   `rol_nombre`, el nombre visible que ya manda el servidor.
+//
+// W-09e (Figma 99:2331): al volver de W-10 se muestra la notificación que dejó esa pantalla en
+// memoria (utils/notificacionPendiente.ts). Lleva el correo del usuario creado, así que no viaja
+// por la URL ni por el almacenamiento del navegador.
 //
 // La búsqueda (que puede ser un correo) solo vive en el estado de este componente: nada en la
 // URL del navegador, en el almacenamiento ni en la consola.
@@ -22,13 +27,15 @@ import EnlaceBoton from "../components/EnlaceBoton";
 import Esqueleto from "../components/Esqueleto";
 import EstadoVacio from "../components/EstadoVacio";
 import Insignia from "../components/Insignia";
+import Notificacion from "../components/Notificacion";
 import IconoMas from "../components/iconos/IconoMas";
 import { LONGITUD_MAXIMA_BUSQUEDA, USUARIOS_POR_PAGINA, listarUsuarios } from "../services/usuariosAdmin";
 import type { ConsultaUsuarios } from "../services/usuariosAdmin";
 import type { PaginaUsuarios, UsuarioResumen } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
-import { ETIQUETA_ROL_USUARIO, insigniaDeEstado, nombreCompleto } from "../utils/presentacionUsuario";
+import { leerNotificacion, limpiarNotificacion } from "../utils/notificacionPendiente";
+import { insigniaDeEstado, nombreCompleto } from "../utils/presentacionUsuario";
 import estilos from "./Usuarios.module.css";
 
 /**
@@ -103,9 +110,17 @@ export default function Usuarios({ titulo }: { titulo: string }) {
   const [esqueletoVisible, setEsqueletoVisible] = useState(true);
   const [error, setError] = useState<AvisoError | null>(null);
   const [totalSinFiltro, setTotalSinFiltro] = useState<number | null>(null);
+  // W-09e. El inicializador tiene que ser puro: React lo llama dos veces con <React.StrictMode>,
+  // así que leer y borrar van separados (ver utils/notificacionPendiente.ts).
+  const [notificacion, setNotificacion] = useState(leerNotificacion);
   const resultadosRef = useRef<HTMLDivElement>(null);
   const hayResultadoRef = useRef(false);
   const enfocarResultadosRef = useRef(false);
+
+  // La notificación ya se leyó: se borra para que no vuelva a salir al entrar de nuevo a la lista.
+  useEffect(() => {
+    limpiarNotificacion();
+  }, []);
 
   // Búsqueda en vivo con espera: no se hace una petición por tecla.
   useEffect(() => {
@@ -263,6 +278,15 @@ export default function Usuarios({ titulo }: { titulo: string }) {
           </div>
         )}
       </div>
+
+      {/* W-09e · «Usuario creado» al volver de W-10. */}
+      {notificacion && (
+        <Notificacion
+          titulo={notificacion.titulo}
+          mensaje={notificacion.mensaje}
+          onCerrar={() => setNotificacion(null)}
+        />
+      )}
     </>
   );
 }
@@ -383,7 +407,7 @@ function TablaUsuarios({ usuarios }: { usuarios: UsuarioResumen[] }) {
                   {nombreCompleto(usuario)}
                 </th>
                 <td className={estilos.celdaCorreo}>{usuario.correo ?? ""}</td>
-                <td>{ETIQUETA_ROL_USUARIO[usuario.rol]}</td>
+                <td>{usuario.rol_nombre}</td>
                 <td>
                   <Insignia tipo={insignia.tipo}>{insignia.texto}</Insignia>
                 </td>
@@ -409,7 +433,7 @@ function TarjetasUsuarios({ usuarios }: { usuarios: UsuarioResumen[] }) {
           <li key={usuario.id} className={estilos.tarjeta}>
             <p className={estilos.tarjetaNombre}>{nombreCompleto(usuario)}</p>
             <p className={estilos.tarjetaDato}>{usuario.correo ?? ""}</p>
-            <p className={estilos.tarjetaDato}>{ETIQUETA_ROL_USUARIO[usuario.rol]}</p>
+            <p className={estilos.tarjetaDato}>{usuario.rol_nombre}</p>
             <Insignia tipo={insignia.tipo}>{insignia.texto}</Insignia>
             <div className={estilos.tarjetaAccion}>
               <EnlaceDetalle usuario={usuario} />

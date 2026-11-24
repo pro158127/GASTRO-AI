@@ -63,6 +63,20 @@ export interface CampoConError {
   mensaje: string;
 }
 
+/**
+ * Un rol de `GET /catalogos/roles` (consulta U-16, resuelta). `nombre` es el mismo texto que
+ * viaja como `rol_nombre` en `/admin/usuarios`: sale de la base, no de una tabla del frontend.
+ */
+export interface RolCatalogo {
+  codigo: RolUsuario;
+  nombre: string;
+}
+
+/** Respuesta de `GET /catalogos/roles`. */
+export interface ListaRoles {
+  items: RolCatalogo[];
+}
+
 /** `rol` de `GET /perfil`: el código y el nombre que se muestra («Doctor/Gastroenterólogo»). */
 export interface RolPerfil {
   codigo: RolUsuario;
@@ -98,6 +112,26 @@ export type EstadoUsuario = "PENDIENTE" | "ACTIVO" | "INACTIVO" | "ELIMINADO";
 /** Solo en cuentas PENDIENTE: si la contraseña temporal sigue vigente o ya venció (RF-U06). */
 export type EstadoActivacion = "PENDIENTE" | "EXPIRADA";
 
+/** Por qué se envió una contraseña temporal (`motivo` de `credencial`). */
+export type MotivoCredencial = "CREACION" | "RESTABLECIMIENTO" | "CAMBIO_CORREO";
+
+/** Resultado del envío del correo con la contraseña temporal (`estado` de `credencial`). */
+export type EstadoEnvioCredencial = "ENVIADO" | "FALLIDO";
+
+/**
+ * `credencial` de las rutas que generan una contraseña temporal (../ARCHITECTURE.md § 3.5,
+ * «Usuarios»). **La contraseña temporal nunca viaja aquí**: solo va por correo.
+ *
+ * Con el correo caído, `estado` es `FALLIDO` y `codigo_error` es `CORREO_NO_ENVIADO`: la cuenta
+ * queda creada igual y la interfaz ofrece reenviar (W-10d, RF-U05 CA 9).
+ */
+export interface Credencial {
+  motivo: MotivoCredencial;
+  estado: EstadoEnvioCredencial;
+  intentado_en: string;
+  codigo_error: string | null;
+}
+
 /**
  * `usuario` de las rutas `/admin/usuarios` (../ARCHITECTURE.md § 3.5, «Usuarios»). `bloqueado` va
  * aparte de `estado`: una cuenta ACTIVO puede estar bloqueada por intentos fallidos (RF-U12).
@@ -110,6 +144,8 @@ export interface UsuarioResumen {
   correo: string | null;
   telefono: string | null;
   rol: RolUsuario;
+  /** Nombre visible del rol, tal como lo da el servidor («Doctor/Gastroenterólogo»). */
+  rol_nombre: string;
   estado: EstadoUsuario;
   bloqueado: boolean;
   creado_en: string;
@@ -118,6 +154,154 @@ export interface UsuarioResumen {
   estado_activacion?: EstadoActivacion | null;
   /** Solo en cuentas PENDIENTE. */
   temporal_expira_en?: string | null;
+  /** Último envío de la contraseña temporal, o `null` si no hubo ninguno. */
+  ultimo_envio?: Credencial | null;
+}
+
+/** Tipo de un traslado de casos (`tipo` de `ultimo_traslado`). */
+export type TipoTraslado = "DESACTIVACION" | "ELIMINACION" | "REASIGNACION";
+
+/** Persona de un traslado: se conserva el nombre aunque la cuenta se haya eliminado (RF-U11). */
+export interface PersonaCuenta {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+/** `ultimo_traslado` del detalle: el último movimiento de casos de esta cuenta, o `null`. */
+export interface UltimoTrasladoCuenta {
+  tipo: TipoTraslado;
+  cantidad_casos: number;
+  ejecutado_en: string;
+  destino: PersonaCuenta;
+}
+
+/**
+ * Respuesta de `GET /admin/usuarios/{id}` (W-11). Es `UsuarioResumen` con lo que solo existe en
+ * el detalle (../ARCHITECTURE.md § 3.5, «Usuarios»).
+ *
+ * `bloqueado_en` solo viene con un bloqueo en curso y `desactivado_en` solo si está INACTIVO; los
+ * dos salen de la bitácora. **La IP del bloqueo no viene aquí**: se consulta en la bitácora
+ * filtrando por este usuario (consulta U-18 en CONTRATOS_API.md).
+ *
+ * `envios_credencial` es el historial de envíos de contraseña temporal, del más reciente al más
+ * antiguo; `ultimo_envio` (heredado) es el primero de esa lista.
+ *
+ * Las acciones (`PATCH`, `/rol`, `/activar`, `/desbloquear`, `/restablecer-contrasena`) responden
+ * `UsuarioResumen`, **no** este tipo: tras cada acción hay que volver a pedir el detalle.
+ */
+export interface UsuarioDetalle extends UsuarioResumen {
+  /** Casos del doctor que siguen siendo suyos; 0 en los administradores. */
+  casos_activos: number;
+  totp_vinculado: boolean;
+  intentos_fallidos: number;
+  bloqueado_hasta: string | null;
+  bloqueado_en?: string | null;
+  desactivado_en?: string | null;
+  ultimo_traslado?: UltimoTrasladoCuenta | null;
+  envios_credencial: Credencial[];
+}
+
+/**
+ * Cuerpo de `PATCH /admin/usuarios/{id}` (W-11f, RF-U07 CA 4). El servidor solo cambia lo que
+ * llega y lo compara con lo que ya tiene, así que mandar un valor igual al actual no hace nada.
+ * `telefono: null` borra el teléfono. Cambiar el `correo` emite una contraseña temporal nueva al
+ * correo nuevo y cierra las sesiones abiertas (CA 7).
+ */
+export interface EdicionUsuario {
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+  correo: string;
+}
+
+/** Respuesta de `POST /{id}/rol`, `/{id}/activar` y `/{id}/desbloquear`. */
+export interface RespuestaUsuario {
+  usuario: UsuarioResumen;
+}
+
+/**
+ * Respuesta de `PATCH /admin/usuarios/{id}`. `credencial` **solo** viene si cambió el correo; un
+ * 200 con `credencial.estado` FALLIDO significa que el correo quedó cambiado pero el aviso no
+ * salió (ver `Credencial`).
+ */
+export interface RespuestaEdicion {
+  usuario: UsuarioResumen;
+  credencial?: Credencial | null;
+}
+
+/**
+ * El `traslado` que devuelven una baja y una reasignación (../ARCHITECTURE.md § 3.5): el
+ * identificador del movimiento, su tipo y cuántos **casos** se movieron. No trae el destino ni la
+ * fecha; eso es `ultimo_traslado` del detalle.
+ */
+export interface TrasladoResumen {
+  id: string;
+  tipo: TipoTraslado;
+  casos_trasladados: number;
+}
+
+/**
+ * Respuesta de `POST /{id}/desactivar` y `POST /{id}/eliminar` (D-01, D-08). `traslado` es `null`
+ * cuando la cuenta no tenía casos activos, que desde el frontend es siempre: nunca se manda
+ * `destino_id` en una baja, porque reasignar es un paso propio y visible (W-25).
+ */
+export interface RespuestaBaja {
+  usuario: UsuarioResumen;
+  traslado?: TrasladoResumen | null;
+}
+
+/** Respuesta de `POST /{id}/reasignar-casos` (W-25 → D-10). Aquí el traslado siempre existe. */
+export interface RespuestaTraslado {
+  traslado: TrasladoResumen;
+}
+
+/**
+ * Un análisis de un caso activo (W-25, paso 2). Solo el código y la fecha: nada clínico ni del
+ * paciente (RF-A06 CA 2). El servidor no entrega nada más.
+ */
+export interface AnalisisCasoActivo {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+}
+
+/** Un caso activo del doctor, con sus análisis. */
+export interface CasoActivoDoctor {
+  caso_id: string;
+  analisis: AnalisisCasoActivo[];
+}
+
+/**
+ * Respuesta de `GET /admin/usuarios/{id}/casos-activos` (W-25). Sin paginación: vienen todos.
+ * `total_casos` es el mismo número que `UsuarioDetalle.casos_activos` y que el `casos_activos` del
+ * 409 DESTINO_REQUERIDO; `total_analisis` puede ser mayor, porque un caso puede tener varios.
+ */
+export interface CasosActivosDoctor {
+  total_casos: number;
+  total_analisis: number;
+  casos: CasoActivoDoctor[];
+}
+
+/**
+ * Cuerpo de `POST /admin/usuarios` (RF-U05). `telefono` es opcional: se omite cuando está vacío.
+ * El servidor normaliza el correo a minúsculas y el teléfono sin separadores.
+ */
+export interface NuevoUsuario {
+  nombre: string;
+  apellido: string;
+  correo: string;
+  telefono?: string;
+  rol: RolUsuario;
+}
+
+/**
+ * Respuesta de `POST /admin/usuarios` (201) y de
+ * `POST /admin/usuarios/{id}/reenviar-credencial`.
+ */
+export interface RespuestaCredencial {
+  usuario: UsuarioResumen;
+  credencial: Credencial;
 }
 
 /** Paginación de las listas: `?pagina&por_pagina` (máximo 100). */
@@ -127,10 +311,28 @@ export interface Paginacion {
   total: number;
 }
 
+/**
+ * `conteos` de `GET /admin/usuarios`: resumen de **todas** las cuentas, sin importar los filtros
+ * de la consulta (../ARCHITECTURE.md § 3.5, «Usuarios»).
+ *
+ * `pendientes` y `expiradas` son conjuntos distintos: «pendientes» son las de contraseña temporal
+ * vigente y «expiradas» las de temporal vencida. Las dos tienen `estado: "PENDIENTE"`, así que las
+ * cuentas pendientes de activación de W-20 son la suma de ambas.
+ */
+export interface ConteosUsuarios {
+  activos: number;
+  pendientes: number;
+  expiradas: number;
+  inactivos: number;
+  bloqueadas: number;
+  eliminadas: number;
+}
+
 /** Respuesta de `GET /admin/usuarios`. */
 export interface PaginaUsuarios {
   items: UsuarioResumen[];
   paginacion: Paginacion;
+  conteos: ConteosUsuarios;
 }
 
 /** Respuesta de `GET /health`. */
@@ -142,4 +344,126 @@ export interface HealthResponse {
 /** Propuesta `GET /api/v1/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
 export interface ResumenCasosRecibidos {
   sin_revisar: number;
+}
+
+// ---------------------------------------------------- Imagen, paciente y análisis (W-06, W-07)
+// ../ARCHITECTURE.md § 3.5, «Paciente y documento» e «Imagen y análisis». Ningún tipo de salida
+// lleva el documento ni el seudónimo del paciente: el documento solo viaja en el cuerpo de un
+// POST y en el frontend vive únicamente en el estado de la pantalla.
+
+/** Un tipo de documento de `GET /catalogos/tipos-documento` (W-06a). */
+export interface TipoDocumento {
+  codigo: string;
+  /** Nombre visible, como lo da el servidor («Cédula de ciudadanía»). */
+  nombre: string;
+  /** Dígitos que acepta el servidor para este tipo (CC 10, TI 11, CE 6). */
+  longitud_maxima: number;
+}
+
+/** Respuesta de `GET /catalogos/tipos-documento`. */
+export interface ListaTiposDocumento {
+  items: TipoDocumento[];
+}
+
+/**
+ * Respuesta de `POST /pacientes/consulta` (W-06h). Solo cuenta los casos **de quien pregunta**
+ * (propios o recibidos por traslado): no revela si el paciente tiene análisis con otro doctor
+ * (RF-H01 CA 5). Por eso los textos dicen «con usted» y no «en el sistema».
+ */
+export interface HistorialPaciente {
+  tiene_historial: boolean;
+  caso_id: string | null;
+  total_analisis: number;
+  ultimo_analisis_en: string | null;
+}
+
+/**
+ * Respuesta 201 de `POST /imagenes` (W-06g). La imagen queda en un área temporal que **vence**
+ * (`expira_en`) y cada `imagen_id` sirve una sola vez: después, `POST /analisis` responde 410
+ * IMAGEN_EXPIRADA y hay que cargarla de nuevo.
+ */
+export interface ImagenCargada {
+  imagen_id: string;
+  /** Nombre del archivo que mandó el navegador; el servidor lo devuelve pero no lo guarda. */
+  nombre: string;
+  formato: string;
+  ancho: number;
+  alto: number;
+  peso_bytes: number;
+  sha256: string;
+  expira_en: string;
+}
+
+/** Cuerpo de `POST /analisis` (W-06). */
+export interface SolicitudAnalisis {
+  imagen_id: string;
+  tipo_documento: string;
+  numero_documento: string;
+  /**
+   * El número escrito por segunda vez. Solo hace falta cuando `/pacientes/consulta` dijo
+   * `tiene_historial: false` (RF-D01 CA 12, W-06i a W-06k); con historial se omite.
+   */
+  confirmacion_documento?: string;
+}
+
+/** Estado de un análisis (`EstadoAnalisis` del backend). */
+export type EstadoAnalisis = "PROCESANDO" | "COMPLETADO" | "FALLIDO";
+
+/** `analisis` del 202 de `POST /analisis` y de `POST /analisis/{id}/reintento`. */
+export interface AnalisisResumen {
+  id: string;
+  /** `A-AAAA-NNNNNN`, el código que ve la persona. */
+  codigo: string;
+  estado: EstadoAnalisis;
+  solicitado_en: string;
+}
+
+/** Respuesta de `POST /analisis` y de `POST /analisis/{id}/reintento`. */
+export interface AnalisisCreado {
+  analisis: AnalisisResumen;
+}
+
+/** Las cuatro etapas que pinta W-07 (`EtapaProceso` del backend). */
+export type CodigoEtapa = "ANONIMIZAR" | "CALIDAD" | "CLASIFICAR" | "GRAD_CAM";
+
+/** Estado de una etapa. W-07 lo dice siempre en texto, no solo con el ícono (WCAG 1.4.1). */
+export type EstadoEtapa = "LISTO" | "EN_CURSO" | "PENDIENTE" | "ERROR";
+
+/** Una entrada de `etapas`. `codigo` llega como texto: el servidor puede añadir etapas. */
+export interface EtapaAnalisis {
+  codigo: string;
+  estado: EstadoEtapa;
+}
+
+/** Causas de calidad insuficiente (`CausaCalidad` del backend) → los tres textos de W-07b. */
+export type CausaCalidad = "BORROSA" | "OSCURA" | "MUY_CLARA_O_REFLEJOS";
+
+/**
+ * `calidad` del análisis FALLIDO por `ERR-1001`. Las medidas las calcula el servidor con los
+ * umbrales de RF-D02 CA 8; el frontend solo nombra las `causas`, nunca recalcula nada.
+ */
+export interface CalidadImagen {
+  suficiente: boolean | null;
+  causas: string[];
+  nitidez?: number | null;
+  brillo?: number | null;
+  saturados_pct?: number | null;
+}
+
+/** Respuesta de `GET /analisis/{id}/estado` (W-07). Lo que no aplica al estado no se manda. */
+export interface EstadoAnalisisRespuesta {
+  estado: EstadoAnalisis;
+  etapas: EtapaAnalisis[];
+  /**
+   * Solo en FALLIDO: `ERR-1001` calidad insuficiente (W-07b), `ERR-1002` servicio de inferencia
+   * no disponible (W-07c), `ERR-1003` cola no disponible, `ERR-1004` error interno.
+   */
+  codigo_error?: string | null;
+  /** Solo en FALLIDO por calidad (`ERR-1001`) → W-07b. */
+  calidad?: CalidadImagen | null;
+  /**
+   * Solo en COMPLETADO. Es la ruta **de la API** (`/api/v1/analisis/{id}`), no una ruta de la
+   * interfaz: la navegación del frontend no sale de aquí.
+   */
+  resultado_url?: string | null;
 }
