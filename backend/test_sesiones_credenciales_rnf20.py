@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy.dialects import postgresql
@@ -167,7 +168,9 @@ def test_emision_reemplaza_temporal_vence_72h_y_audita_sin_secreto(emision, moti
     e.hasher.assert_called_once_with(e.generador.return_value)
     destino, asunto, texto = e.correo.enviar.call_args.args
     assert destino == "prueba@example.invalid" and asunto == mod.ASUNTOS[motivo]
-    assert e.generador.return_value in texto and "2026-01-04 12:00 (UTC)" in texto
+    vencimiento_local = (AHORA + timedelta(hours=72)).astimezone(ZoneInfo("America/Bogota"))
+    assert e.generador.return_value in texto
+    assert f"Vence el {vencimiento_local:%d/%m/%Y a las %H:%M} (hora de Colombia)" in texto
     e.repo.registrar.assert_called_once_with(USUARIO_ID, motivo, EstadoEnvio.ENVIADO, None)
     evento = e.eventos.publicar.call_args.args[0]
     assert evento.resultado == ResultadoAccion.EXITO
