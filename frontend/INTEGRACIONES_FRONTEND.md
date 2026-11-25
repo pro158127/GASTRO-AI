@@ -55,7 +55,7 @@ verificaciones.
 - **Build (`pnpm build`):** aprobado el 25/11/2026 (`tsc --noEmit` y `vite build`).
 - **Prueba de endpoint:** health API respondió `200`; GET y POST administrativos devolvieron `401` sin sesión, control de acceso esperado. No se verificó respuesta autenticada `200`.
 - **Prueba en navegador:** no se completó flujo autenticado.
-- **Errores encontrados:** durante el reinicio del API, Nginx devolvió temporalmente `502`; se resolvió al quedar saludable el API. Ningún error de compilación.
+- **Errores encontrados:** antes de iniciar Compose, `GET /api/v1/auth/sesion` respondió `500` porque Vite no podía conectar con `127.0.0.1:80` (`ECONNREFUSED`); la interfaz protegida no llegó a montarse. Durante el reinicio de API/worker, Nginx también devolvió temporalmente `502`; se resolvió al quedar saludable el API. No hubo errores de compilación ni queda un error reproducible con el stack saludable.
 - **Limitaciones / trabajo pendiente:** validar GET, POST y estados visuales con sesión de administrador.
 - **Desvíos de Figma o solicitudes al backend:** se separó el mockup unido en el archivo
   recibido. Los valores de tiempos y modelo del mockup son ficticios y no se usan.
