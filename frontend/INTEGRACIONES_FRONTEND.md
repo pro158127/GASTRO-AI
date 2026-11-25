@@ -62,3 +62,23 @@ verificaciones.
   La barra lateral, encabezado y aviso global se reutilizan del layout. W-22 no incluye
   mascota; la capa «Estado vacío con TOPOLOGO» del archivo corresponde a W-23b.
 
+## W-23 · Métricas del modelo
+
+- **Fecha:** 25/11/2026.
+- **Archivos de frontend:** `src/pages/MetricasModelo.tsx`,
+  `src/pages/MetricasModelo.module.css` y `src/services/metricasModelo.ts`.
+- **Endpoint:** `GET /api/v1/admin/modelo/metricas`.
+- **Contrato revisado:** `backend/app/api/routers/admin_monitoreo.py`,
+  `backend/app/schemas/monitoreo.py`, `backend/app/services/monitoreo.py` y
+  `backend/app/schemas/reporte_evaluacion.py`. Métricas entre 0 y 1; las claves
+  omitidas/null se presentan como «No reportada», nunca como cero. Brier/ECE se muestran
+  como valores de calibración y se indica que menor es mejor.
+- **Estados cubiertos:** carga, error/reintento, reporte disponible y `disponible: false`
+  sin cifras provisionales. El estado W-23b reutiliza `EstadoVacio` y la mascota SVG
+  existente, que es decorativa. Se informa que son métricas del conjunto de prueba y no
+  desempeño en producción.
+- **Build (`pnpm build`):** aprobado el 25/11/2026.
+- **Prueba de endpoint:** API saludable (`/api/v1/health` `200`); `GET /api/v1/admin/modelo/metricas` devuelve `401` sin sesión, control esperado. Falta validar con administrador.
+- **Prueba en navegador:** flujo autenticado pendiente.
+- **Errores / limitaciones:** build aprobado; no se observaron errores de backend reproducibles. Queda pendiente validar respuestas con y sin reporte usando sesión administrativa.
+- **Desvíos / solicitudes al backend:** no registrados.
