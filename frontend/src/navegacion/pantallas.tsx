@@ -8,6 +8,7 @@ import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import EstadoOperativo from "../pages/EstadoOperativo";
+import LogsTecnicos from "../pages/LogsTecnicos";
 import MetricasModelo from "../pages/MetricasModelo";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
