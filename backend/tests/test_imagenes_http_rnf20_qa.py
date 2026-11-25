@@ -10,12 +10,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import deps
-from app.api.routers.imagenes import router, nombre_visible
+from app.api.routers.imagenes import nombre_visible, router
 from app.core.errores import ErrorApi, registrar_manejadores
 from app.models import CodigoRol, EstadoUsuario, EtapaSesion
-from app.services.autenticacion import ServicioAutenticacion, ReglasSesion
+from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 from app.services.verificadores_imagen import PESO_MAXIMO_BYTES
-
 
 AHORA = datetime(2026, 11, 22, 12, tzinfo=UTC)
 
