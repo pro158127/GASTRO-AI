@@ -25,9 +25,11 @@ from app.models import (
     Analisis,
     CasoPaciente,
     EstadoAnalisis,
+    EstadoInferencia,
     EtapaProceso,
     ExplicacionLlm,
     FormatoImagen,
+    LogInferencia,
     ObservacionProfesional,
     Traslado,
     Usuario,
@@ -45,6 +47,12 @@ log = logging.getLogger("gastroia.analisis")
 # El año del código es el de Cali, no el de Greenwich (un 31 de dic a las 8 p. m. ya es
 # 2027 en UTC y el doctor vería A-2027 en un análisis del 2026).
 ZONA_COLOMBIA = timezone(timedelta(hours=-5))
+
+# Una entrega viva no pasa de 150 s (task_time_limit); si en 10 min nadie renovó
+# procesando_desde, el worker murió y el mensaje no volvió (PROC-01)
+ATASCO = timedelta(minutes=10)
+# Va en LogInferencia.codigo_error para distinguirlo en la supervisión
+CODIGO_SIN_WORKER = "SIN_RESPUESTA_WORKER"
 
 
 class CodigoFalla(StrEnum):
@@ -199,6 +207,7 @@ class ServicioAnalisis:
             imagen_peso_bytes=temporal.peso_bytes,
             estado=EstadoAnalisis.PROCESANDO,
             solicitado_en=ahora,
+            procesando_desde=ahora,
         )
         self._repo.agregar(analisis)
         self._unidad.confirmar()  # suelta el candado
@@ -220,6 +229,7 @@ class ServicioAnalisis:
 
     def obtener(self, doctor_id: UUID, analisis_id: UUID) -> DetalleAnalisis:
         analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
+        self._cerrar_si_atascado(analisis)
         traslado = (
             self._repo.traslado_recibido(analisis.caso_id, doctor_id)
             if analisis.doctor_ejecutor_id != doctor_id
@@ -234,6 +244,7 @@ class ServicioAnalisis:
         el doctor carga otra. Responde 409 NO_REINTENTABLE.
         """
         analisis = ProxyAccesoAnalisis(self._repo, doctor_id).obtener(analisis_id)
+        self._cerrar_si_atascado(analisis)  # uno atascado sí se puede reintentar
         if (
             analisis.estado is not EstadoAnalisis.FALLIDO
             or analisis.codigo_error == CodigoFalla.CALIDAD_INSUFICIENTE.value
@@ -242,9 +253,43 @@ class ServicioAnalisis:
         analisis.estado = EstadoAnalisis.PROCESANDO
         analisis.etapa_proceso = None
         analisis.codigo_error = None
+        analisis.procesando_desde = self._reloj()
         self._unidad.confirmar()
         self._encolar_o_fallar(analisis)
         return analisis
+
+    def _cerrar_si_atascado(self, analisis: Analisis) -> None:
+        """PROCESANDO sin señales del worker en ATASCO → FALLIDO con ERR-1002 (W-07c).
+
+        Pasa si el worker murió y el mensaje se perdió (Redis reiniciado, cola purgada). Sin
+        esto el doctor vería PROCESANDO para siempre y el reintento respondería 409. Se
+        bloquea la fila y se vuelve a mirar, por si el worker justo la estaba terminando.
+        """
+        if analisis.estado is not EstadoAnalisis.PROCESANDO or not self._atascado(analisis):
+            return
+        self._repo.bloquear(analisis)
+        if analisis.estado is not EstadoAnalisis.PROCESANDO or not self._atascado(analisis):
+            self._unidad.confirmar()  # suelta el bloqueo
+            return
+        log.error("Análisis %s atascado en PROCESANDO; se marca FALLIDO", analisis.id)
+        self._repo.agregar(
+            LogInferencia(
+                analisis_id=analisis.id,
+                modelo_id=analisis.modelo_id,
+                estado=EstadoInferencia.ERROR,
+                latencia_vision_ms=0,  # la llamada al Space nunca terminó
+                codigo_error=CODIGO_SIN_WORKER,
+            )
+        )
+        analisis.estado = EstadoAnalisis.FALLIDO
+        analisis.codigo_error = CodigoFalla.SERVICIO_NO_DISPONIBLE.value
+        # La etapa se deja donde iba (sin etapa, etapas_de pinta el ERROR en la primera)
+        self._unidad.confirmar()
+
+    def _atascado(self, analisis: Analisis) -> bool:
+        # Los análisis de antes de 0004 no tienen procesando_desde: cuenta la solicitud
+        desde = analisis.procesando_desde or analisis.solicitado_en
+        return desde is not None and self._reloj() - desde >= ATASCO
 
     def explicacion(
         self, doctor_id: UUID, analisis_id: UUID
