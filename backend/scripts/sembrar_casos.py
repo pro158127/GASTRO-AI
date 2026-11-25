@@ -117,7 +117,7 @@ def sembrar(
     for _ in range(casos):
         documento = str(PRIMER_DOCUMENTO + azar.randrange(999_999_999))
         codigos = []
-        for n in range(analisis_por_caso):
+        for _ in range(analisis_por_caso):
             temporal = imagenes.cargar(doctor.id, imagen_sintetica(azar.randrange(2**32)))
             analisis = servicio.solicitar(
                 doctor,
@@ -125,8 +125,9 @@ def sembrar(
                     imagen_id=temporal.imagen_id,
                     tipo_documento="CC",
                     numero_documento=documento,
-                    # Solo el primero es paciente nuevo y pide la confirmación (RF-D01 CA 12)
-                    confirmacion_documento=documento if n == 0 else None,
+                    # Va siempre: hasta que un análisis quede COMPLETADO el paciente sigue
+                    # siendo nuevo y el servidor pide la confirmación (RF-D01, W-06i)
+                    confirmacion_documento=documento,
                 ),
             )
             codigos.append(analisis.codigo)
