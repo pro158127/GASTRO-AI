@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.almacen import crear_almacen
 from app.adapters.cola import TAREA_EXPLICAR_ANALISIS, TAREA_PROCESAR_ANALISIS
+from app.adapters.entregas import ContadorEntregasRedis
 from app.adapters.inferencia import crear_inferencia
 from app.adapters.llm import crear_adaptador_llm
 from app.core.config import get_settings
@@ -30,11 +31,15 @@ def _explicaciones(db: Session) -> ServicioExplicaciones:
     )
 
 
-# acks_late: si el worker se muere a la mitad, Redis le devuelve el mensaje a otro.
-# Lo que ya terminó no se toca; lo que seguía PROCESANDO se retoma desde el principio.
+# acks_late + task_reject_on_worker_lost (celery_app.py): si el proceso muere a la mitad,
+# Redis le devuelve el mensaje a otro. Lo que ya terminó no se toca; lo que seguía PROCESANDO
+# se retoma desde el principio, hasta MAX_ENTREGAS veces (services/procesamiento.py).
 @celery_app.task(name=TAREA_PROCESAR_ANALISIS, acks_late=True)
 def procesar_analisis(analisis_id: str) -> None:
     ajustes = get_settings()
+    id_analisis = UUID(analisis_id)
+    entregas = ContadorEntregasRedis.desde_url(ajustes.redis_url)
+    entrega = entregas.sumar(id_analisis)
     with SessionLocal() as db:
         almacen = crear_almacen(ajustes)
         analisis, catalogo, unidad = (
@@ -46,10 +51,14 @@ def procesar_analisis(analisis_id: str) -> None:
         clasificador = ServicioClasificacion(
             crear_inferencia(ajustes, codigos), almacen, analisis, catalogo, unidad
         )
-        ServicioProcesamiento(analisis, almacen, unidad, clasificador).procesar(UUID(analisis_id))
+        ServicioProcesamiento(analisis, almacen, unidad, clasificador).procesar(
+            id_analisis, entrega
+        )
         # El resultado ya quedó guardado; ahora sí la explicación (RF-R05 CA 3). Si el
         # mensaje llega repetido, generar() solo actúa si sigue PENDIENTE.
-        _explicaciones(db).generar(UUID(analisis_id))
+        _explicaciones(db).generar(id_analisis)
+    # Terminó sin que muriera el proceso: si el doctor reintenta, vuelve a contar desde 1
+    entregas.olvidar(id_analisis)
 
 
 @celery_app.task(name=TAREA_EXPLICAR_ANALISIS, acks_late=True)

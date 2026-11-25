@@ -166,6 +166,11 @@ class Analisis(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     completado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Inicio de la entrega actual (POST, reintento o cada entrega del worker). Con esto se
+    # detecta un análisis atascado porque el worker murió y el mensaje no volvió (0004).
+    procesando_desde: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     caso: Mapped[CasoPaciente] = relationship(back_populates="analisis")
     doctor_ejecutor: Mapped[Usuario] = relationship(back_populates="analisis_ejecutados")
