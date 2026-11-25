@@ -12,7 +12,7 @@ from app.api import deps
 from app.api.routers.catalogos import router
 from app.core.errores import registrar_manejadores
 from app.models import CodigoRol, EstadoUsuario, EtapaSesion
-from app.services.autenticacion import ServicioAutenticacion, ReglasSesion
+from app.services.autenticacion import ReglasSesion, ServicioAutenticacion
 
 AHORA = datetime(2026, 11, 21, 12, tzinfo=UTC)
 
