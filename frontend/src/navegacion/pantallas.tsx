@@ -4,7 +4,9 @@
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
+import { useUsuarioActual } from "../sesion/UsuarioActual";
 import CrearUsuario from "../pages/CrearUsuario";
+import Dashboard from "../pages/Dashboard";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import Historial from "../pages/Historial";
@@ -31,12 +33,25 @@ const AMBOS: RolInterfaz[] = ["doctor", "administrador"];
 const SOLO_DOCTOR: RolInterfaz[] = ["doctor"];
 const SOLO_ADMINISTRADOR: RolInterfaz[] = ["administrador"];
 
+/**
+ * `/dashboard` es una ruta con dos pantallas distintas: W-15 para el doctor y W-19 para el
+ * administrador. El doctor ya tiene la suya; la del administrador sigue pendiente, así que el
+ * reparto se hace aquí y no duplicando la ruta. La autorización real la hace el backend: cada
+ * dashboard es un endpoint distinto y con su rol.
+ */
+function DashboardPorRol({ titulo }: { titulo: string }) {
+  const { rol } = useUsuarioActual();
+  if (rol === "doctor") return <Dashboard titulo={titulo} />;
+  // TEMPORAL: reemplazar antes de la entrega (W-19)
+  return <PantallaPendiente titulo={titulo} />;
+}
+
 export const pantallas: Pantalla[] = [
   {
     ruta: "/dashboard",
     titulo: { doctor: "Dashboard", administrador: "Dashboard técnico" },
     roles: AMBOS,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-15 / W-19)
+    elemento: (titulo) => <DashboardPorRol titulo={titulo} />, // W-15 (doctor) / W-19 (pendiente)
   },
   {
     ruta: "/nuevo-analisis",

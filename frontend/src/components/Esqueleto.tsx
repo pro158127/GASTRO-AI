@@ -7,12 +7,14 @@ import estilos from "./Esqueleto.module.css";
 interface PropiedadesEsqueleto {
   /**
    * `fila-tabla`: variante «Fila de tabla» de Figma (5 barras).
+   * `tarjeta-indicador`: variante «Tarjeta de indicador» de Figma (91:2292), la que usa W-15e
+   * mientras cargan las cifras del dashboard: etiqueta, cifra y detalle.
    * `tarjeta`: no dibujada en Figma; misma idea para las listas que en tableta y celular pasan a
    * tarjetas (T-09, M-09): nombre, dos líneas e insignia.
    * `parrafo`: cuatro líneas de ancho decreciente, para un bloque de texto que todavía no
    * llega. Lo pide la nota de W-08c («esqueleto con forma de párrafo»).
    */
-  forma: "fila-tabla" | "tarjeta" | "parrafo";
+  forma: "fila-tabla" | "tarjeta-indicador" | "tarjeta" | "parrafo";
 }
 
 export default function Esqueleto({ forma }: PropiedadesEsqueleto) {
@@ -23,6 +25,16 @@ export default function Esqueleto({ forma }: PropiedadesEsqueleto) {
         <span className={`${estilos.barra} ${estilos.parrafoLinea}`} />
         <span className={`${estilos.barra} ${estilos.parrafoLinea}`} />
         <span className={`${estilos.barra} ${estilos.parrafoUltima}`} />
+      </div>
+    );
+  }
+
+  if (forma === "tarjeta-indicador") {
+    return (
+      <div className={estilos.tarjeta} aria-hidden="true">
+        <span className={`${estilos.barra} ${estilos.indicadorEtiqueta}`} />
+        <span className={`${estilos.barra} ${estilos.indicadorValor}`} />
+        <span className={`${estilos.barra} ${estilos.indicadorDetalle}`} />
       </div>
     );
   }

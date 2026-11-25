@@ -1,0 +1,118 @@
+/* Pantalla W-15 (Figma 62:3316), con sus versiones de tableta (T-15) y celular (M-15).
+   La disposición interna ya separa los bloques con 24 px y les pone `min-width: 0`. */
+
+/* --------------------------------------------------------------- aviso de traslado nuevo */
+
+/* W-15b: la alerta ocupa el ancho y el botón queda a su derecha. En celular el botón baja,
+   porque «Ver casos recibidos» y el texto no caben en una línea a 320 px. */
+.traslado {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+.traslado > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------------ las cinco cifras */
+
+/* Cuadrícula de 5 en escritorio, 3 en tableta y 2 en celular, como T-15 y M-15. Por debajo de
+   360 px pasa a una sola columna: es lo que evita el desplazamiento horizontal a 320 px
+   (WCAG 1.4.10) con una cifra de 32 px dentro de la tarjeta. */
+.indicadores {
+  display: grid;
+  margin: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--espacio-4);
+  padding: 0;
+  list-style: none;
+}
+
+/* ------------------------------------------------- casos recientes y gráfica de frecuencia */
+
+/* En escritorio, la tabla a 768 px y la gráfica con el resto, como Figma. Debajo, una columna. */
+.casosYFrecuencia {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espacio-4);
+}
+
+/* --------------------------------------------------------------- primer uso, carga y error */
+
+.tarjetaVacia {
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* W-15e: una sola tarjeta con los esqueletos dentro y el texto «Cargando…» al final. */
+.cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.esqueletoTarjetas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--espacio-4);
+}
+
+/* Visible, no solo para lectores de pantalla: lo dibuja W-15e. */
+.textoCargando {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.errorCarga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
+
+/* ------------------------------------------------------------------------------ escritorio */
+
+@media (min-width: 1280px) {
+  .casosYFrecuencia {
+    grid-template-columns: minmax(0, 768px) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* --------------------------------------------------------------------------------- tableta */
+
+@media (max-width: 1279px) {
+  .indicadores,
+  .esqueletoTarjetas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------------- celular */
+
+@media (max-width: 767px) {
+  .indicadores,
+  .esqueletoTarjetas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .traslado {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 359px) {
+  .indicadores,
+  .esqueletoTarjetas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

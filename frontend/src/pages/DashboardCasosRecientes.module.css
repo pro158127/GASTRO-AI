@@ -1,0 +1,185 @@
+/* Tarjeta «Casos recientes» de W-15 (Figma 62:3393). Tabla en escritorio, tarjetas desde
+   tableta (T-15 106:2584, M-15 106:2792). */
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* Título y «Ver historial». En celular el botón baja debajo del título antes que estrecharlo. */
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+}
+
+.vacio {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.nota {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+}
+
+/* ------------------------------------------------------------------ escritorio: la tabla */
+
+.marcoTabla {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radio-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--texto-dato-tabla);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th {
+  padding: var(--espacio-2) var(--espacio-3);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla td {
+  padding: var(--espacio-3);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+  color: var(--color-texto-primario);
+  vertical-align: middle;
+}
+
+/* Las columnas de los extremos ocupan lo justo; «Característica principal» se queda con el resto. */
+.columnaCodigo,
+.columnaFecha {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.columnaAccion {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* «Ver detalle» de la fila: enlace de texto, igual que en la tabla de W-16. */
+.enlaceDetalle {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tamano-objetivo-minimo);
+  color: var(--color-texto-enlace);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  text-decoration: none;
+}
+
+.enlaceDetalle:hover {
+  text-decoration: underline;
+}
+
+.enlaceDetalle:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+/* ------------------------------------------------------- tableta y celular: las tarjetas */
+
+.tarjetas {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: 0;
+  list-style: none;
+}
+
+.tarjetaCaso {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* ID a la izquierda y fecha a la derecha; si no caben, la fecha baja de línea. */
+.lineaCaso {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--espacio-1) var(--espacio-2);
+}
+
+.codigo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.fecha {
+  margin: 0;
+  font: var(--texto-leyenda);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-terciario);
+}
+
+.caracteristica {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------------ qué se ve dónde */
+
+.soloEscritorio {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .soloEscritorio {
+    display: block;
+  }
+
+  .soloTarjetas {
+    display: none;
+  }
+}

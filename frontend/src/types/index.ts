@@ -44,6 +44,15 @@ export interface RespuestaSesion {
   etapa: EtapaSesion;
   usuario: UsuarioActual;
   inactividad: Inactividad;
+  /**
+   * Contador del ítem «Casos recibidos» del menú: **traslados** que el doctor no ha abierto,
+   * no casos (`casos_recibidos_nuevos` de `RespuestaSesion` en el backend). Es el mismo número
+   * que `casos_recibidos.traslados_nuevos` del dashboard, pero viene aquí porque el menú se ve
+   * en todas las pantallas y el dashboard solo se carga en la suya.
+   *
+   * `null` cuando no aplica: sin la etapa ACTIVA o con un rol que no es doctor.
+   */
+  casos_recibidos_nuevos: number | null;
 }
 
 /** Respuesta de `POST /auth/sesion/continuar` (W-05, «Seguir conectado»). */
@@ -339,11 +348,6 @@ export interface PaginaUsuarios {
 export interface HealthResponse {
   status: "ok" | "degraded";
   database: "ok" | "error";
-}
-
-/** Propuesta `GET /api/v1/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
-export interface ResumenCasosRecibidos {
-  sin_revisar: number;
 }
 
 // ---------------------------------------------------- Imagen, paciente y análisis (W-06, W-07)
@@ -741,5 +745,106 @@ export interface AnalisisDetalle {
   observaciones: ObservacionAnalisis[];
   realizado_por: RealizadoPor;
   trasladado: TrasladoAnalisis | null;
+  aviso: AvisoApi;
+}
+
+// ------------------------------------------- Dashboard clínico (W-15, RF-DB01, contrato §3.5)
+// `GET /dashboard/doctor`. Todo se calcula **solo con los análisis propios completados** (los
+// que hizo el doctor y siguen siendo suyos). Lo que recibió por traslado va aparte, en
+// `casos_recibidos` y `avisos_traslado`, y no cambia sus indicadores (RF-A07 CA 2). Nada de
+// datos del paciente: los análisis se identifican por su código (RF-DB01 CA 2, RNF-24).
+
+/** Las cuatro cifras del resumen del doctor. */
+export interface ResumenDoctor {
+  /** Acumulado de completados propios (RF-DB01 CA 1). */
+  total_analisis: number;
+  /** Mes en curso en hora de Colombia, no la del navegador (RF-DB01 CA 1). */
+  analisis_mes: number;
+  /** El servidor lo calcula, pero W-15 no lo dibuja. Ver CONTRATOS_API.md. */
+  ultimos_7_dias: number;
+  /** Completados sin la observación del doctor. Tampoco está dibujado en W-15. */
+  sin_valoracion: number;
+}
+
+/** Una de las 5 filas de «Casos recientes» (RF-DB01 CA 2). Vienen en cualquier estado. */
+export interface AnalisisReciente {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /**
+   * `null` significa dos cosas distintas: ninguna característica superó el umbral, **o** el
+   * análisis todavía no termina. Se distinguen con `estado`, nunca mostrando el mismo texto.
+   */
+  caracteristica_principal: string | null;
+  /** Nombres de las que superan el umbral, de mayor a menor probabilidad. */
+  caracteristicas_que_superan: string[];
+}
+
+/** Una barra de la gráfica de frecuencia. Vienen todas las características activas, las de 0 también. */
+export interface BarraFrecuencia {
+  caracteristica_id: number;
+  codigo: string;
+  nombre: string;
+  /** En cuántos análisis propios superó el umbral que regía ese día (RF-A01 CA 2). */
+  analisis: number;
+}
+
+/** Gráfica de **barras**, nunca circular (RF-DB01 CA 3). */
+export interface Frecuencia {
+  /** Rótulo exigido por RF-DB01 CA 4. Lo manda el servidor; no se escribe en el frontend. */
+  rotulo: string;
+  barras: BarraFrecuencia[];
+}
+
+/** Concordancia del doctor con el modelo (RF-DB01 CA 5). */
+export interface ConcordanciaDoctor {
+  /** De 0 a 100 con un decimal: coincide / (coincide + no coincide). `null` si no valoró nada. */
+  porcentaje: number | null;
+  coincide: number;
+  no_coincide: number;
+  /** **No entra en el porcentaje**: se informa aparte para que la cifra no parezca mal calculada. */
+  no_concluyente: number;
+}
+
+/** Quién trasladó los casos. `cuenta_eliminada` añade «(cuenta eliminada)» (RF-A07 CA 4). */
+export interface OrigenTraslado {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+/** Un traslado recibido que el doctor todavía no ha abierto. */
+export interface AvisoTraslado {
+  traslado_id: string;
+  /** Por ejemplo `DESACTIVACION`. W-15 no lo muestra. */
+  tipo: string;
+  cantidad_casos: number;
+  origen: OrigenTraslado;
+  ejecutado_en: string;
+}
+
+/** Lo recibido por traslado, aparte de los indicadores propios (RF-A07 CA 2). */
+export interface CasosRecibidos {
+  /** Traslados sin abrir; es el número que puede nombrar el aviso, no el total de traslados. */
+  traslados_nuevos: number;
+  /** Total de casos recibidos, nuevos y ya vistos. */
+  casos: number;
+}
+
+/** Respuesta de `GET /dashboard/doctor`. */
+export interface DashboardDoctor {
+  /** Sin ningún análisis: estado vacío «Realizar el primer análisis», sin gráficas (CA 10). */
+  primer_uso: boolean;
+  resumen: ResumenDoctor;
+  /** Los 5 más recientes. */
+  analisis_recientes: AnalisisReciente[];
+  frecuencia: Frecuencia;
+  concordancia: ConcordanciaDoctor;
+  /** Casos con 2 o más análisis propios (RF-DB01 CA 6). */
+  pacientes_con_seguimiento: number;
+  avisos_traslado: AvisoTraslado[];
+  casos_recibidos: CasosRecibidos;
+  /** RF-DB01 CA 9. */
   aviso: AvisoApi;
 }

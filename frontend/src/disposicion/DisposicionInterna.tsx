@@ -6,7 +6,7 @@ import { Outlet, useLocation, useNavigationType } from "react-router";
 import AvisoExperimental from "../components/AvisoExperimental";
 import { buscarPantalla, tituloDePantalla } from "../navegacion/pantallas";
 import { etiquetaRol, menusPorRol } from "../navegacion/menus";
-import { ProveedorUsuario, useUsuarioActual } from "../sesion/UsuarioActual";
+import { useUsuarioActual } from "../sesion/UsuarioActual";
 import { useSesion } from "../sesion/ProveedorSesion";
 import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
@@ -15,14 +15,6 @@ import PanelMenuMovil from "./PanelMenuMovil";
 import estilos from "./DisposicionInterna.module.css";
 
 export default function DisposicionInterna() {
-  return (
-    <ProveedorUsuario>
-      <Armazon />
-    </ProveedorUsuario>
-  );
-}
-
-function Armazon() {
   const { usuario, rol, casosSinRevisar } = useUsuarioActual();
   const { cerrarSesion } = useSesion();
   const ubicacion = useLocation();

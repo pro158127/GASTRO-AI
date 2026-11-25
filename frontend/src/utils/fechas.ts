@@ -27,6 +27,18 @@ const FORMATO_SIN_ANIO = new Intl.DateTimeFormat("es-CO", {
   hourCycle: "h23",
 });
 
+/**
+ * El mes del dashboard (W-15) es **el de Colombia**, no el del navegador: el servidor cuenta
+ * `analisis_mes` desde el día 1 a las 00:00 en esa zona (`inicio_de_mes` del backend). Un
+ * doctor que abra la pantalla desde otra zona horaria el día 1 vería un mes que no es el que
+ * se está contando, así que la zona va fija.
+ */
+const FORMATO_MES = new Intl.DateTimeFormat("es-CO", {
+  month: "long",
+  year: "numeric",
+  timeZone: "America/Bogota",
+});
+
 const UNA_HORA_MS = 60 * 60 * 1000;
 
 /** Quita la coma que `Intl` mete entre la fecha y la hora: «14/10/2026, 08:30» → «14/10/2026 08:30». */
@@ -59,6 +71,20 @@ export function fechaHoraSinAnio(iso: string | null | undefined): string {
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return "";
   return sinComa(FORMATO_SIN_ANIO.format(fecha));
+}
+
+/**
+ * «noviembre de 2026»: el mes de la tarjeta «Análisis este mes» de W-15.
+ *
+ * **En minúscula**, que es como se escribe un mes en español. Figma lo dibuja con mayúscula
+ * porque allí es una línea suelta que empieza frase, pero el detalle de la tarjeta lo lleva
+ * dentro de una («Completados en noviembre de 2026»). Quien lo use para empezar una frase le
+ * pone la mayúscula en su sitio, que es donde se sabe si la hace falta.
+ *
+ * @param ahora instante de referencia; parámetro para poder probarlo.
+ */
+export function mesEnCurso(ahora: Date = new Date()): string {
+  return FORMATO_MES.format(ahora);
 }
 
 /**

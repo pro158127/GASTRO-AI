@@ -1,0 +1,95 @@
+/* Tarjeta «Frecuencia de características» de W-15 (Figma 62:3445) y su versión a ancho
+   completo de T-15 y M-15. La barra es CSS: una pista y un relleno, los dos con radio
+   completo y 12 px de alto, como dibuja Figma. */
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.descripcion {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.vacio {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.lista {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Nombre y cifra en una línea mientras quepan; si no, la cifra baja debajo del nombre en vez
+   de empujar el ancho de la tarjeta (a 320 px, «Metaplasia intestinal» y «19 de 47 análisis»
+   no caben juntos). */
+.rotulos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--espacio-1) var(--espacio-3);
+}
+
+.nombre {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.cifra {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-secundario);
+}
+
+.pista {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: var(--radio-completo);
+  background: var(--color-fondo-superficie-sutil);
+}
+
+/* El ancho lo pone el componente en línea, porque es el dato. Sin transición: la barra no
+   crece a la vista, así que no hay animación que apagar con prefers-reduced-motion. */
+.relleno {
+  height: 100%;
+  border-radius: var(--radio-completo);
+  background: var(--color-marca-primario);
+}
+
+.nota {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+}

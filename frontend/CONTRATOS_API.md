@@ -29,7 +29,7 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | Código de referencia en errores 5xx | implementado | `ERR-xxxx` en `codigo` de los 5xx; `id_solicitud` en todo error |
 | `POST /api/auth/logout` | implementado | `POST /api/v1/auth/logout`, con cookie |
 | `GET /api/auth/me` | implementado | `GET /api/v1/auth/sesion` |
-| `GET /api/casos-recibidos/resumen` | propuesto | pendiente (ruta pasa a `/api/v1`) |
+| `GET /api/casos-recibidos/resumen` | resuelto de otra forma | no hace falta: `casos_recibidos_nuevos` viene en `GET /api/v1/auth/sesion` |
 | `GET /api/v1/admin/usuarios`: parámetro `orden` | implementado | ya acepta `orden`; W-09 todavía no lo usa |
 | `GET /api/v1/admin/usuarios`: `q` en la query string | observación | sin cambio en el contrato |
 | `rol_nombre` en los usuarios del administrador (U-8) | implementado | llega en cada `usuario`; el frontend ya lo muestra |
@@ -38,6 +38,13 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | IP del bloqueo en el detalle de la cuenta (U-18) | propuesto | no existe; W-11b dice la fecha y los intentos, y remite a la bitácora |
 | «Es el último administrador activo» en el detalle (U-19) | propuesto | no existe; W-11 lo deduce con una segunda consulta |
 | Motivo de la desactivación en el detalle (U-20) | propuesto | no existe; W-11c dice desde cuándo y cuántos casos se reasignaron |
+| `probabilidad_principal` en `analisis_recientes` (DB-1) | propuesto | no existe; W-15 quitó la columna «Prob.» |
+| Total de traslados en `casos_recibidos` (DB-2) | propuesto | no existe; la tarjeta cuenta los nuevos |
+| Umbral vigente en `frecuencia` (DB-3) | propuesto | no existe; la nota de la gráfica va sin el número |
+| Sitio en Figma para `no_concluyente` (DB-4) | propuesto a diseño | el frontend lo añade al detalle de la tarjeta |
+| `ultimos_7_dias` y `sin_valoracion` sin dibujar (DB-5) | pregunta abierta | se calculan y no se muestran |
+| Las cifras del panel solo cuentan completados (DB-6) | propuesto a diseño | el detalle de cada tarjeta lo dice |
+| «Ver detalle» en la tabla de escritorio (DB-7) | propuesto a diseño | el frontend lo añadió |
 
 ## Propuestas
 
@@ -101,26 +108,21 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 
 ### `GET /api/casos-recibidos/resumen` · contador del menú «Casos recibidos» (W-15, W-15b)
 
-- **Estado:** propuesto. La ruta pasa a `GET /api/v1/casos-recibidos/resumen` por la nueva
-  base; el backend aún lista los traslados como «planeados».
-- **Solicitud:** requiere sesión en etapa `ACTIVA` (cookie). Solo para el rol doctor.
-- **Respuesta:** `200` con la cantidad de casos trasladados por otros doctores que el doctor
-  todavía no ha revisado:
-
-  ```json
-  { "sin_revisar": 4 }
-  ```
-- **Errores:** `401 SESION_EXPIRADA`; `403 PERMISO_DENEGADO` si el usuario no es doctor;
-  `5xx` con `ERR-xxxx`.
-- **Notas:**
-  - El contador del menú se oculta cuando vale 0 y se anuncia como «Casos recibidos, 4 sin
-    revisar» (nota del componente «Ítem de navegación» en Figma, marcado «Fase 2»).
-  - Los casos trasladados no se suman a los demás indicadores (RF-A07 CA 2); el dashboard
-    debe usar este mismo dato para su indicador «Casos recibidos».
-  - Pendiente definir cuándo se actualiza (al cargar la pantalla, al abrir un traslado). Si
-    se consulta automáticamente, debería llevar `X-Actividad-Pasiva: 1`.
-- **Simulación actual:** valor fijo 4 en `src/services/simulados/usuario.ts`, único lugar del
-  dato. Es un valor de ejemplo del componente de Figma; el dashboard W-15 dibuja 0.
+- **Estado:** resuelto de otra forma, mejor que la propuesta. **No hace falta el endpoint.**
+- **Cómo quedó:** el número llega en `GET /api/v1/auth/sesion` como `casos_recibidos_nuevos`
+  (`int | null`), junto a la etapa, el usuario y la inactividad. Es `null` cuando no aplica:
+  sin la etapa `ACTIVA` o con un rol que no es doctor.
+- **Por qué es mejor:** el menú se ve en **todas** las pantallas, y la sesión ya se consulta al
+  cargar la página y en cada comprobación pasiva de inactividad. Así el contador se actualiza
+  solo, sin una petición más y sin depender de que la persona entre al dashboard.
+- **Ojo con el nombre:** cuenta **traslados** sin abrir, no casos. Es el mismo número que
+  `casos_recibidos.traslados_nuevos` del dashboard. La insignia del menú se anuncia «Casos
+  recibidos, 4 sin revisar» (nota del componente «Ítem de navegación» en Figma), que dice
+  «casos» para un número de traslados; queda anotado para diseño.
+- **Qué hace el frontend:** `ProveedorSesion` lo guarda con el resto de la sesión y
+  `useUsuarioActual` lo entrega a la barra lateral y al menú de celular (0 cuando es `null`,
+  que es como la insignia se oculta). Se eliminaron `src/services/usuario.ts` y
+  `src/services/simulados/usuario.ts`: ya no queda nada simulado en el frontend.
 
 ### Parámetro `orden` en `GET /api/v1/admin/usuarios` · W-09
 
@@ -301,3 +303,117 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   de la desactivación, cuántos casos se reasignaron. El motivo no se inventa.
 - **Nota:** mientras no exista, la bitácora sigue siendo el lugar donde se ve quién desactivó la
   cuenta y cuándo, que es casi siempre lo que se busca.
+
+### `probabilidad_principal` en `analisis_recientes` de `GET /api/v1/dashboard/doctor` · W-15 (DB-1)
+
+- **Estado:** propuesto.
+- **Por qué:** W-15 (Figma 62:3401) dibuja la tabla de casos recientes con cuatro columnas: ID de
+  análisis, Fecha, Característica principal y **Prob.** («84 %», «67 %»). `AnalisisReciente` no
+  trae ninguna probabilidad, aunque la fila del historial (`FilaHistorial`, `GET /analisis`) sí
+  tenga `probabilidad_principal`. No se puede calcular en el frontend ni inventar.
+- **Solicitud propuesta:** añadir a cada elemento de `analisis_recientes` el mismo campo que ya
+  existe en el historial, con la misma escala (0 a 1) y la misma regla:
+
+  ```json
+  { "id": "…", "codigo": "A-2026-000147", "caracteristica_principal": "Atrofia gástrica", "probabilidad_principal": 0.84 }
+  ```
+
+  `null` cuando no hay ninguna por encima del umbral o el análisis no ha terminado, igual que
+  `caracteristica_principal`.
+- **Qué hace el frontend mientras tanto:** W-15 se construyó **sin** la columna «Prob.», en
+  escritorio y en tarjetas. Una columna entera de «—» no informa de nada. Cuando el campo llegue,
+  la columna entra en `src/pages/DashboardCasosRecientes.tsx` sin tocar el resto de la pantalla.
+
+### Total de traslados en `casos_recibidos` de `GET /api/v1/dashboard/doctor` · W-15c (DB-2)
+
+- **Estado:** propuesto. Prioridad baja.
+- **Por qué:** la tarjeta «Casos recibidos» de W-15c se escribe «7» con el detalle «2 traslados»,
+  es decir, el **total** de traslados recibidos. La respuesta trae `casos` (el total de casos) y
+  `traslados_nuevos` (solo los que no ha abierto), así que ese total no se puede deducir: con 2
+  traslados y 1 sin abrir, `traslados_nuevos` vale 1.
+- **Solicitud propuesta:** un campo más en `casos_recibidos`, que el endpoint
+  `GET /api/v1/casos-recibidos` ya calcula como `total_traslados`:
+
+  ```json
+  { "casos_recibidos": { "traslados_nuevos": 1, "traslados": 2, "casos": 7 } }
+  ```
+- **Qué hace el frontend mientras tanto:** el detalle de la tarjeta dice lo que el número es de
+  verdad («1 traslado nuevo sin abrir», «2 traslados nuevos sin abrir») y, sin traslados nuevos,
+  el texto de W-15 «Por traslado de otros doctores». **No** se hace una segunda petición a
+  `GET /casos-recibidos` por un número decorativo.
+
+### Umbral vigente en `frecuencia` de `GET /api/v1/dashboard/doctor` · W-15 (DB-3)
+
+- **Estado:** propuesto. Prioridad baja.
+- **Por qué:** la nota al pie de la gráfica dice en Figma «Umbral vigente: 50 % (umbral global
+  inicial, RF-A01 CA 4)». Ese número no viene en la respuesta y el único endpoint que lo tiene,
+  `GET /admin/configuracion-inferencia`, es de administrador. Escribir «50 %» a mano sería
+  inventar un dato que el administrador puede cambiar.
+- **Solicitud propuesta:** `frecuencia.umbral_vigente` (0 a 1, o `null` si está en modo por
+  característica), o bien un endpoint de lectura del umbral para el rol doctor.
+- **Qué hace el frontend mientras tanto:** la nota va sin número y dice lo que sí es cierto para
+  toda la gráfica: «Cada análisis se cuenta con el umbral que regía el día en que se hizo»
+  (RF-A01 CA 2; cada resultado guarda el umbral con el que se evaluó, así que un solo número
+  tampoco describiría bien la barra entera).
+
+### Dónde va `no_concluyente` en la tarjeta de concordancia · W-15 (DB-4)
+
+- **Estado:** propuesto **al equipo de diseño**, no al backend: el dato ya existe.
+- **Por qué:** `ConcordanciaSalida` trae `coincide`, `no_coincide` y `no_concluyente`, y el
+  contrato dice que el último «se informa aparte, no entra al porcentaje». Figma solo dibuja el
+  porcentaje y una línea de detalle («32 de 41 análisis valorados»), sin sitio para los no
+  concluyentes. Omitirlos incumple el requisito, y sumarlos a la base haría que el porcentaje
+  pareciera mal calculado.
+- **Qué hace el frontend:** el detalle de la tarjeta los nombra y dice expresamente que no entran:
+  «32 de 41 análisis valorados · 5 no concluyentes, que no entran en el porcentaje». Si diseño le
+  hace un sitio propio en el frame, se mueve ahí.
+- **Tres estados, no dos.** `porcentaje` llega nulo en dos situaciones distintas y Figma solo
+  dibuja una. Se distinguen con los tres conteos:
+  - sin ninguna valoración → «—» y «Sin valoraciones todavía» (el texto de W-12);
+  - con valoraciones, **todas** no concluyentes → «—» y «5 valoraciones, todas no concluyentes:
+    no entran en el porcentaje». Decir aquí que no hay valoraciones sería falso;
+  - con porcentaje → la base, más los no concluyentes si los hay.
+
+### `ultimos_7_dias` y `sin_valoracion` no están dibujados · W-15 (DB-5)
+
+- **Estado:** pregunta abierta para diseño y backend.
+- **Qué pasa:** `ResumenDoctor` trae cuatro cifras y W-15 solo dibuja dos de ellas
+  (`analisis_mes` y `total_analisis`); las otras tres tarjetas son concordancia, casos con
+  seguimiento y casos recibidos. `ultimos_7_dias` y `sin_valoracion` se calculan en cada carga
+  (dos consultas más en `dashboard_repository.py`) y no se muestran en ninguna parte.
+- **Qué hace el frontend:** los tipa en `src/types/index.ts` con un comentario que dice que no se
+  dibujan, y no los usa. No se inventan tarjetas que Figma no tiene.
+- **Qué hay que decidir:** o Figma les hace sitio (serían dos tarjetas más, y `sin_valoracion`
+  encaja bien con el recordatorio de valorar), o el backend deja de calcularlos.
+
+### Las cifras del panel solo cuentan análisis completados · W-15 (DB-6)
+
+- **Estado:** propuesto **al equipo de diseño**; el backend está bien, lo que falta es decirlo
+  en la pantalla.
+- **Qué pasa:** el panel puede decir «Análisis acumulados: 5» mientras el historial lista 17
+  filas, y las dos cifras son correctas. `dashboard_repository.py` lo dice en su cabecera:
+  «Propios = análisis **COMPLETADOS** que hizo el doctor y **cuyo caso sigue asignado a él**».
+  El historial, en cambio, lista los tres estados y además los recibidos por traslado. Los
+  textos de Figma («Desde su primer ingreso», «Pacientes con 2 o más análisis») no lo insinúan,
+  así que la diferencia se lee como un error de la aplicación.
+- **A qué cifras les pasa:** `analisis_mes` y `total_analisis` (las dos primeras tarjetas),
+  `pacientes_con_seguimiento` y la gráfica de frecuencia, que cuenta sobre los mismos análisis
+  y los compara con `total_analisis`. La concordancia no lo necesita: su base ya se nombra
+  («32 de 41 análisis valorados»), y valorar un análisis supone que terminó.
+- **Qué hace el frontend:** los detalles dicen «Completados en octubre de 2026», «Completados
+  desde su primer ingreso» y «Pacientes con 2 o más análisis completados», y la descripción de
+  la gráfica, «Número de análisis **completados** en que cada característica superó el umbral…».
+- **Qué queda sin decir:** la segunda mitad de la condición, que solo cuentan los casos que
+  siguen asignados al doctor. Un doctor al que le reasignaron casos verá bajar sus cifras sin
+  explicación, y eso no cabe en una línea de detalle de 12 px. Hace falta un sitio en el frame:
+  una nota al pie de la fila de tarjetas, como la de privacidad de «Casos recientes».
+
+### «Ver detalle» en la tabla de escritorio de «Casos recientes» · W-15 (DB-7)
+
+- **Estado:** propuesto **al equipo de diseño**. Ya implementado en el frontend.
+- **Qué pasa:** W-15 dibuja la tabla con cuatro columnas y ninguna acción, pero T-15 y M-15
+  dibujan cada caso como tarjeta **con un botón «Ver detalle»**. Tal cual, desde una pantalla
+  grande se puede hacer menos que desde el celular: para abrir un análisis habría que pasar por
+  «Ver historial». La tabla de W-16 ya tiene esa acción en cada fila.
+- **Qué hace el frontend:** una columna «Acción» con el mismo enlace de texto de W-16 (no un
+  botón de 40 px, que engordaría las filas), con el código del análisis en el nombre accesible.

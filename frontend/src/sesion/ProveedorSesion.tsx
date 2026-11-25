@@ -34,13 +34,27 @@ type EstadoSesion =
   | { fase: "cargando" }
   | { fase: "error"; error: ErrorApi | null }
   | { fase: "sin_sesion" }
-  | { fase: "con_sesion"; etapa: EtapaSesion; inactividad: Inactividad; usuario: UsuarioActual };
+  | {
+      fase: "con_sesion";
+      etapa: EtapaSesion;
+      inactividad: Inactividad;
+      usuario: UsuarioActual;
+      /** Traslados sin abrir para la insignia del menú; `null` si no aplica. */
+      casosRecibidosNuevos: number | null;
+    };
 
 interface ValorSesion {
   /** Etapa de la sesión actual; `null` si no hay sesión. */
   etapa: EtapaSesion | null;
   /** Usuario de la sesión; `null` si no hay sesión. Existe desde la etapa de cambio de contraseña. */
   usuario: UsuarioActual | null;
+  /**
+   * Traslados recibidos sin abrir, para la insignia del menú «Casos recibidos». `null` si no
+   * hay sesión, si no está ACTIVA o si el usuario no es doctor. Llega con cada consulta de
+   * `GET /auth/sesion`, así que se actualiza al cargar la página y en cada comprobación pasiva
+   * de inactividad, sin pedir nada aparte.
+   */
+  casosRecibidosNuevos: number | null;
   /** Solo con la etapa ACTIVA se entra a las pantallas internas. */
   autenticado: boolean;
   /**
@@ -104,6 +118,7 @@ function estadoDesdeRespuesta(respuesta: RespuestaSesion): EstadoSesion {
     etapa: respuesta.etapa,
     inactividad: respuesta.inactividad,
     usuario: respuesta.usuario,
+    casosRecibidosNuevos: respuesta.casos_recibidos_nuevos,
   };
 }
 
@@ -299,6 +314,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return {
       etapa: conSesion?.etapa ?? null,
       usuario: conSesion?.usuario ?? null,
+      casosRecibidosNuevos: conSesion?.casosRecibidosNuevos ?? null,
       autenticado: conSesion?.etapa === "ACTIVA",
       motivoCierre,
       refrescarSesion,

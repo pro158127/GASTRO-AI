@@ -1,0 +1,38 @@
+/* Tarjeta KPI (Figma 16:694): 24 px de relleno horizontal, 16 px vertical, radio md y las
+   tres líneas separadas 4 px. */
+
+.tarjeta {
+  display: flex;
+  /* Sin esto, una tarjeta con texto largo no encoge dentro de la cuadrícula y la desborda. */
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-1);
+  padding: var(--espacio-4) var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+}
+
+/* Figma escribe las tres líneas sin salto («whitespace-nowrap»), pero aquí sí se permiten:
+   a 320 px «Concordancia con el modelo» no cabe en una línea y recortarla sería perder el
+   nombre del indicador. */
+.indicador {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+.valor {
+  margin: 0;
+  font: var(--texto-dato-kpi);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-primario);
+}
+
+.detalle {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+  overflow-wrap: anywhere;
+}
