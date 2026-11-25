@@ -9,6 +9,11 @@ import type {
   AnalisisDetalle,
   AnalisisResumen,
   EstadoAnalisisRespuesta,
+  ExplicacionEstado,
+  ExplicacionReintentada,
+  ObservacionCreada,
+  ObservacionEntrada,
+  ObservacionGuardada,
   SolicitudAnalisis,
 } from "../types";
 import { solicitar } from "./api";
@@ -58,6 +63,64 @@ export function obtenerEstadoAnalisis(id: string): Promise<EstadoAnalisisRespues
  */
 export function obtenerAnalisis(id: string): Promise<AnalisisDetalle> {
   return solicitar<AnalisisDetalle>(`/analisis/${encodeURIComponent(id)}`);
+}
+
+/**
+ * `GET /analisis/{id}/explicacion`. El sondeo de W-08c: **siempre pasiva**.
+ *
+ * Es una consulta automática, no una acción de la persona. Sin `pasiva: true` tener W-08
+ * abierta mantendría viva la sesión para siempre y el cierre por inactividad de los 10
+ * minutos dejaría de funcionar, igual que pasaría con el sondeo de W-07.
+ *
+ * El endpoint responde con `response_model_exclude_none=True`: lo que es nulo no viene. Y su
+ * 404 significa «este análisis no tiene explicación» (análisis FALLIDO), **no** «el análisis
+ * no existe»: quien llame no debe confundirlo con el 404 de la pantalla.
+ */
+export function obtenerExplicacion(id: string): Promise<ExplicacionEstado> {
+  return solicitar<ExplicacionEstado>(`/analisis/${encodeURIComponent(id)}/explicacion`, {
+    pasiva: true,
+  });
+}
+
+/**
+ * `POST /analisis/{id}/explicacion/reintentar` (202). El «Reintentar» de W-08d.
+ *
+ * **No es pasiva, a diferencia del sondeo de arriba.** La pulsa una persona, así que renueva
+ * la inactividad de la sesión como cualquier otra acción suya. Que el éxito reanude el sondeo
+ * no cambia nada: lo que cuenta como actividad es el clic, no las consultas que vienen
+ * detrás, que vuelven a ir pasivas.
+ *
+ * Errores: 409 EXPLICACION_NO_REINTENTABLE (ya GENERADA o todavía PENDIENTE) y 429
+ * REINTENTOS_AGOTADOS, que trae `max_intentos`.
+ */
+export function reintentarExplicacion(id: string): Promise<ExplicacionReintentada> {
+  return solicitar<ExplicacionReintentada>(
+    `/analisis/${encodeURIComponent(id)}/explicacion/reintentar`,
+    { metodo: "POST" }
+  );
+}
+
+/**
+ * `POST /analisis/{id}/observaciones` (201). La valoración del profesional (RF-D04, W-08e).
+ *
+ * **No es pasiva:** es la acción de la persona.
+ *
+ * **Es irreversible.** Hay una observación por análisis y por doctor, y no se edita: un
+ * segundo envío responde 409 OBSERVACION_YA_REGISTRADA y el servidor no sobrescribe nada.
+ * Quien llame tiene que haberlo advertido antes.
+ *
+ * `texto` en blanco no se manda: el servidor lo guarda como `null`.
+ */
+export async function crearObservacion(
+  id: string,
+  entrada: ObservacionEntrada
+): Promise<ObservacionGuardada> {
+  const texto = entrada.texto?.trim();
+  const { observacion } = await solicitar<ObservacionCreada>(
+    `/analisis/${encodeURIComponent(id)}/observaciones`,
+    { metodo: "POST", cuerpo: { valoracion: entrada.valoracion, texto: texto || null } }
+  );
+  return observacion;
 }
 
 /**

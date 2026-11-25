@@ -19,6 +19,14 @@
   }
 }
 
+/* Características, explicación y valoración, una debajo de otra. */
+.columnaDerecha {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
 .tarjeta {
   display: flex;
   min-width: 0;

@@ -545,19 +545,86 @@ export interface RegionInteres {
   mapa_calor_url: string;
 }
 
-/** Explicación del LLM. Se tipa aquí; la dibuja W-08c / W-08d (tarea 6b). */
+/**
+ * Los cuatro estados de la explicación (`EstadoExplicacion` del backend,
+ * `backend/app/models/analisis.py`). No hay más.
+ */
+export type EstadoExplicacion = "PENDIENTE" | "GENERADA" | "FALLIDA" | "RECHAZADA";
+
+/** Explicación del LLM tal como viene dentro de `GET /analisis/{id}`. */
 export interface ExplicacionAnalisis {
-  estado: string;
+  estado: EstadoExplicacion;
   texto: string | null;
   generada_en: string | null;
   intentos: number;
 }
 
-/** Observación de un profesional. Se tipa aquí; la dibuja W-08e y siguientes (tarea 6b). */
+/**
+ * Respuesta de `GET /analisis/{id}/explicacion` (W-08c, W-08d).
+ *
+ * El endpoint usa `response_model_exclude_none=True`: **los campos nulos no vienen en el
+ * JSON**, así que aquí son opcionales de verdad. Si todavía no hay fila de explicación, la
+ * respuesta es `{estado: "PENDIENTE"}` a secas.
+ */
+export interface ExplicacionEstado {
+  estado: EstadoExplicacion;
+  texto?: string | null;
+  generada_en?: string | null;
+  /** `ERR-3001` (no disponible) o `ERR-3002` (texto rechazado). No se le muestra a la persona. */
+  codigo_error?: string | null;
+  /**
+   * Mensaje estándar de indisponibilidad (RF-R05 CA 5). Solo llega en FALLIDA y RECHAZADA.
+   * **Se pinta tal cual**, como `MapaCalor.aviso`: lo escribe el servidor, no el frontend.
+   */
+  mensaje?: string | null;
+  intentos: number;
+  /**
+   * Lo calcula el servidor (`estado ∈ (FALLIDA, RECHAZADA)` y `intentos < 3`). **Es lo que
+   * habilita el botón «Reintentar»**; el frontend no repite esa cuenta.
+   */
+  puede_reintentar: boolean;
+}
+
+/** Respuesta de `POST /analisis/{id}/explicacion/reintentar` (202). */
+export interface ExplicacionReintentada {
+  estado: EstadoExplicacion;
+  intentos: number;
+}
+
+/** Las tres valoraciones posibles (`Valoracion` del backend). */
+export type Valoracion = "COINCIDE" | "NO_COINCIDE" | "NO_CONCLUYENTE";
+
+/** Tope de `texto` en una observación (`TEXTO_OBSERVACION_MAXIMO` del backend). */
+export const TEXTO_OBSERVACION_MAXIMO = 2000;
+
+/** Cuerpo de `POST /analisis/{id}/observaciones`. */
+export interface ObservacionEntrada {
+  valoracion: Valoracion;
+  texto?: string;
+}
+
+/** La observación tal como la devuelve el 201. El autor trae `id`, a diferencia del detalle. */
+export interface ObservacionGuardada {
+  id: string;
+  valoracion: Valoracion;
+  texto: string | null;
+  autor: { id: string; nombre: string; apellido: string };
+  registrada_en: string;
+}
+
+/** Respuesta de `POST /analisis/{id}/observaciones` (201). */
+export interface ObservacionCreada {
+  observacion: ObservacionGuardada;
+}
+
+/**
+ * Observación de un profesional dentro de `GET /analisis/{id}`. `es_mia` es lo que decide si
+ * W-08 muestra el formulario o la valoración ya registrada en solo lectura.
+ */
 export interface ObservacionAnalisis {
   id: string;
   es_mia: boolean;
-  valoracion: string;
+  valoracion: Valoracion;
   texto: string | null;
   autor: { nombre: string; apellido: string };
   registrada_en: string;

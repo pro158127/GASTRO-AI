@@ -13,11 +13,20 @@
   width: 420px;
   max-width: calc(100% - 2 * var(--espacio-4));
   padding: 14px var(--espacio-4);
-  border: var(--borde-grosor) solid var(--color-estado-exito-icono);
+  border: var(--borde-grosor) solid;
   border-left-width: 4px;
   border-radius: var(--radio-md);
   background: var(--color-fondo-superficie);
   box-shadow: var(--sombra-elevacion-2-menu);
+}
+
+/* El color solo acompaña: el título dice qué pasó y el icono lo refuerza (WCAG 1.4.1). */
+.exito {
+  border-color: var(--color-estado-exito-icono);
+}
+
+.error {
+  border-color: var(--color-estado-error-icono);
 }
 
 .icono {
@@ -25,7 +34,14 @@
   width: 24px;
   height: 24px;
   flex-shrink: 0;
+}
+
+.exito .icono {
   color: var(--color-estado-exito-icono);
+}
+
+.error .icono {
+  color: var(--color-estado-error-icono);
 }
 
 .texto {

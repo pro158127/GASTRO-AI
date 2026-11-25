@@ -59,6 +59,21 @@
   border-radius: var(--radio-completo);
 }
 
+/* Párrafo (W-08c): líneas a todo el ancho y la última más corta, como acaba un párrafo. */
+.parrafo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+}
+
+.parrafoLinea {
+  width: 100%;
+}
+
+.parrafoUltima {
+  width: 55%;
+}
+
 @keyframes esqueleto-pulso {
   50% {
     opacity: 0.5;

@@ -62,6 +62,8 @@ interface DetalleError {
   permitidos?: string[];
   /** `minimo` de IMAGEN_RESOLUCION_INSUFICIENTE: el tamaño mínimo en píxeles. */
   minimo?: TamanoImagen | null;
+  /** `max_intentos` de REINTENTOS_AGOTADOS: cuántos intentos de explicación permite el servidor. */
+  maxIntentos?: number | null;
 }
 
 /**
@@ -96,6 +98,11 @@ export class ErrorApi extends Error {
   readonly permitidos: string[];
   /** Tamaño mínimo del 422 IMAGEN_RESOLUCION_INSUFICIENTE, en píxeles. */
   readonly minimo: TamanoImagen | null;
+  /**
+   * Intentos que permite el servidor, en el 429 REINTENTOS_AGOTADOS de la explicación. Lo
+   * manda él para que el texto no repita un «3» escrito aquí que mañana puede no ser cierto.
+   */
+  readonly maxIntentos: number | null;
 
   constructor(estado: number | null, detalle: DetalleError = {}) {
     super(detalle.codigo ?? "Error de la API");
@@ -111,6 +118,7 @@ export class ErrorApi extends Error {
     this.maxBytes = detalle.maxBytes ?? null;
     this.permitidos = detalle.permitidos ?? [];
     this.minimo = detalle.minimo ?? null;
+    this.maxIntentos = detalle.maxIntentos ?? null;
   }
 
   /**
@@ -215,6 +223,7 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     maxBytes: numeroONulo(detalle.max_bytes),
     permitidos: listaDe(detalle.permitidos, esTexto),
     minimo: tamanoONulo(detalle.minimo),
+    maxIntentos: numeroONulo(detalle.max_intentos),
   });
 }
 

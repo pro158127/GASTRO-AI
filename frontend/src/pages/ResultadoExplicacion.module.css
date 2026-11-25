@@ -1,0 +1,69 @@
+/* Tarjeta «Explicación en lenguaje natural» de W-08 (Figma 47:870), con W-08c y W-08d.
+   Misma caja que las demás tarjetas de la pantalla. */
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.cabecera {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.estado {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.esqueleto {
+  width: 100%;
+}
+
+/* Texto del modelo: puede traer palabras largas y en celular no debe desbordar. */
+.texto {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.pie {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+  overflow-wrap: anywhere;
+}
+
+/* Las alertas ocupan el ancho de la tarjeta aunque el contenedor alinee a la izquierda. */
+.tarjeta > div[role="status"],
+.tarjeta > div[role="alert"] {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .tarjeta > button {
+    width: 100%;
+  }
+}

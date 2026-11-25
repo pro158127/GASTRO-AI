@@ -9,11 +9,24 @@ interface PropiedadesEsqueleto {
    * `fila-tabla`: variante «Fila de tabla» de Figma (5 barras).
    * `tarjeta`: no dibujada en Figma; misma idea para las listas que en tableta y celular pasan a
    * tarjetas (T-09, M-09): nombre, dos líneas e insignia.
+   * `parrafo`: cuatro líneas de ancho decreciente, para un bloque de texto que todavía no
+   * llega. Lo pide la nota de W-08c («esqueleto con forma de párrafo»).
    */
-  forma: "fila-tabla" | "tarjeta";
+  forma: "fila-tabla" | "tarjeta" | "parrafo";
 }
 
 export default function Esqueleto({ forma }: PropiedadesEsqueleto) {
+  if (forma === "parrafo") {
+    return (
+      <div className={estilos.parrafo} aria-hidden="true">
+        <span className={`${estilos.barra} ${estilos.parrafoLinea}`} />
+        <span className={`${estilos.barra} ${estilos.parrafoLinea}`} />
+        <span className={`${estilos.barra} ${estilos.parrafoLinea}`} />
+        <span className={`${estilos.barra} ${estilos.parrafoUltima}`} />
+      </div>
+    );
+  }
+
   if (forma === "tarjeta") {
     return (
       <div className={estilos.tarjeta} aria-hidden="true">

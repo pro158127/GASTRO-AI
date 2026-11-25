@@ -95,6 +95,25 @@ export const CodigoErrorApi = {
   CASOS_INVALIDOS: "CASOS_INVALIDOS",
   /** 422 · W-02b: trae `campos` y `requisitos`. */
   CONTRASENA_NO_CUMPLE_POLITICA: "CONTRASENA_NO_CUMPLE_POLITICA",
+  /**
+   * 409 · `POST /analisis/{id}/observaciones`: este doctor ya registró su valoración de este
+   * análisis. **No se sobrescribe**: hay una por análisis y por persona, y no se edita
+   * (RF-D04). Pasa, por ejemplo, con dos pestañas abiertas → W-08.
+   */
+  OBSERVACION_YA_REGISTRADA: "OBSERVACION_YA_REGISTRADA",
+  /** 409 · Valorar un análisis que todavía no tiene resultado. W-08 solo se pinta COMPLETADO. */
+  ANALISIS_NO_COMPLETADO: "ANALISIS_NO_COMPLETADO",
+  /**
+   * 409 · `POST /analisis/{id}/explicacion/reintentar` cuando la explicación ya está GENERADA
+   * o sigue PENDIENTE. `puede_reintentar` del GET evita llegar aquí; queda por si el estado
+   * cambió entre la consulta y el clic.
+   */
+  EXPLICACION_NO_REINTENTABLE: "EXPLICACION_NO_REINTENTABLE",
+  /**
+   * 429 · Ya se hicieron los tres intentos de la explicación (ANA-04). Trae `max_intentos`
+   * (ver `ErrorApi.maxIntentos`): el número lo dice el servidor, no una constante de aquí.
+   */
+  REINTENTOS_AGOTADOS: "REINTENTOS_AGOTADOS",
   /** 429 · Límite por IP en login y códigos (10/min); trae `Retry-After`. */
   DEMASIADOS_INTENTOS: "DEMASIADOS_INTENTOS",
 } as const;

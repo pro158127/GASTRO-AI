@@ -36,6 +36,8 @@ import IconoMas from "../components/iconos/IconoMas";
 import type { AnalisisDetalle, CaracteristicaResultado, MapaCalor, RegionInteres } from "../types";
 import { fechaHoraCorta } from "../utils/fechas";
 import { fraccionEnBarra, porcentajeDeFraccion, porcentajeDirecto } from "../utils/numeros";
+import ResultadoExplicacion from "./ResultadoExplicacion";
+import ResultadoValoracion from "./ResultadoValoracion";
 import { useAnalisis } from "./useAnalisis";
 import estilos from "./ResultadoAnalisis.module.css";
 
@@ -259,40 +261,55 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
           )}
         </section>
 
-        <section className={estilos.tarjeta} aria-labelledby="titulo-caracteristicas">
-          <div className={estilos.cabeceraTarjeta}>
-            <h2 id="titulo-caracteristicas" className={estilos.tituloTarjeta}>
-              Características identificadas
-            </h2>
-            <DistintivoExperimental />
-          </div>
+        {/* Columna derecha: tres tarjetas apiladas. En celular todo queda en una columna. */}
+        <div className={estilos.columnaDerecha}>
+          <section className={estilos.tarjeta} aria-labelledby="titulo-caracteristicas">
+            <div className={estilos.cabeceraTarjeta}>
+              <h2 id="titulo-caracteristicas" className={estilos.tituloTarjeta}>
+                Características identificadas
+              </h2>
+              <DistintivoExperimental />
+            </div>
 
-          {/* W-08b. No se deduce de la lista: el servidor lo dice en un campo propio. */}
-          {ninguna_supera_umbral && (
-            <Alerta tipo="info" titulo="Ninguna característica supera el umbral de confianza">
-              El modelo no alcanzó la confianza mínima en ninguna característica. Esto no descarta
-              hallazgos: interprete la imagen con su criterio profesional.
-            </Alerta>
-          )}
+            {/* W-08b. No se deduce de la lista: el servidor lo dice en un campo propio. */}
+            {ninguna_supera_umbral && (
+              <Alerta tipo="info" titulo="Ninguna característica supera el umbral de confianza">
+                El modelo no alcanzó la confianza mínima en ninguna característica. Esto no
+                descarta hallazgos: interprete la imagen con su criterio profesional.
+              </Alerta>
+            )}
 
-          {caracteristicas.length === 0 ? (
-            <p className={estilos.sinCaracteristicas}>
-              Este análisis no tiene características evaluadas.
+            {caracteristicas.length === 0 ? (
+              <p className={estilos.sinCaracteristicas}>
+                Este análisis no tiene características evaluadas.
+              </p>
+            ) : (
+              <ul className={estilos.caracteristicas}>
+                {caracteristicas.map((caracteristica) => (
+                  <FilaCaracteristica key={caracteristica.id} caracteristica={caracteristica} />
+                ))}
+              </ul>
+            )}
+
+            <p className={estilos.pieTarjeta}>
+              La raya vertical de cada barra marca el umbral que se aplicó a este análisis, que
+              puede no ser el que está configurado hoy (lo configura el administrador, RF-A01).
+              Una imagen puede tener varias características a la vez: las probabilidades no suman
+              100 %.
             </p>
-          ) : (
-            <ul className={estilos.caracteristicas}>
-              {caracteristicas.map((caracteristica) => (
-                <FilaCaracteristica key={caracteristica.id} caracteristica={caracteristica} />
-              ))}
-            </ul>
-          )}
+          </section>
 
-          <p className={estilos.pieTarjeta}>
-            La raya vertical de cada barra marca el umbral que se aplicó a este análisis, que puede
-            no ser el que está configurado hoy (lo configura el administrador, RF-A01). Una imagen
-            puede tener varias características a la vez: las probabilidades no suman 100 %.
-          </p>
-        </section>
+          {/* W-08c y W-08d. Llega después del resultado y no lo bloquea (RF-R05 CA 3). */}
+          <ResultadoExplicacion idAnalisis={idAnalisis} semilla={detalle.explicacion} />
+
+          {/* W-08e a W-08h. Solo cuenta la observación propia: las de otros doctores llegan
+              con un caso trasladado y se ven en W-17b, que W-08 no dibuja. */}
+          <ResultadoValoracion
+            idAnalisis={idAnalisis}
+            observacionPropia={detalle.observaciones.find((o) => o.es_mia) ?? null}
+            onRecargar={recargar}
+          />
+        </div>
       </div>
     </>
   );
