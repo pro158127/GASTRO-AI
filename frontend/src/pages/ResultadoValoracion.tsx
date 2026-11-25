@@ -53,25 +53,36 @@ interface PropiedadesResultadoValoracion {
   idAnalisis: string;
   /** La observación de quien mira, si ya la registró (`es_mia`). */
   observacionPropia: ObservacionAnalisis | null;
+  /**
+   * Las de los demás doctores (`es_mia: false`), en el orden que manda el servidor. Aparecen
+   * cuando el caso llegó por traslado: quien lo recibe agrega la suya sin tocar la del
+   * doctor de origen (RF-A07 CA 3).
+   */
+  observacionesAjenas: ObservacionAnalisis[];
   /** Vuelve a pedir el detalle: se usa cuando el 409 revela una valoración de otra pestaña. */
   onRecargar: () => void;
 }
 
-/** Lo registrado, en solo lectura. Es lo que se ve tras guardar y al recargar la pantalla. */
+/**
+ * Una valoración ya registrada, en solo lectura. La usan tres sitios: lo que se ve tras
+ * guardar, lo que se ve al recargar la pantalla y cada valoración de otro profesional.
+ */
 function ValoracionRegistrada({
   valoracion,
   texto,
   quien,
   cuando,
+  etiqueta = "Su valoración",
 }: {
   valoracion: Valoracion;
   texto: string | null;
   quien: string;
   cuando: string;
+  etiqueta?: string;
 }) {
   return (
     <dl className={estilos.registrada}>
-      <dt className={estilos.etiquetaDato}>Su valoración</dt>
+      <dt className={estilos.etiquetaDato}>{etiqueta}</dt>
       <dd className={estilos.valorDato}>{ETIQUETAS[valoracion]}</dd>
       {texto && (
         <>
@@ -90,6 +101,7 @@ function ValoracionRegistrada({
 export default function ResultadoValoracion({
   idAnalisis,
   observacionPropia,
+  observacionesAjenas,
   onRecargar,
 }: PropiedadesResultadoValoracion) {
   const { autenticado } = useSesion();
@@ -325,6 +337,32 @@ export default function ResultadoValoracion({
               Guardar valoración
             </Boton>
           </>
+        )}
+
+        {/* PROPUESTA: ningún frame del archivo dibuja las valoraciones de otros doctores.
+            W-17, que es el detalle desde el historial, solo muestra «Su valoración». El dato
+            sí está en el contrato (RF-A07 CA 3: quien recibe un caso trasladado agrega la
+            suya sin tocar la del doctor de origen) y en la API (`es_mia`), así que se pintan
+            con el mismo formato de solo lectura que la propia, separadas y nombrando a su
+            autor. Va al lote de diseño. */}
+        {observacionesAjenas.length > 0 && (
+          <div className={estilos.ajenas}>
+            <h3 className={estilos.tituloAjenas}>
+              {observacionesAjenas.length === 1
+                ? "Valoración de otro profesional"
+                : "Valoraciones de otros profesionales"}
+            </h3>
+            {observacionesAjenas.map((observacion) => (
+              <ValoracionRegistrada
+                key={observacion.id}
+                etiqueta="Valoración"
+                valoracion={observacion.valoracion}
+                texto={observacion.texto}
+                quien={`${observacion.autor.nombre} ${observacion.autor.apellido}`.trim()}
+                cuando={fechaHoraCorta(observacion.registrada_en)}
+              />
+            ))}
+          </div>
         )}
       </section>
 

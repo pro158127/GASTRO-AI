@@ -79,8 +79,15 @@ const CALIDAD: Record<string, { etapa: string; frase: string; arreglo: string }>
   },
 };
 
-/** Texto de W-07b según las causas que mande el servidor; nunca se recalculan aquí. */
-function descripcionCalidad(calidad: CalidadImagen | null | undefined): string {
+/**
+ * Texto de W-07b según las causas que mande el servidor; nunca se recalculan aquí.
+ *
+ * Lo exporta para `ResultadoAnalisis`, que lo usa al mostrar un análisis fallido abierto
+ * desde el historial: el motivo y el arreglo («cargue otra imagen más nítida») siguen siendo
+ * los mismos días después, así que repetir el catálogo de causas en otro archivo solo
+ * invitaría a que los dos textos se separaran.
+ */
+export function descripcionCalidad(calidad: CalidadImagen | null | undefined): string {
   const causas = (calidad?.causas ?? []).filter((causa) => causa in CALIDAD);
   if (causas.length === 0) {
     return "La imagen no cumple los requisitos de calidad para analizarla, así que no se generó ningún resultado. Cargue otra imagen.";

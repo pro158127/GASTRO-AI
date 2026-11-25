@@ -1,0 +1,55 @@
+/* Pestañas de W-16 (Figma 81:7288): etiquetas en línea sobre una regla, con la activa
+   subrayada en azul marino. El subrayado no es la única señal: `aria-selected` lo dice al
+   lector y el peso de la letra cambia (WCAG 1.4.1). */
+
+.lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+  border-bottom: var(--borde-grosor) solid var(--color-borde-sutil);
+}
+
+.pestana {
+  position: relative;
+  /* El objetivo táctil mínimo lo da el alto, no un padding aproximado. */
+  min-height: var(--tamano-control);
+  margin: 0;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: 0;
+  background: transparent;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-terciario);
+  cursor: pointer;
+}
+
+.pestana:hover {
+  color: var(--color-texto-primario);
+}
+
+.pestana[data-activa] {
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+}
+
+/* La barra inferior va en un pseudoelemento para no mover el texto al activarse. */
+.pestana[data-activa]::after {
+  position: absolute;
+  right: 0;
+  bottom: calc(-1 * var(--borde-grosor));
+  left: 0;
+  height: 2px;
+  background: var(--color-marca-primario);
+  content: "";
+}
+
+.pestana:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: -2px;
+  border-radius: var(--radio-sm);
+}
+
+@media (max-width: 767px) {
+  .pestana {
+    min-height: var(--tamano-control-tactil);
+  }
+}

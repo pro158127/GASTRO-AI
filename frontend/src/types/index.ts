@@ -617,6 +617,67 @@ export interface ObservacionCreada {
   observacion: ObservacionGuardada;
 }
 
+// ------------------------------------------------------------ Historial (W-16, contrato §4)
+// Dos endpoints con la misma fila: `GET /analisis` («Mis análisis») y
+// `POST /pacientes/analisis/buscar` («Buscar por paciente»).
+//
+// **`GET /analisis` nunca lleva datos del paciente**: lo dice su docstring en el backend.
+// Ninguna de las dos respuestas trae documento ni seudónimo.
+
+/** `origen` de «Mis análisis» (RF-A07 CA 5). Van en minúscula: es un `StrEnum` del backend. */
+export type OrigenHistorial = "todos" | "propios" | "recibidos";
+
+/** `orden` de las dos consultas. Con «-» delante, del más reciente al más antiguo. */
+export type OrdenHistorial = "solicitado_en" | "-solicitado_en";
+
+/** Quién hizo el análisis, en una fila del historial. */
+export interface RealizadoPorResumen {
+  nombre: string;
+  apellido: string;
+  /** «(cuenta eliminada)» junto al nombre (RF-A07 CA 4). */
+  cuenta_eliminada: boolean;
+}
+
+/** Una fila de «Mis análisis» o de «Buscar por paciente». */
+export interface FilaHistorial {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /** Nombres de las que superan el umbral, de mayor a menor probabilidad. */
+  caracteristicas_que_superan: string[];
+  /** `null` significa «sin característica sobre el umbral»; no se pinta en blanco. */
+  caracteristica_principal: string | null;
+  /** 0 a 1, como el resto de probabilidades de la API. */
+  probabilidad_principal: number | null;
+  /** La del doctor que consulta, no la de otros. */
+  tiene_observacion: boolean;
+  observacion: string | null;
+  modelo_revision: string;
+  /** Lo hizo otro doctor y llegó por traslado (RF-A07 CA 5). */
+  trasladado: boolean;
+  realizado_por: RealizadoPorResumen;
+}
+
+/** Respuesta de `GET /analisis`. */
+export interface PaginaHistorial {
+  items: FilaHistorial[];
+  paginacion: Paginacion;
+}
+
+/**
+ * Respuesta de `POST /pacientes/analisis/buscar`: lo mismo más los casos del paciente.
+ *
+ * Un paciente ajeno o inexistente responde **200 con `items: []`**, no 404 (RF-H01 CA 5):
+ * el vacío no puede dejar deducir si el paciente existe.
+ */
+export interface PaginaHistorialPaciente extends PaginaHistorial {
+  /** El caso más reciente; es lo que usaría «Descargar reporte de este paciente». */
+  caso_id: string | null;
+  /** Todos, si recibió por traslado un paciente que ya tenía. */
+  caso_ids: string[];
+}
+
 /**
  * Observación de un profesional dentro de `GET /analisis/{id}`. `es_mia` es lo que decide si
  * W-08 muestra el formulario o la valoración ya registrada en solo lectura.

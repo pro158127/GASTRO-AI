@@ -1,0 +1,162 @@
+/* Pantalla W-16 · Historial (Figma 81:7288 y 63:3389). Lo comparten el cascarón y las dos
+   pestañas: las dos pintan la misma tarjeta de lista y el mismo pie.
+
+   A 320 px no hay desplazamiento horizontal (WCAG 1.4.10): los filtros se apilan y la tabla
+   pasa a tarjetas (eso último lo resuelve TablaHistorial.module.css). */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
+/* ----------------------------------------------------------------- filtros y búsqueda */
+
+/* `start`, no `end`: así todas las etiquetas arrancan a la misma altura. Con `end` mandaba
+   el borde inferior, y el campo que lleva ayuda debajo («Solo números, sin puntos ni
+   espacios») empujaba su control hacia arriba y dejaba la fila escalonada. */
+.filtros,
+.buscadorPaciente {
+  display: grid;
+  align-items: start;
+  gap: var(--espacio-4);
+  padding: var(--espacio-5);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .buscadorPaciente {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+}
+
+/* Cinco controles y el botón no caben en una fila legible por debajo de 1280 px: en tableta
+   van de dos en dos. */
+@media (min-width: 768px) {
+  .filtros {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .filtros {
+    grid-template-columns:
+      minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+}
+
+/* El botón se alinea con los campos, no con el bloque entero que los contiene.
+   Baja exactamente el alto de una etiqueta (1.25rem, el interlineado de
+   --texto-etiqueta-campo) más la separación que el campo deja debajo de ella, con lo que su
+   borde superior coincide con el del control; como el botón y el control miden los dos
+   --tamano-control, el inferior coincide también. La ayuda del campo cuelga por debajo sin
+   arrastrar nada. Supone etiquetas de una sola línea, que es lo que hay desde 768 px; por
+   debajo todo se apila y el margen se quita. */
+.accionFiltros {
+  display: flex;
+  margin-top: calc(1.25rem + var(--espacio-2));
+}
+
+@media (max-width: 767px) {
+  .accionFiltros {
+    margin-top: 0;
+  }
+
+  .accionFiltros,
+  .accionFiltros > button {
+    width: 100%;
+  }
+}
+
+.indicacion {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+/* ------------------------------------------------------------------- tarjeta de la lista */
+
+.tarjetaLista {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-5);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.cabeceraLista {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+}
+
+.tituloLista {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.accionesLista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-3);
+}
+
+@media (max-width: 767px) {
+  .accionesLista,
+  .accionesLista > a {
+    width: 100%;
+  }
+}
+
+/* Recibe el foco al cambiar de página: el botón pulsado puede quedar deshabilitado. */
+.resultados:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 4px;
+  border-radius: var(--radio-sm);
+}
+
+/* ------------------------------------------------------------------------- pie y errores */
+
+.pieLista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+}
+
+.resumen {
+  min-width: 0;
+  flex: 1 1 12rem;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.notaLista {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+  overflow-wrap: anywhere;
+}
+
+.errorCarga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}

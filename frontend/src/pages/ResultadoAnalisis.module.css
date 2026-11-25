@@ -231,6 +231,15 @@
   color: var(--color-texto-secundario);
 }
 
+/* Fecha de un análisis fallido. Es la de la solicitud, no la del fallo: el backend no
+   escribe `completado_en` cuando algo falla. */
+.fechaFallo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-secundario);
+}
+
 .sinCaracteristicas,
 .pieTarjeta {
   margin: 0;

@@ -1,0 +1,220 @@
+/* Lista de análisis de W-16 (Figma 81:7288 y 63:3389). Tabla en escritorio, tarjetas desde
+   tableta: a 320 px cinco columnas no caben sin desplazamiento horizontal. */
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ escritorio: la tabla */
+
+.marcoTabla {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radio-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--texto-dato-tabla);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th {
+  padding: var(--espacio-3) var(--espacio-4);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla td {
+  padding: var(--espacio-3) var(--espacio-4);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+  color: var(--color-texto-primario);
+  vertical-align: middle;
+}
+
+.columnaCodigo {
+  width: 1%;
+}
+
+.columnaProbabilidad,
+.probabilidad {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------- las insignias y los saltos de línea
+
+   Por qué «Fallido» se partía letra a letra en vertical: el componente compartido trae
+   `overflow-wrap: anywhere` en `.insignia` (Insignia.module.css), para que una insignia
+   larga como «Contraseña temporal expirada» pueda partirse en celular en W-09 y W-11. Esa
+   regla reduce la anchura MÍNIMA del contenido a la de una sola letra, y `width: 1%` le
+   pide justamente eso a la tabla: la anchura mínima. Resultado, una columna de un carácter.
+
+   Se arregla aquí y no en el componente, que las otras dos pantallas sí quieren como está. */
+
+.columnaMarcas {
+  width: 1%;
+  /* Suelo para que la columna no vuelva a encogerse a la anchura de una letra. */
+  min-width: 9rem;
+}
+
+.columnaAccion {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.codigo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* Encabezado ordenable: es un botón de verdad, para que el teclado lo alcance. */
+.botonOrden {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tamano-objetivo-minimo);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  gap: var(--espacio-1);
+}
+
+.botonOrden:hover {
+  color: var(--color-texto-primario);
+}
+
+.botonOrden:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+.iconoOrden {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Celda de la tabla. La de las tarjetas es `.marcasTarjeta`, más abajo: no comparten clase
+   porque no quieren la misma regla de salto. */
+.celdaMarcas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+/* El estado («Fallido», «En proceso») no se parte nunca, ni en tabla ni en tarjeta: son dos
+   palabras cortas y acotadas, así que `nowrap` no puede desbordar nada. */
+.marcaEstado > span {
+  white-space: nowrap;
+}
+
+/* El traslado sí puede pasar de línea, pero **entre palabras**, nunca a media palabra. Con
+   `nowrap` un nombre largo ensancharía la columna hasta recortar la tabla, que lleva
+   `overflow: hidden`; con el `anywhere` del componente volvería el apilado vertical. */
+.celdaMarcas .marcaTraslado > span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.enlaceDetalle {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tamano-objetivo-minimo);
+  color: var(--color-texto-enlace);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  text-decoration: none;
+}
+
+.enlaceDetalle:hover {
+  text-decoration: underline;
+}
+
+.enlaceDetalle:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+/* ------------------------------------------------------------- tableta y celular: tarjetas */
+
+.tarjetas {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: 0;
+  list-style: none;
+}
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.datoTarjeta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* Las insignias en tarjeta. Aquí la de traslado **sí** conserva el `overflow-wrap: anywhere`
+   del componente: a 320 px la tarjeta mide unos 288 px y un apellido muy largo tiene que
+   poder partirse antes que desbordar. No hay riesgo de apilado vertical porque la tarjeta no
+   encoge al mínimo del contenido, como sí hacía la columna de la tabla. */
+.marcasTarjeta {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+/* ------------------------------------------------------------------------ qué se ve dónde */
+
+.soloEscritorio {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .soloEscritorio {
+    display: block;
+  }
+
+  .soloTarjetas {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .enlaceDetalle {
+    min-height: var(--tamano-control-tactil);
+  }
+}

@@ -75,6 +75,23 @@
   margin-top: var(--espacio-3);
 }
 
+/* Valoraciones de otros doctores: separadas de la propia por una regla, para que no se
+   confundan con ella. Cada una nombra a su autor. */
+.ajenas {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding-top: var(--espacio-4);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+}
+
+.tituloAjenas {
+  margin: 0;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+}
+
 /* El borrador que el 409 dejó sin poder guardar: visible para poder copiarlo. */
 .borradorPerdido {
   display: flex;

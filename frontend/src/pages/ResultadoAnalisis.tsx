@@ -33,8 +33,10 @@ import EstadoVacio from "../components/EstadoVacio";
 import ImagenFirmada from "../components/ImagenFirmada";
 import Insignia from "../components/Insignia";
 import IconoMas from "../components/iconos/IconoMas";
+import { CodigoFalloAnalisis } from "../services/codigosError";
 import type { AnalisisDetalle, CaracteristicaResultado, MapaCalor, RegionInteres } from "../types";
 import { fechaHoraCorta } from "../utils/fechas";
+import { descripcionCalidad } from "./ProgresoAnalisis";
 import { fraccionEnBarra, porcentajeDeFraccion, porcentajeDirecto } from "../utils/numeros";
 import ResultadoExplicacion from "./ResultadoExplicacion";
 import ResultadoValoracion from "./ResultadoValoracion";
@@ -112,6 +114,26 @@ function BloqueRegion({
   );
 }
 
+/**
+ * Por qué falló un análisis, con lo que sí trae `GET /analisis/{id}`: `codigo_error` y, en
+ * el fallo de calidad, `calidad.causas`. Está en pasado y **no ofrece reintentar**: desde el
+ * historial se abre algo que falló hace días, no un intento recién hecho.
+ *
+ * El `ERR-xxxx` no se le muestra a la persona. El código que se dicta al administrador es el
+ * de los 5xx (W-31), y estos cuatro no lo son: son fallos documentados del análisis.
+ */
+function motivoDelFallo(detalle: AnalisisDetalle): string {
+  if (detalle.codigo_error === CodigoFalloAnalisis.CALIDAD_INSUFICIENTE) {
+    return descripcionCalidad(detalle.calidad);
+  }
+  // `ERR-1002` (inferencia), `ERR-1003` (cola) y `ERR-1004` (error interno) son todos fallos
+  // del servicio y se dicen con el mismo texto, sin detalles técnicos (RF-R05 CA 5).
+  return (
+    "El servicio que clasifica las imágenes no respondió y el análisis quedó sin resultado. " +
+    "La imagen no se guardó."
+  );
+}
+
 /** «ID A-2026-000123 · 19/10/2026 10:42 · Modelo: usuario/modelo @ 3e1f9c0» */
 function lineaDatos(detalle: AnalisisDetalle): string {
   const cuando = fechaHoraCorta(detalle.completado_en ?? detalle.solicitado_en);
@@ -181,11 +203,48 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
     );
   }
 
-  // Un análisis que todavía corre o que falló se ve en W-07, que es su pantalla. Pasa si
-  // alguien guardó el enlace del resultado. No está dibujado: por eso se redirige en vez de
-  // inventar un estado.
-  if (detalle.estado !== "COMPLETADO") {
+  // Un análisis que todavía corre sí se ve en W-07: ahí el seguimiento en vivo tiene
+  // sentido y es su pantalla.
+  if (detalle.estado === "PROCESANDO") {
     return <Navigate to={`/nuevo-analisis/${encodeURIComponent(idAnalisis)}`} replace />;
+  }
+
+  // PROPUESTA no dibujada: un análisis FALLIDO se queda aquí.
+  //
+  // Hasta la tarea 7 también se redirigía a W-07, decisión de la 6a tomada cuando el
+  // historial no existía y aquí solo se llegaba recién hecho el análisis. Abierto desde el
+  // historial, eso enseñaba «Su imagen no se guardó. Intente de nuevo en unos minutos» con
+  // un «Reintentar» para algo que falló hace dos días: un texto escrito para un intento
+  // recién hecho.
+  if (detalle.estado === "FALLIDO") {
+    return (
+      <>
+        <EncabezadoPagina
+          titulo="Resultado del análisis"
+          descripcion={lineaDatos(detalle)}
+          acciones={accionNuevo}
+        />
+        <section className={estilos.tarjeta} aria-labelledby="titulo-fallo">
+          <h2 id="titulo-fallo" className={estilos.tituloTarjeta}>
+            Este análisis no produjo resultado
+          </h2>
+          {/* `advertencia` y no `error`: es un hecho ya pasado que se consulta, no un fallo
+              que acaba de ocurrir, así que se anuncia con `role="status"` y no interrumpe. */}
+          <Alerta tipo="advertencia">{motivoDelFallo(detalle)}</Alerta>
+          {/* «Solicitado», no «Falló»: ninguna de las dos rutas de fallo del backend escribe
+              `completado_en` (`procesamiento.py:_fallar` y `clasificacion.py`), así que la
+              única fecha que llega es la de la solicitud. Decir «falló el …» sería inventar
+              un dato que la API no da. */}
+          <p className={estilos.fechaFallo}>
+            Solicitado el {fechaHoraCorta(detalle.solicitado_en)}.
+          </p>
+          <p className={estilos.pieTarjeta}>
+            No hay imagen, mapa de calor ni características: el análisis se interrumpió antes
+            de generarlos.
+          </p>
+        </section>
+      </>
+    );
   }
 
   const { imagen, mapa_calor: mapaCalor, caracteristicas, regiones, ninguna_supera_umbral } = detalle;
@@ -307,6 +366,7 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
           <ResultadoValoracion
             idAnalisis={idAnalisis}
             observacionPropia={detalle.observaciones.find((o) => o.es_mia) ?? null}
+            observacionesAjenas={detalle.observaciones.filter((o) => !o.es_mia)}
             onRecargar={recargar}
           />
         </div>

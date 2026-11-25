@@ -7,6 +7,7 @@ import { matchPath } from "react-router";
 import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
+import Historial from "../pages/Historial";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
@@ -63,7 +64,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/historial",
     titulo: "Historial",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-16c)
+    elemento: (titulo) => <Historial titulo={titulo} />, // W-16, W-16b a W-16g
   },
   {
     ruta: "/casos-recibidos",
