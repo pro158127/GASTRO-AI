@@ -923,3 +923,7 @@ POST /api/v1/auth/logout {motivo: "manual"}            → 204 (la sesión queda
 - **Datos reales pendientes:** los `HF_*` llegan cuando el equipo de ML publique el modelo;
   hasta entonces la carga inicial usa valores de ejemplo.
 - **Pruebas:** las construye el equipo de calidad (RNF-20 pide cobertura ≥ 70 % y CI).
+
+
+**Recuperación del único administrador (RF-U09 CA 10).**
+`backend/scripts/recuperar_admin.py` usa el servicio de recuperación con acceso al servidor. Ver el procedimiento limitado en `backend/README.md`. Requiere la corrección de credenciales #283.

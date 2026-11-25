@@ -195,3 +195,35 @@ ruff check . && ruff format .
 
 Código, comentarios y mensajes en español; nombres del dominio en español. Capas:
 router → servicio → repositorio (ver `ARCHITECTURE.md` §3.1 y §3.11).
+
+
+## Recuperar al único administrador (RF-U09 CA 10)
+
+Si hay otro administrador activo, la contraseña se restablece desde la aplicación
+(Gestión de usuarios → Restablecer contraseña). Este procedimiento es solo para cuando hay
+**un único administrador** y perdió la contraseña o la app autenticadora, o quedó
+bloqueado. Requiere acceso al servidor:
+
+```bash
+docker compose exec api python -m scripts.recuperar_admin --correo admin@hospital.co
+```
+
+- Hace lo mismo que el restablecimiento de la app:
+  - emite una contraseña temporal nueva, que **llega por correo** y vence en 72 h;
+  - desvincula la app autenticadora;
+  - quita el bloqueo;
+  - cierra todas las sesiones de esa cuenta.
+
+  Al entrar, el sistema pide cambiar la contraseña y vincular de nuevo la app.
+- Si el correo no funciona, agrega `--mostrar`: la temporal se imprime **una sola vez** en
+  la terminal y no se manda correo. Entrégasela a la persona en mano; no la copies en chats
+  ni en archivos.
+- Queda en la bitácora como `CONTRASENA_RESTABLECIDA` con `"origen": "SERVIDOR"` y por
+  dónde se entregó la temporal (`CORREO` o `PANTALLA`).
+- Se niega, sin cambiar nada, en estos casos:
+  - hay otro administrador activo;
+  - el correo no es de un administrador;
+  - la cuenta está INACTIVO o ELIMINADO.
+
+
+El comando anterior usa el stack de desarrollo. El procedimiento de producción depende de la promoción y revisión separada de su configuración HTTPS; no se incorpora con este módulo mínimo.
