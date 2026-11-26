@@ -8,6 +8,7 @@ import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import EstadoOperativo from "../pages/EstadoOperativo";
+import MetricasModelo from "../pages/MetricasModelo";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
@@ -128,7 +129,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/metricas-del-modelo",
     titulo: "Métricas del modelo",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // W-23
+    elemento: (titulo) => <MetricasModelo titulo={titulo} />, // W-23
   },
   {
     ruta: "/logs-tecnicos",
