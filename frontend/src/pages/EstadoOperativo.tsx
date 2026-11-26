@@ -129,6 +129,7 @@ export default function EstadoOperativo({ titulo }: { titulo: string }) {
       window.setTimeout(() => setEstadoCopia(null), 2000);
     } catch {
       setEstadoCopia("error");
+      window.setTimeout(() => setEstadoCopia(null), 2000);
     }
   }
 

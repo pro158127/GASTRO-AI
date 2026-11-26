@@ -43,10 +43,10 @@ function segundos(ms: number | null): string {
 function InsigniaLog({ log }: { log: LogTecnico }) {
   const estado = estadoDeLog(log);
   return (
-    <span className={`${estilos.insignia} ${estado.clase}`}>
-      {estado.etiqueta}
+    <div className={estilos.estadoLog}>
+      <span className={`${estilos.insignia} ${estado.clase}`}>{estado.etiqueta}</span>
       {log.codigo_error !== null && <code className={estilos.codigoError}>Código: {log.codigo_error}</code>}
-    </span>
+    </div>
   );
 }
 
