@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
 import { useUsuarioActual } from "../sesion/UsuarioActual";
+import Bitacora from "../pages/Bitacora";
 import CasosRecibidos from "../pages/CasosRecibidos";
 import CrearUsuario from "../pages/CrearUsuario";
 import Dashboard from "../pages/Dashboard";
@@ -135,7 +136,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/bitacora",
     titulo: "Bitácora",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <Bitacora titulo={titulo} />, // W-21, W-21b
   },
   {
     ruta: "/estado-operativo",

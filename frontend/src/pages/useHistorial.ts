@@ -14,14 +14,14 @@
 // No se parametriza más de la cuenta: recibe una función que consulta y devuelve la página.
 // Quién arma los filtros, y de dónde salen, es cosa de cada pestaña.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PaginaHistorial } from "../types";
+import type { Paginacion } from "../types";
 import type { AvisoError } from "../utils/avisosError";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 
 /** Al refiltrar, el esqueleto solo aparece si la espera supera esto. */
 const ESPERA_ESQUELETO_MS = 1000;
 
-export interface CargaHistorial<T extends PaginaHistorial> {
+export interface CargaHistorial<T extends { paginacion: Paginacion }> {
   /** Última página buena; `null` mientras no ha llegado ninguna. */
   pagina: T | null;
   /** Hay una consulta en curso. */
@@ -51,7 +51,7 @@ export interface OpcionesHistorial {
  * @param consultar función que trae la página. **Tiene que ser estable** (envuelta en
  *   `useCallback` por quien llama) o el efecto se repetiría en cada render.
  */
-export function useHistorial<T extends PaginaHistorial>(
+export function useHistorial<T extends { paginacion: Paginacion }>(
   consultar: () => Promise<T>,
   { activa = true, alFallar }: OpcionesHistorial = {}
 ): CargaHistorial<T> {

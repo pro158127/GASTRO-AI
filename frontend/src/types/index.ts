@@ -1060,3 +1060,67 @@ export interface DashboardTecnico {
   /** Cuándo se midieron **los servicios**, no cuándo se pidió la pantalla. */
   verificado_en: string;
 }
+
+/* ------------------------------------------------------------------ W-21 · Bitácora (RF-A02)
+
+   `GET /admin/bitacora` y `GET /admin/bitacora/filtros`, los dos solo ADMINISTRADOR y solo
+   lectura: no hay POST, PUT ni DELETE, y la base lo impide con triggers. */
+
+/** Quién hizo la acción (`actor`) o sobre quién se hizo (`objetivo`). */
+export interface PersonaBitacora {
+  id: string;
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+export type ResultadoBitacora = "EXITO" | "FALLO";
+
+/** Una fila de la bitácora. Los textos los redacta el servidor; aquí se pintan tal cual. */
+export interface EntradaBitacora {
+  /**
+   * Un `bigint` que el servidor manda **como texto a propósito**, para que JavaScript no
+   * pierda precisión. Es la clave de React y nada más: no se convierte a número.
+   */
+  id: string;
+  ocurrido_en: string;
+  /** `null` = sin sesión: el intento no llegó a identificar a nadie. No es un dato que falte. */
+  actor: PersonaBitacora | null;
+  /** El código crudo (`CUENTA_BLOQUEADA`). Sirve para filtrar; no se muestra nunca. */
+  accion: string;
+  /** El texto ya redactado por el servidor («Bloqueo temporal de cuenta»). Se pinta tal cual. */
+  accion_texto: string;
+  resultado: ResultadoBitacora;
+  /** La cuenta sobre la que se hizo la acción, si aplica. */
+  objetivo: PersonaBitacora | null;
+  /** Texto ya armado por el servidor a partir del JSON guardado; `null` si no hay nada. */
+  detalle: string | null;
+  ip: string | null;
+}
+
+export interface PaginaBitacora {
+  items: EntradaBitacora[];
+  paginacion: Paginacion;
+}
+
+/** Una opción del desplegable «Tipo de evento». */
+export interface AccionFiltro {
+  codigo: string;
+  texto: string;
+}
+
+/**
+ * Una opción del desplegable «Usuario». **El nombre llega ya compuesto** («Ana Pérez») y sin
+ * `apellido`, al revés que `PersonaBitacora`.
+ */
+export interface UsuarioFiltro {
+  id: string;
+  nombre: string;
+  cuenta_eliminada: boolean;
+}
+
+/** Respuesta de `GET /admin/bitacora/filtros`: las opciones de los dos desplegables. */
+export interface FiltrosBitacora {
+  acciones: AccionFiltro[];
+  usuarios: UsuarioFiltro[];
+}

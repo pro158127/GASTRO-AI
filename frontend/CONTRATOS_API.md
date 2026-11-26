@@ -50,6 +50,10 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | «Casos» o «análisis» en el bloque de traslado (CR-3) | propuesto a diseño | el frontend hace que la palabra siga al número |
 | El filtro «Doctor de origen» sin resultados (CR-4) | propuesto a diseño | no está dibujado; el frontend lo resuelve con una línea y un botón |
 | Orden de los análisis en `GET /casos-recibidos` (CR-5) | propuesto | no existe; W-27 deja los encabezados como texto, igual que W-16 |
+| El filtro `resultado` de la bitácora, sin dibujar (BI-1) | propuesto a diseño | el endpoint ya lo acepta; W-21 lo añade como quinto desplegable |
+| Orden de las columnas en `GET /admin/bitacora` (BI-2) | propuesto | no existe; W-21 deja los cinco encabezados como texto |
+| La columna «Usuario» de W-21 muestra correos (BI-3) | propuesto a diseño | el contrato no entrega correos; W-21 pinta nombre y apellido |
+| `objetivo` sin columna en el frame de W-21 (BI-4) | propuesto a diseño | el frontend lo pone delante del detalle |
 
 ## Propuestas
 
@@ -489,3 +493,67 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   navegador las 5 filas que se muestran aparentaría ordenar las 12 del traslado. El sentido se
   dice con palabras en el pie del bloque («del más reciente al más antiguo»), no solo con una
   flecha (WCAG 1.4.1).
+
+### El filtro `resultado` no está dibujado · W-21 (BI-1)
+
+- **Estado:** propuesto **al equipo de diseño**, no al backend: el parámetro ya existe.
+- **Por qué:** `GET /admin/bitacora` acepta `resultado` (`EXITO` o `FALLO`,
+  `backend/app/api/routers/admin_bitacora.py:51`), pero el frame solo dibuja «Tipo de evento»,
+  «Usuario», «Desde» y «Hasta». La alerta de seguridad de W-19 manda al administrador a esta
+  pantalla justamente a revisar **intentos fallidos**; sin este filtro tendría que buscarlos a
+  ojo entre 245 eventos.
+- **Qué hace el frontend:** un quinto desplegable, «Resultado», con marcador «Todos los
+  resultados» y las opciones «Correctos» y «Fallidos». Es la única desviación de los controles
+  del frame.
+
+### Orden de las columnas en `GET /admin/bitacora` · W-21 (BI-2)
+
+- **Estado:** propuesto. Prioridad baja. Es el mismo caso que CR-5 (W-27) y las tres columnas
+  sin orden de W-16.
+- **Por qué:** el frame dibuja «Fecha y hora» con la flecha descendente activa y las otras
+  cuatro cabeceras con el ícono de ordenable. El endpoint **no acepta ningún parámetro de
+  orden**: los ocho que acepta son `pagina`, `por_pagina`, `accion`, `resultado`, `actor_id`,
+  `actor`, `desde` y `hasta`. El servidor devuelve siempre lo más reciente primero.
+- **Solicitud propuesta:** un `orden` como el de `GET /analisis` (`ocurrido_en`,
+  `-ocurrido_en`), si el orden tiene que poder cambiarse.
+- **Qué hace el frontend mientras tanto:** los cinco encabezados son texto, sin botón, sin
+  ícono y sin `aria-sort`. Tampoco se ordena en el navegador: reordenar las 8 filas de la
+  página aparentaría ordenar las 245 del total. El sentido se dice con palabras, visible en el
+  pie («· del más reciente al más antiguo») y en un `<span>` para lector de pantalla dentro del
+  encabezado de la fecha (WCAG 1.4.1).
+
+### La columna «Usuario» muestra correos · W-21 (BI-3)
+
+- **Estado:** propuesto **al equipo de diseño**.
+- **Por qué:** el frame escribe `marta.rios@usc.edu.co` en la columna «Usuario», y
+  `luis.gomez@usc.edu.co` dentro de varios detalles. El contrato **no entrega correos**: `actor`
+  y `objetivo` son `{id, nombre, apellido, cuenta_eliminada}`
+  (`backend/app/schemas/bitacora.py:11-16`).
+- **Qué hace el frontend:** pinta nombre y apellido, con «(cuenta eliminada)» cuando
+  corresponde (RF-A07 CA 4), reutilizando `nombreDeOrigen`. Los textos de evento y detalle los
+  redacta el servidor y se pintan tal cual, así que los ejemplos del frame («Inicio de sesión
+  fallido», «Creación de usuario») no coinciden palabra por palabra con `TEXTO_ACCION`
+  («Inicio de sesión», «Creación de cuenta»): manda el servidor.
+
+### `objetivo` no tiene columna en el frame · W-21 (BI-4)
+
+- **Estado:** propuesto **al equipo de diseño**.
+- **Por qué:** cada entrada trae `objetivo`, la cuenta sobre la que se hizo la acción
+  (`backend/app/schemas/bitacora.py:25`), y el frame tiene cinco columnas, ninguna para ella. Y
+  hace falta: `detalle_legible()` (`backend/app/services/bitacora.py:116-150`) **no nombra
+  nunca al objetivo** —el único nombre que compone es el destino de `CASOS_REASIGNADOS`—, así
+  que un cambio de rol llega como «De Doctor a Administrador» sin decir de quién, y una cuenta
+  creada como «Rol: Doctor» sin decir cuál. Sin el objetivo, la bitácora registraría cambios sin
+  decir sobre quién.
+- **Qué hace el frontend:** lo pone delante del detalle, separado con «·»: «Carlos Díaz · De
+  Doctor a Administrador». No se añade ninguna columna. Es lo que ya hace el frame, que mete la
+  cuenta afectada dentro de la columna «Detalle» («carlos.diaz@usc.edu.co: Doctor →
+  Administrador»), con el nombre en vez del correo (ver BI-3).
+
+### Nota aparte: el 422 del período en `GET /admin/bitacora`
+
+No es una propuesta, es un error del contrato que no estaba anotado. `desde > hasta` responde
+`422 RANGO_FECHAS_INVALIDO` con `campos: [{campo: "desde", mensaje: "..."}]`, desde
+`limites_de_fechas` (`backend/app/services/historial.py:33-39`). Lo comparten `GET /analisis`
+(W-16) y esta pantalla. W-21 lee `campos` y pone el mensaje del servidor en el campo que el
+servidor señala. **W-16 todavía no lo trata** y lo manda a la alerta genérica de W-31.

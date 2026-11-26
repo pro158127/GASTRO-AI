@@ -83,6 +83,13 @@ export const CodigoErrorApi = {
   SIN_CASOS_ACTIVOS: "SIN_CASOS_ACTIVOS",
   DATOS_INVALIDOS: "DATOS_INVALIDOS",
   /**
+   * 422 · Un período con la fecha inicial posterior a la final. Lo lanza `limites_de_fechas`
+   * del backend, que comparten `GET /analisis` (W-16) y `GET /admin/bitacora` (W-21). Trae
+   * `campos` con el campo que señala el servidor (`desde`) y su mensaje: se pinta ahí, no en
+   * una alerta suelta. **W-16 todavía no lo trata** y lo manda a la alerta genérica.
+   */
+  RANGO_FECHAS_INVALIDO: "RANGO_FECHAS_INVALIDO",
+  /**
    * 422 · El destino no es otro doctor con la cuenta activa (también si es el propio origen).
    * Trae `campos` con `{campo: "destino_id"}`, así que se pinta en el desplegable de destino.
    */

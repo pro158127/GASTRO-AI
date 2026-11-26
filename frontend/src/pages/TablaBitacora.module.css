@@ -1,0 +1,157 @@
+/* Lista de eventos de W-21 (Figma 70:5981). Tabla en escritorio, tarjetas desde tableta: a
+   320 px cinco columnas no caben sin desplazamiento horizontal (WCAG 1.4.10).
+
+   Los encabezados son texto y no botones: el endpoint no ordena. Ver el comentario de
+   cabecera de TablaBitacora.tsx. */
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ escritorio: la tabla */
+
+.marcoTabla {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radio-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--texto-dato-tabla);
+  table-layout: fixed;
+}
+
+.tabla th {
+  padding: var(--espacio-3) var(--espacio-4);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+  text-align: left;
+}
+
+.tabla td {
+  padding: var(--espacio-3) var(--espacio-4);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+  color: var(--color-texto-primario);
+  vertical-align: top;
+  /* El detalle puede traer un nombre largo o una lista de umbrales; se parte antes que
+     desbordar el marco, que lleva `overflow: hidden`. */
+  overflow-wrap: anywhere;
+}
+
+/* Anchos del frame (160 / 210 / 230 / resto / 130 sobre 1100 px de tabla), en porcentaje para
+   que la tabla siga encogiendo entre 1280 px y pantallas más anchas. «Detalle» no lleva ancho:
+   se queda con lo que sobra, que es lo que dibuja Figma. */
+.columnaFecha {
+  width: 15%;
+}
+
+.columnaUsuario {
+  width: 19%;
+}
+
+.columnaEvento {
+  width: 21%;
+}
+
+.columnaIp {
+  width: 12%;
+}
+
+/* Cifras tabulares solo donde hay cifras: la fecha y la IP. En el detalle, que es prosa,
+   descolocarían el texto. */
+.fecha,
+.ip {
+  font-variant-numeric: tabular-nums;
+}
+
+.celdaEvento {
+  /* La insignia «Fallido» baja de línea cuando el nombre del evento ocupa el ancho. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espacio-2);
+}
+
+.accion {
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+}
+
+/* «Fallido» son dos palabras cortas y acotadas: no se parte nunca. `Insignia` trae
+   `overflow-wrap: anywhere` para las insignias largas de W-09 y W-11, y aquí eso dejaría la
+   pastilla partida letra a letra. Se corrige en el envoltorio, no en el componente. */
+.marcaResultado > span {
+  white-space: nowrap;
+}
+
+/* Los textos de lo que el servidor no registró («Sin sesión identificada», «Sin detalle
+   registrado», «Sin IP registrada»). El color es solo refuerzo: lo que dice que no hay dato
+   son las palabras (WCAG 1.4.1). */
+.sinDato {
+  color: var(--color-texto-terciario);
+}
+
+/* ------------------------------------------------------------- tableta y celular: tarjetas */
+
+.tarjetas {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: 0;
+  list-style: none;
+}
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-2);
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.lineaEvento {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.datoTarjeta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------------ qué se ve dónde */
+
+.soloEscritorio {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .soloEscritorio {
+    display: block;
+  }
+
+  .soloTarjetas {
+    display: none;
+  }
+}

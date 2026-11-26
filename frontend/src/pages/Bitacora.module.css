@@ -1,0 +1,130 @@
+/* Pantalla W-21 · Bitácora (Figma 70:5771 y 101:2230).
+
+   A 320 px no hay desplazamiento horizontal (WCAG 1.4.10): los filtros se apilan y la tabla
+   pasa a tarjetas (eso último lo resuelve TablaBitacora.module.css). */
+
+/* ------------------------------------------------------------------ aviso de solo lectura */
+
+/* Va en `acciones` del encabezado, a la derecha del título, como en el frame. No es un botón
+   ni una alerta: es una afirmación sobre la pantalla. */
+.avisoSoloLectura {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.iconoCandado {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--color-texto-secundario);
+}
+
+/* ------------------------------------------------------------------------------- filtros */
+
+/* `start`, no `end`: así todas las etiquetas arrancan a la misma altura, y el campo que pinta
+   un mensaje de error debajo no deja la fila escalonada. */
+.filtros {
+  display: grid;
+  align-items: start;
+  gap: var(--espacio-4);
+  padding: var(--espacio-5);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Cinco controles y el botón no caben en una fila legible por debajo de 1280 px: en tableta
+   van de dos en dos. */
+@media (min-width: 768px) {
+  .filtros {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .filtros {
+    grid-template-columns:
+      minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr)
+      minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+}
+
+/* El botón se alinea con los controles, no con el bloque que los contiene: baja el alto de
+   una etiqueta (1.25rem, el interlineado de --texto-etiqueta-campo) más la separación que el
+   campo deja debajo. Supone etiquetas de una sola línea, que es lo que hay desde 768 px; por
+   debajo todo se apila y el margen sobra. */
+.accionFiltros {
+  display: flex;
+  margin-top: calc(1.25rem + var(--espacio-2));
+}
+
+@media (max-width: 767px) {
+  .accionFiltros {
+    margin-top: 0;
+  }
+
+  .accionFiltros,
+  .accionFiltros > button {
+    width: 100%;
+  }
+}
+
+/* ------------------------------------------------------------------- tarjeta de la lista */
+
+.tarjetaLista {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-5);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.tituloLista {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* Recibe el foco al cambiar de página: el botón pulsado puede quedar deshabilitado. */
+.resultados:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 4px;
+  border-radius: var(--radio-sm);
+}
+
+/* ------------------------------------------------------------------------- pie y errores */
+
+.pieLista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+}
+
+.resumen {
+  min-width: 0;
+  flex: 1 1 12rem;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.errorCarga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
