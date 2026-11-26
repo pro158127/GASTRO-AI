@@ -66,8 +66,10 @@
 
 .columnaMarcas {
   width: 1%;
-  /* Suelo para que la columna no vuelva a encogerse a la anchura de una letra. */
-  min-width: 9rem;
+  /* Suelo para que la columna no vuelva a encogerse a la anchura de una letra. A 9rem un
+     nombre corriente se partía en cuatro líneas; con 12rem la marca cabe en dos o tres y la
+     tabla sigue teniendo sitio de sobra en escritorio (la tabla solo existe desde 1280 px). */
+  min-width: 12rem;
 }
 
 .columnaAccion {
@@ -135,6 +137,22 @@
 .celdaMarcas .marcaTraslado > span {
   overflow-wrap: normal;
   word-break: normal;
+}
+
+/* La marca de traslado es la única insignia de la aplicación que ocupa **varias líneas**:
+   «Trasladado · de Marcela Quintero (cuenta eliminada)» no cabe en una. El componente
+   compartido está dibujado para una sola (Figma 14:574: relleno vertical 0 y radio completo),
+   y con cuatro líneas esa pastilla se vuelve un óvalo cuyas curvas se comen las líneas de los
+   extremos y dejan el texto tocando el borde.
+
+   Se corrige aquí, en el envoltorio que ya usa este archivo, y no en `Insignia`: donde la
+   insignia cabe en una línea —que es el resto de la aplicación— la pastilla sigue siendo
+   exactamente la que dibuja Figma. Vale para la tabla y para las tarjetas de celular, donde
+   el texto también se parte. */
+.marcaTraslado > span {
+  align-items: flex-start;
+  padding-block: var(--espacio-1);
+  border-radius: var(--radio-md);
 }
 
 .enlaceDetalle {
