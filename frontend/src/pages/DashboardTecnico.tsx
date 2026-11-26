@@ -14,11 +14,11 @@
 // Para el fallo de carga no hay frame propio: se usan los estados globales W-30 (sin conexión)
 // y W-31 (error inesperado) en una alerta con «Reintentar», como en W-15.
 //
-// **Fuera de alcance, a propósito** (cada uno es otra tarea y otro endpoint):
-//
 // - El bloque «Evaluación del modelo desplegado sobre el conjunto de prueba» y su estado vacío
-//   W-19q: salen de `/admin/modelo/metricas`, que es W-23.
-// - El recorrido guiado del administrador (W-19e a W-19p).
+//   W-19q viven en `EvaluacionModelo.tsx`, porque son **otra petición**
+//   (`/admin/modelo/metricas`) con su propia carga y su propio error.
+//
+// **Fuera de alcance, a propósito:** el recorrido guiado del administrador (W-19e a W-19p).
 //
 // **Tres duplicaciones conscientes con W-22 (`EstadoOperativo.tsx`), que no se puede tocar**
 // porque es de otra persona y tiene correcciones en curso. Unificarlas es un refactor
@@ -50,6 +50,7 @@ import type {
 } from "../types";
 import { fechaHoraCorta } from "../utils/fechas";
 import type { TipoInsignia } from "../utils/presentacionUsuario";
+import EvaluacionModelo from "./EvaluacionModelo";
 import ExportarAuditoria from "./ExportarAuditoria";
 import { useDashboardTecnico } from "./useDashboardTecnico";
 import estilos from "./DashboardTecnico.module.css";
@@ -549,6 +550,14 @@ export default function DashboardTecnico({ titulo }: { titulo: string }) {
           <Latencia latencia={datos.latencia_7d} />
         </>
       )}
+
+      {/* El bloque de evaluación del modelo va **fuera** de las tres ramas de arriba, igual que
+          «Exportar auditoría»: es otra petición, y que `/admin/modelo/metricas` falle no puede
+          dejar en blanco las cuentas ni el estado operativo. Mientras el esqueleto de W-19b está
+          en pantalla, este bloque ya se ve abajo con su propio «Cargando…»: W-19b no lo dibuja
+          porque se dibujó antes de que el bloque existiera, pero son dos peticiones distintas y
+          se ven como dos. */}
+      <EvaluacionModelo />
     </>
   );
 }

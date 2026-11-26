@@ -91,6 +91,15 @@
   color: var(--color-texto-terciario);
 }
 
+/* Línea «Reporte del 19/10/2026 · fuente: model card…» del bloque de evaluación (Figma
+   68:4453). No es `.pieTarjeta`: el frame la dibuja a 14 px y en texto secundario, no a 12 px
+   en terciario, porque no es un pie sino la procedencia de las cifras que vienen debajo. */
+.notaEvaluacion {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
 /* ------------------------------------------------------------------- cuadrículas de cifras */
 
 /* Cuatro tarjetas en escritorio, dos en tableta y celular. Por debajo de 360 px una sola
