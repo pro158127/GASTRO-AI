@@ -12,8 +12,10 @@ from fastapi.testclient import TestClient
 from app.api import deps
 from app.api.routers import pacientes
 from app.core.errores import ErrorApi, registrar_manejadores
+from app.core.seudonimo import Seudonimizador
 from app.models import CodigoRol, EtapaSesion
 from app.repositories.pacientes_repository import HistorialPaciente
+from app.services.pacientes import ServicioPacientes
 
 CASO = UUID("12345678-1234-5678-9abc-123456789abc")
 MEDICO = UUID("12345678-1234-5678-9abc-123456789abd")
@@ -176,3 +178,39 @@ def test_busqueda_rechaza_filtro_invalido_antes_del_servicio(entorno):
     assert response.status_code == 422
     assert response.json()["error"]["codigo"] == "DATOS_INVALIDOS"
     historial.de_paciente.assert_not_called()
+
+
+def test_servicio_consulta_con_seudonimos_de_todas_las_versiones():
+    repository = Mock()
+    expected = HistorialPaciente(CASO, 2, datetime(2026, 11, 26, tzinfo=UTC))
+    repository.historial.return_value = expected
+    pseudonymizer = Seudonimizador(
+        {1: "clave-ficticia-para-qa-000000000001", 2: "clave-ficticia-para-qa-000000000002"},
+        2,
+    )
+    service = ServicioPacientes(repository, pseudonymizer)
+    doctor = NS(id=MEDICO)
+    assert service.consultar(doctor, " cc ", "9.331-817450") is expected
+    passed_id, passed_pseudonyms = repository.historial.call_args.args
+    assert passed_id == MEDICO
+    assert passed_pseudonyms == pseudonymizer.todos("CC:9331817450")
+    assert [item.version_clave for item in passed_pseudonyms] == [2, 1]
+    assert all(DOCUMENTO not in item.valor for item in passed_pseudonyms)
+
+
+@pytest.mark.parametrize(
+    "tipo,numero,campo",
+    [("XX", DOCUMENTO, "tipo_documento"), ("CC", "12ab", "numero_documento")],
+)
+def test_servicio_rechaza_documento_invalido_sin_consultar_repositorio(tipo, numero, campo):
+    repository = Mock()
+    service = ServicioPacientes(
+        repository, Seudonimizador({1: "clave-ficticia-para-qa-000000000001"}, 1)
+    )
+    with pytest.raises(ErrorApi) as raised:
+        service.consultar(NS(id=MEDICO), tipo, numero)
+    assert raised.value.estado == 422
+    assert raised.value.codigo == "DOCUMENTO_INVALIDO"
+    assert raised.value.campos[0]["campo"] == campo
+    assert numero not in raised.value.mensaje
+    repository.historial.assert_not_called()
