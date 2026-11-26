@@ -25,8 +25,13 @@ export default function Boton({
   className,
   children,
   onClick,
+  "aria-disabled": noDisponible,
   ...resto
 }: PropiedadesBoton) {
+  // `cargando` es un caso de «no disponible»; quien llama puede marcarlo también a mano
+  // (aria-disabled) para un botón que debe conservar el foco, como «Cancelar» mientras el
+  // diálogo envía.
+  const inerte = cargando || noDisponible === true || noDisponible === "true";
   const clases = [
     estilos.boton,
     estilos[jerarquia],
@@ -40,7 +45,7 @@ export default function Boton({
   // Se usa aria-disabled (no `disabled`) para que el botón conserve el foco; los clics se
   // ignoran aquí, incluido el envío implícito del formulario con Enter.
   function manejarClic(evento: MouseEvent<HTMLButtonElement>) {
-    if (cargando) {
+    if (inerte) {
       evento.preventDefault();
       return;
     }
@@ -54,7 +59,7 @@ export default function Boton({
       className={clases}
       onClick={manejarClic}
       aria-busy={cargando || undefined}
-      aria-disabled={cargando || undefined}
+      aria-disabled={inerte || undefined}
     >
       {cargando ? (
         <>

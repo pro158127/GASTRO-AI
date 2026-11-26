@@ -160,10 +160,15 @@ class ServicioAnalisis:
                 503, "SERVICIO_NO_DISPONIBLE", "El servicio de análisis no está disponible."
             )
 
-        caso = self._repo.caso_del_doctor(doctor.id, self._seudonimizador.todos(valor))
-        if caso is None:
-            # Paciente nuevo pa este doctor: el número va dos veces y debe coincidir (RF-D01 CA 12)
+        seudonimos = self._seudonimizador.todos(valor)
+        caso = self._repo.caso_del_doctor(doctor.id, seudonimos)
+        # Sin un análisis COMPLETADO con este doctor, el número va dos veces y debe coincidir
+        # (RF-D01, W-06i). Un caso con solo análisis fallidos no cuenta: si contara, un número
+        # mal escrito cuyo análisis falló quedaría como paciente conocido y nadie lo revisaría.
+        # Es la misma regla de POST /pacientes/consulta.
+        if caso is None or not self._repo.paciente_con_historial(doctor.id, seudonimos):
             self._exigir_confirmacion(solicitud, valor)
+        if caso is None:
             caso = CasoPaciente(
                 id=uuid4(),
                 seudonimo=actual.valor,

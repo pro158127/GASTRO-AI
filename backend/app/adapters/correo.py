@@ -59,6 +59,18 @@ class EnviadorSmtp:
             logger.warning("No salió un correo: %s", type(error).__name__)
             raise ErrorCorreo("No se pudo enviar el correo.") from error
 
+    def salud(self, timeout: float = 3.0) -> None:
+        """Pa el panel de supervisión (RF-A04): conecta, saluda y entra, sin mandar nada."""
+        try:
+            with smtplib.SMTP(self._host, self._puerto, timeout=timeout) as smtp:
+                if self._starttls:
+                    smtp.starttls(context=ssl.create_default_context())
+                if self._usuario:
+                    smtp.login(self._usuario, self._contrasena)
+                smtp.noop()
+        except (OSError, smtplib.SMTPException) as error:
+            raise ErrorCorreo("El servidor de correo no responde.") from error
+
 
 def crear_enviador(settings: Settings) -> EnviadorSmtp:
     return EnviadorSmtp(

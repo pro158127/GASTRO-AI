@@ -12,6 +12,7 @@ psycopg[binary]>=3.2           # driver de PostgreSQL
 # Tareas en segundo plano
 celery>=5.4
 redis>=5.2                     # cliente para el broker Redis
+sse-starlette>=3.0             # eventos en tiempo real (GET /eventos)
 packaging>=24                  # lo importa el transporte Redis de kombu sin declararlo
 
 # Seguridad

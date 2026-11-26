@@ -1,9 +1,10 @@
 """Etapas CLASIFICAR y GRAD_CAM del worker (PROC-01, RF-M01, RF-M03, RF-R03, RNF-29).
 
 Le manda la imagen limpia al Space, comprueba que la revisión sea la del modelo vigente,
-sube los mapas de calor a MinIO, aplica el umbral de ese momento (y lo copia en cada
-resultado, RF-A01 CA 2) y deja el análisis COMPLETADO. Cada inferencia, buena o mala,
-deja su renglón en LogInferencia con tiempos y estado, sin datos clínicos (RF-M03).
+aplica el umbral de ese momento (y lo copia en cada resultado, RF-A01 CA 2), sube a MinIO
+los mapas de calor de las características que lo superan y deja el análisis COMPLETADO.
+Cada inferencia, buena o mala, deja su renglón en LogInferencia con tiempos y estado, sin
+datos clínicos (RF-M03).
 
 La explicación de Gemini va después y por aparte: el resultado ya queda guardado aunque el
 LLM se caiga (RF-R05 CA 3).
@@ -100,15 +101,21 @@ class ServicioClasificacion:
         for detectada in salida.caracteristicas:
             caracteristica = caracteristicas[detectada.codigo]
             umbral = politica.umbral_para(detectada.codigo)
+            detectado = supera(detectada.probabilidad, umbral)
             filas.append(
                 ResultadoCaracteristica(
                     analisis_id=analisis.id,
                     caracteristica_id=caracteristica.id,
                     probabilidad=detectada.probabilidad,
                     umbral_aplicado=umbral,
-                    supera_umbral=supera(detectada.probabilidad, umbral),
+                    supera_umbral=detectado,
                 )
             )
+            # La región (y su mapa) solo se guarda si la característica supera el umbral
+            # vigente: por debajo queda la probabilidad, pero no se muestra como hallazgo.
+            # El umbral interno del Grad-CAM solo recorta activaciones; no decide la detección.
+            if not detectado:
+                continue
             for orden, region in enumerate(detectada.regiones, start=1):
                 clave = f"mapas/{analisis.id}/{detectada.codigo}-{orden}.png"
                 self._almacen.subir(clave, region.mapa_png, "image/png")

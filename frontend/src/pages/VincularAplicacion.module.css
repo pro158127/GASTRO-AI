@@ -55,6 +55,16 @@
   color: var(--color-texto-secundario);
 }
 
+/* Nota del paso 2: borrar en la app la entrada anterior de esta cuenta. Se lee como aclaración de
+   ese paso, no como un paso más, pero con más peso que la clave escrita porque es un atasco. */
+.avisoEntradaAnterior {
+  margin: 0;
+  padding-left: var(--espacio-3);
+  border-left: var(--borde-grosor) solid var(--color-borde-sutil);
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
 .clave {
   margin: 0;
   font: var(--texto-cuerpo-pequeno);
