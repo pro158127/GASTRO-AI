@@ -848,3 +848,95 @@ export interface DashboardDoctor {
   /** RF-DB01 CA 9. */
   aviso: AvisoApi;
 }
+
+// ---------------------------------------------------------------- casos recibidos (W-27)
+//
+// Bandeja de casos recibidos por traslado: `GET /casos-recibidos`, `POST /casos-recibidos/buscar`
+// y `POST /traslados/{id}/visto` (ARCHITECTURE.md § 3.5, RF-A07). Es **un bloque por traslado**,
+// el más reciente primero, no una lista plana de análisis.
+//
+// Ojo con los nombres parecidos: `CasosRecibidos` (arriba) es la tarjeta del dashboard
+// (`{traslados_nuevos, casos}`) y no tiene nada que ver con `BandejaRecibidos`.
+
+/**
+ * Doctor de origen de un traslado, o quien hizo un análisis. El nombre se conserva aunque la
+ * cuenta se haya eliminado: entonces se escribe «(cuenta eliminada)» (RF-A07 CA 4). Nunca trae
+ * `id`, y nunca se dice qué administrador hizo el traslado.
+ */
+export type PersonaOrigen = OrigenTraslado;
+
+/** Una opción del filtro «Doctor de origen». Es `PersonaOrigen` con el `id` para `origen_id`. */
+export interface DoctorOrigen extends PersonaOrigen {
+  id: string;
+}
+
+/** Un caso (paciente) dentro de un traslado. Lo que cuenta `total_casos`. */
+export interface CasoRecibido {
+  caso_id: string;
+  total_analisis: number;
+  /** `null` si el caso no tiene ningún análisis. */
+  ultimo_analisis_en: string | null;
+}
+
+/** Una fila de la tabla de un bloque. */
+export interface AnalisisRecibido {
+  id: string;
+  /** Por ejemplo `A-2026-000152`. */
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /** `null` cuando ninguna característica supera el umbral. */
+  caracteristica_principal: string | null;
+  /** De 0 a 1. `null` junto con `caracteristica_principal`. */
+  probabilidad_principal: number | null;
+  /**
+   * Quien hizo el análisis, cuando no es el doctor de origen del traslado ni el que consulta:
+   * es el caso trasladado dos veces, e imprime «Originalmente de …» (trazabilidad RNF-25).
+   */
+  originalmente_de: PersonaOrigen | null;
+}
+
+/** Un bloque de la bandeja: todo lo que llegó en un mismo traslado. */
+export interface TrasladoRecibido {
+  id: string;
+  tipo: TipoTraslado;
+  ejecutado_en: string;
+  /** El doctor todavía no lo ha abierto: insignia «Nuevo». `visto_en` nulo en el servidor. */
+  nuevo: boolean;
+  origen: PersonaOrigen;
+  casos: CasoRecibido[];
+  /** Total de análisis del bloque, **sin** aplicar `limite`: es el «de N» del pie. */
+  analisis_total: number;
+  /** Los primeros `limite` análisis, del más reciente al más antiguo. */
+  analisis: AnalisisRecibido[];
+}
+
+/** Respuesta de `GET /casos-recibidos` y de `POST /casos-recibidos/buscar`. */
+export interface BandejaRecibidos {
+  /**
+   * Traslados sin abrir. **Siempre global**: no lo filtran ni `origen_id` ni la búsqueda por
+   * paciente, así que es el mismo número que la insignia del menú y se puede volcar al contexto
+   * de sesión desde cualquier carga.
+   */
+  nuevos: number;
+  /** Ya filtrados por `origen_id` o por paciente, al contrario que `nuevos`. */
+  total_traslados: number;
+  total_casos: number;
+  /** Opciones del filtro. También global, con todo el que haya trasladado algo alguna vez. */
+  doctores_origen: DoctorOrigen[];
+  traslados: TrasladoRecibido[];
+  /**
+   * Cuántos análisis de ese paciente hizo el propio doctor, para el aviso «también tiene N
+   * suyos». Solo en la búsqueda; en la bandeja llega `null`.
+   */
+  analisis_propios_paciente: number | null;
+}
+
+/** Cuerpo de `POST /casos-recibidos/buscar`. El documento nunca va en la URL. */
+export interface BusquedaRecibidos {
+  tipo_documento: string;
+  numero_documento: string;
+  origen_id?: string;
+  /** Análisis por bloque; `0` los trae todos. */
+  limite?: number;
+}

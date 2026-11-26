@@ -53,6 +53,10 @@ interface ValorSesion {
    * hay sesión, si no está ACTIVA o si el usuario no es doctor. Llega con cada consulta de
    * `GET /auth/sesion`, así que se actualiza al cargar la página y en cada comprobación pasiva
    * de inactividad, sin pedir nada aparte.
+   *
+   * Entre consulta y consulta pueden pasar minutos, y abrir un traslado en W-27 no toca la
+   * sesión: por eso esa pantalla lo corrige con `fijarCasosRecibidosNuevos` y
+   * `descontarCasoRecibidoNuevo`, sin pedir nada más al servidor.
    */
   casosRecibidosNuevos: number | null;
   /** Solo con la etapa ACTIVA se entra a las pantallas internas. */
@@ -88,6 +92,24 @@ interface ValorSesion {
    * (W-18), para que la barra superior y el menú los muestren sin otra consulta.
    */
   actualizarUsuario: (datos: Pick<UsuarioActual, "nombre" | "apellido">) => void;
+  /**
+   * Fija el contador de la insignia con el número que acaba de responder el servidor
+   * (`nuevos` de `GET /casos-recibidos`, que llega siempre global, sin filtrar por doctor de
+   * origen ni por paciente). W-27 lo llama tras cada carga con éxito, para que el menú no se
+   * quede con el número viejo de la última consulta de sesión.
+   */
+  fijarCasosRecibidosNuevos: (nuevos: number) => void;
+  /**
+   * Un traslado más abierto: baja el contador en uno, sin bajar de cero. W-27 lo llama tras
+   * cada `204` de `POST /traslados/{id}/visto`.
+   *
+   * **No recibe ningún número a propósito.** La pantalla abre de golpe todos los bloques
+   * nuevos, así que se marcan varios traslados a la vez; si quien llama calculara
+   * `actual - 1` con el valor que leyó del contexto, los N descuentos escribirían el mismo
+   * número y el contador se quedaría en `actual - 1` en vez de en cero. Aquí el descuento se
+   * hace dentro del actualizador, sobre el valor previo, así que se acumulan.
+   */
+  descontarCasoRecibidoNuevo: () => void;
 }
 
 const ContextoSesion = createContext<ValorSesion | null>(null);
@@ -282,6 +304,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const fijarCasosRecibidosNuevos = useCallback((nuevos: number) => {
+    setEstado((previo) =>
+      previo.fase === "con_sesion" ? { ...previo, casosRecibidosNuevos: nuevos } : previo
+    );
+  }, []);
+
+  // El descuento va dentro del actualizador para que varios traslados marcados a la vez se
+  // acumulen (ver el comentario de `descontarCasoRecibidoNuevo` en ValorSesion). Con el
+  // contador en `null` no se toca nada: no aplica (sin etapa ACTIVA o sin rol doctor).
+  const descontarCasoRecibidoNuevo = useCallback(() => {
+    setEstado((previo) =>
+      previo.fase === "con_sesion" && previo.casosRecibidosNuevos !== null
+        ? { ...previo, casosRecibidosNuevos: Math.max(0, previo.casosRecibidosNuevos - 1) }
+        : previo
+    );
+  }, []);
+
   // 401 SESION_EXPIRADA: se descarta la sesión local y las guardas llevan a /iniciar-sesion; el
   // aviso sale de `motivoDeExpiracion` (W-01d, W-01b o ninguno). 403 PERMISO_DENEGADO: lleva a W-28. 403 ETAPA_INVALIDA: falta un
   // paso; se toma la etapa que trae el error (o, si no vino, se vuelve a consultar la sesión) y
@@ -322,8 +361,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       cerrarSesion,
       consumirMotivoCierre,
       actualizarUsuario,
+      fijarCasosRecibidosNuevos,
+      descontarCasoRecibidoNuevo,
     };
-  }, [estado, motivoCierre, refrescarSesion, avanzarEtapa, cerrarSesion, consumirMotivoCierre, actualizarUsuario]);
+  }, [
+    estado,
+    motivoCierre,
+    refrescarSesion,
+    avanzarEtapa,
+    cerrarSesion,
+    consumirMotivoCierre,
+    actualizarUsuario,
+    fijarCasosRecibidosNuevos,
+    descontarCasoRecibidoNuevo,
+  ]);
 
   let contenido: ReactNode = children;
   // Mientras se confirma el cierre por inactividad no se muestra la pantalla anterior.

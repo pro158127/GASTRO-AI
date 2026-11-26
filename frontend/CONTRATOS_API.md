@@ -45,6 +45,11 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 | `ultimos_7_dias` y `sin_valoracion` sin dibujar (DB-5) | pregunta abierta | se calculan y no se muestran |
 | Las cifras del panel solo cuentan completados (DB-6) | propuesto a diseño | el detalle de cada tarjeta lo dice |
 | «Ver detalle» en la tabla de escritorio (DB-7) | propuesto a diseño | el frontend lo añadió |
+| Total del traslado en la búsqueda de W-27 (CR-1) | propuesto | no existe; el frontend lo cruza con la bandeja que ya tiene en memoria |
+| `limite` por traslado, no por bandeja (CR-2) | propuesto | no existe; «Ver los N análisis» repide toda la bandeja con `limite=0` |
+| «Casos» o «análisis» en el bloque de traslado (CR-3) | propuesto a diseño | el frontend hace que la palabra siga al número |
+| El filtro «Doctor de origen» sin resultados (CR-4) | propuesto a diseño | no está dibujado; el frontend lo resuelve con una línea y un botón |
+| Orden de los análisis en `GET /casos-recibidos` (CR-5) | propuesto | no existe; W-27 deja los encabezados como texto, igual que W-16 |
 
 ## Propuestas
 
@@ -417,3 +422,70 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
   «Ver historial». La tabla de W-16 ya tiene esa acción en cada fila.
 - **Qué hace el frontend:** una columna «Acción» con el mismo enlace de texto de W-16 (no un
   botón de 40 px, que engordaría las filas), con el código del análisis en el nombre accesible.
+
+### Total del traslado en `POST /casos-recibidos/buscar` · W-27f (CR-1)
+
+- **Estado:** propuesto. Prioridad baja.
+- **Por qué:** el encabezado de cada bloque en la búsqueda dice «2 casos de este paciente · **12
+  en el traslado** · trasladados el 20/10/2026». La respuesta de la búsqueda solo trae los
+  totales ya filtrados por paciente (`analisis_total` del bloque es el del paciente), así que
+  ese «12» no está en ninguna parte de esa respuesta.
+- **Solicitud propuesta:** un campo más en cada bloque de la búsqueda, por ejemplo
+  `analisis_total_traslado`, con el total sin filtrar.
+- **Qué hace el frontend mientras tanto:** lo cruza con lo que ya tiene. `GET /casos-recibidos`
+  devuelve el `analisis_total` real de cada traslado, y la pantalla lo guarda por `id` en cada
+  carga que no es una búsqueda (`useBandejaRecibidos`, `totalDelTraslado`). Si ese traslado no
+  se hubiera visto nunca sin filtrar, la frase se omite en vez de inventar un número.
+
+### Un `limite` por traslado, no uno para toda la bandeja · W-27d (CR-2)
+
+- **Estado:** propuesto.
+- **Por qué:** `GET /casos-recibidos?limite=5` recorta **todos** los bloques a la vez, pero el
+  botón «Ver los 12 análisis» de W-27d es de **un** bloque: el doctor pide ver un traslado
+  entero, no los tres.
+- **Solicitud propuesta:** un `limite` por bloque, o un endpoint
+  `GET /traslados/{id}/analisis` con su propia paginación.
+- **Qué hace el frontend mientras tanto:** repide la bandeja entera con `limite=0` y recorta en
+  pantalla los bloques a los que no se les pidió nada (un `Set` de traslados «completos»). El
+  resultado se ve exactamente como el diseño, a cambio de una petición más y de traer análisis
+  que no se van a mostrar. Con bandejas grandes esto no escala.
+
+### «Casos» o «análisis» en el bloque de traslado · W-27b a W-27f (CR-3)
+
+- **Estado:** propuesto **al equipo de diseño**, no al backend: los datos ya existen.
+- **Por qué:** Figma escribe «casos» en los cuatro sitios del bloque («12 casos» en la cabecera,
+  «Mostrando 5 de 12 casos» en el pie, «Ver los 12 casos» en el botón) y «19 casos recibidos en
+  3 traslados» arriba. Pero la API separa dos cosas que en los datos de ejemplo coinciden:
+  `casos` (los pacientes-caso, que es lo que suma `total_casos`) y `analisis_total` (las filas
+  de la tabla). Con un análisis por caso los dos números son el mismo, y por eso el frame no
+  los distingue; con dos análisis de un mismo paciente dejan de serlo, y entonces «Mostrando 5
+  de 12 casos» sobre una tabla de análisis sería falso.
+- **Qué hace el frontend:** la palabra sigue al número. «Casos» donde el número es de casos
+  (el resumen de arriba, que usa `total_casos`, y la cabecera del bloque, que usa
+  `casos.length`) y «análisis» donde el número es `analisis_total` («Mostrando 5 de 12
+  análisis», «Ver los 12 análisis»). En la búsqueda, la cabecera cuenta análisis del paciente,
+  y lo dice: «2 análisis de este paciente · 12 en el traslado».
+
+### El filtro «Doctor de origen» sin resultados · W-27 (CR-4)
+
+- **Estado:** propuesto **al equipo de diseño**. No está dibujado.
+- **Por qué:** el filtro puede dejar la bandeja vacía (el doctor de origen elegido ya no tiene
+  casos en ella), y ese estado no tiene frame. No es W-27a («aún no ha recibido casos»), que
+  diría algo falso, ni W-27g, que es de la búsqueda.
+- **Qué hace el frontend:** una línea, «Ningún caso recibido de ese doctor.», y un botón «Ver
+  todos los doctores» que deshace el filtro. Sin mascota y sin tarjeta: no es un vacío de la
+  pantalla, es un filtro que no encontró nada, y el camino de vuelta tiene que estar a la vista.
+
+### Orden de los análisis en `GET /casos-recibidos` · W-27 (CR-5)
+
+- **Estado:** propuesto. Prioridad baja. Es el mismo caso que las tres columnas sin orden de
+  W-16.
+- **Por qué:** W-27 dibuja los cuatro encabezados de la tabla con flechas de ordenar, y «Fecha
+  del análisis» con la flecha descendente activa. El endpoint no acepta ningún parámetro de
+  orden: solo `origen_id` y `limite`. El servidor devuelve siempre `solicitado_en DESC`.
+- **Solicitud propuesta:** un `orden` como el de `GET /analisis` (`solicitado_en`,
+  `-solicitado_en`), si el orden tiene que poder cambiarse.
+- **Qué hace el frontend mientras tanto:** los encabezados son texto, no botones. Ordenar en el
+  navegador las 5 filas que se muestran aparentaría ordenar las 12 del traslado. El sentido se
+  dice con palabras en el pie del bloque («del más reciente al más antiguo»), no solo con una
+  flecha (WCAG 1.4.1).

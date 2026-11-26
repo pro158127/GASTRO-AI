@@ -54,3 +54,44 @@ export function leerBusquedaGuardada(): BusquedaPaciente | null {
 export function limpiarBusquedaGuardada(): void {
   guardada = null;
 }
+
+// ------------------------------------------------- el documento que W-27 entrega a W-16
+//
+// «Ver historial completo del paciente» (W-27e y W-27f) y «Buscar en Historial» (W-27g) abren
+// W-16 con el tipo y el número ya escritos, para no obligar a teclear otra vez lo que se acaba
+// de teclear (WCAG 3.3.7). El documento no puede ir en la URL ni en `location.state`, así que
+// se entrega por el mismo camino de memoria que la búsqueda de arriba.
+//
+// Es un hueco DISTINTO, y los dos no se estorban:
+//
+// - el de arriba se escribe al ir al detalle y solo se restaura en un **POP** (volver atrás);
+// - este se escribe al salir de W-27 y solo se restaura cuando el montaje **no** es un POP,
+//   que es lo que hace `navigate()`.
+//
+// Son excluyentes por tipo de navegación. Si aun así hubiera algo en los dos, manda el POP.
+//
+// **De un solo uso.** Se lee y se borra en el mismo montaje: `leerBusquedaEntregada` es pura
+// (el inicializador de `useState` corre dos veces en StrictMode, igual que arriba) y
+// `limpiarBusquedaEntregada` va en el efecto de montaje, que corre siempre. Así, entrar a
+// `/historial` por el menú tres días después no resucita la búsqueda de un paciente que nadie
+// pidió: el hueco se vació en la primera visita.
+//
+// Pérdida conocida y aceptada: si desde W-16 se va «atrás» a W-27 y luego «adelante», ese
+// montaje es un POP y el hueco ya está vacío, así que la búsqueda entregada no se restaura.
+
+let entregada: BusquedaPaciente | null = null;
+
+/** W-27 deja el documento para que W-16 arranque con la búsqueda hecha. */
+export function dejarBusquedaParaHistorial(busqueda: BusquedaPaciente): void {
+  entregada = busqueda;
+}
+
+/** Lectura pura: devuelve lo entregado sin borrarlo. Se puede llamar varias veces. */
+export function leerBusquedaEntregada(): BusquedaPaciente | null {
+  return entregada;
+}
+
+/** Borra lo entregado. Es idempotente: llamarla de más no hace nada. */
+export function limpiarBusquedaEntregada(): void {
+  entregada = null;
+}

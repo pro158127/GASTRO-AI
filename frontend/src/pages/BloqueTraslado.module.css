@@ -1,0 +1,125 @@
+/* Un bloque de traslado de la bandeja de W-27 (W-27b a W-27f, M-27 en celular). */
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bloque {
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* Borde de acento del traslado nuevo. Solo refuerza: lo que dice que es nuevo es la insignia,
+   que lleva texto (WCAG 1.4.1). El borde más grueso no mueve nada porque se compensa el
+   relleno del interior. */
+.nuevo {
+  border: var(--borde-grosor-foco) solid var(--color-accion-primaria);
+}
+
+.encabezado {
+  margin: 0;
+  font: inherit;
+}
+
+.boton {
+  display: flex;
+  width: 100%;
+  min-height: var(--tamano-control-tactil);
+  align-items: flex-start;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  border: 0;
+  border-radius: var(--radio-lg);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boton:hover {
+  background: var(--color-fondo-superficie-sutil);
+}
+
+.boton:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+}
+
+.chevron {
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+  margin-top: var(--espacio-1);
+  color: var(--color-texto-secundario);
+  transform: rotate(-90deg);
+  transition: transform 150ms ease;
+}
+
+.chevronAbierto {
+  transform: rotate(0deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.textos {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--espacio-1);
+}
+
+.origen {
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.detalle {
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+.marcaNuevo {
+  flex-shrink: 0;
+}
+
+.contenido {
+  padding: 0 var(--espacio-4) var(--espacio-4);
+}
+
+.sinAnalisis {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-3);
+  padding-top: var(--espacio-3);
+}
+
+.resumen {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}

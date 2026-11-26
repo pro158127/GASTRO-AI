@@ -29,7 +29,9 @@ import { CodigoErrorApi } from "../services/codigosError";
 import type { OrdenHistorial, TipoDocumento } from "../types";
 import {
   guardarBusquedaParaVolver,
+  leerBusquedaEntregada,
   leerBusquedaGuardada,
+  limpiarBusquedaEntregada,
   limpiarBusquedaGuardada,
 } from "../utils/busquedaPacienteEnMemoria";
 import { esErrorGlobal } from "../utils/avisosError";
@@ -57,16 +59,20 @@ export default function HistorialPaciente() {
   const tipoNavegacion = useNavigationType();
 
   // Lectura pura en el inicializador: StrictMode lo llama dos veces y eso tiene que dar
-  // igual. Solo se restaura al volver hacia atrás; entrar desde el menú es un PUSH y
-  // entonces no se recupera nada (ver el módulo de la memoria).
+  // igual. Dos huecos de memoria, excluyentes por tipo de navegación: al volver hacia atrás
+  // se restaura la búsqueda que quedó al ir al detalle; en un PUSH, la que W-27 acaba de
+  // entregar con «Ver historial completo del paciente». Entrar desde el menú también es un
+  // PUSH, pero entonces el hueco está vacío porque el efecto de abajo lo vació la vez
+  // anterior (ver el módulo de la memoria).
   const [guardada] = useState(() =>
-    tipoNavegacion === "POP" ? leerBusquedaGuardada() : null
+    tipoNavegacion === "POP" ? leerBusquedaGuardada() : leerBusquedaEntregada()
   );
 
-  // El borrado va aparte del leer, y corre en TODO montaje: así el hueco queda vacío en
-  // cuanto el historial vuelve a abrirse, se haya restaurado o no.
+  // El borrado va aparte del leer, y corre en TODO montaje: así los dos huecos quedan vacíos
+  // en cuanto el historial vuelve a abrirse, se haya restaurado algo o no.
   useEffect(() => {
     limpiarBusquedaGuardada();
+    limpiarBusquedaEntregada();
   }, []);
 
   const [tipos, setTipos] = useState<TipoDocumento[] | null>(null);

@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
 import { useUsuarioActual } from "../sesion/UsuarioActual";
+import CasosRecibidos from "../pages/CasosRecibidos";
 import CrearUsuario from "../pages/CrearUsuario";
 import Dashboard from "../pages/Dashboard";
 import CuentasPendientes from "../pages/CuentasPendientes";
@@ -85,7 +86,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/casos-recibidos",
     titulo: "Casos recibidos",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-27c)
+    elemento: (titulo) => <CasosRecibidos titulo={titulo} />, // W-27, W-27a a W-27h
   },
   {
     ruta: "/perfil",
