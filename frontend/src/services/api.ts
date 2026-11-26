@@ -6,11 +6,15 @@
 // `atenderRespuesta`, y un 2xx que no es 204 y no trae JSON se trata como error inesperado
 // (W-31). El envío sí puede no ser JSON: por eso existe `enviarMultipart`.
 //
-// Consecuencia para quien venga después: un endpoint que devuelva otra cosa —el reporte en
-// PDF (`/analisis/{id}/reporte`) o el CSV de la auditoría son los candidatos— necesita un
+// Consecuencia para quien venga después: un endpoint que devuelva otra cosa necesita un
 // transporte propio. Ese transporte debe seguir usando `atenderRespuesta` para los errores
 // (el cuerpo de error sí es JSON) y quedarse solo con la lectura del cuerpo bueno; si no,
 // se pierde el manejo global de sesión y permisos.
+//
+// Ya hay uno: `solicitarBinario`, que nació para el reporte en PDF
+// (`GET /reportes/{id}/archivo`, W-17). **El CSV de la auditoría sigue pendiente** (el botón
+// de exportar de W-19, `GET /admin/auditoria/exportar`): cuando se construya, va por el mismo
+// transporte con su propio tipo de contenido.
 import type {
   CampoConError,
   EdicionPerfil,
@@ -437,6 +441,120 @@ export function enviarMultipart<T>(
  */
 export async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
   return (await solicitarCompleta<T>(ruta, opciones)).datos;
+}
+
+/**
+ * Ocupa el lugar del cuerpo en `atenderRespuesta` cuando la respuesta es un archivo. Ese
+ * paso solo distingue «hay cuerpo» de «no hay cuerpo» (`cuerpo === null`, el 2xx fuera del
+ * contrato); los bytes se leen después y lo que traen se comprueba aparte.
+ */
+const CUERPO_BINARIO = Object.freeze({ binario: true });
+
+export interface OpcionesBinario {
+  /**
+   * Tipo de contenido que la respuesta **tiene que declarar** (por ejemplo `application/pdf`).
+   * No es un adorno: es lo único que separa un archivo de una página de error con 200.
+   */
+  tipoEsperado: string;
+  /** Si es `false`, el error no dispara los manejadores globales (lo atiende quien llama). */
+  global?: boolean;
+}
+
+export interface RespuestaBinaria {
+  datos: Blob;
+  /** `filename` de `Content-Disposition`, o `null` si no vino o no se pudo leer. */
+  nombreArchivo: string | null;
+}
+
+/**
+ * `filename` de `Content-Disposition`, o `null`. Acepta la forma extendida
+ * (`filename*=UTF-8''…`) y la entrecomillada, que es la que manda el servidor.
+ *
+ * Se queda solo con el nombre base: el servidor lo compone él
+ * (`Reporte_GastroAI_{codigo}.pdf`), pero este valor acaba en el atributo `download` de un
+ * enlace y en un texto en pantalla, así que no se confía en que no traiga rutas ni caracteres
+ * de control.
+ */
+function nombreDeContentDisposition(cabecera: string | null): string | null {
+  if (!cabecera) return null;
+  const extendido = /filename\*\s*=\s*utf-8''([^;]+)/i.exec(cabecera);
+  const entreComillas = /filename\s*=\s*"([^"]*)"/i.exec(cabecera);
+  const suelto = /filename\s*=\s*([^;]+)/i.exec(cabecera);
+  let valor = extendido?.[1] ?? entreComillas?.[1] ?? suelto?.[1] ?? "";
+  if (extendido) {
+    try {
+      valor = decodeURIComponent(valor);
+    } catch {
+      return null;
+    }
+  }
+  const base = valor.trim().split(/[\\/]/).pop() ?? "";
+  // Sin regex de caracteres de control: se filtran por código, que además es más claro.
+  const limpio = Array.from(base)
+    .filter((caracter) => caracter >= " " && caracter !== "\u007f")
+    .join("")
+    .trim();
+  return limpio === "" || limpio === "." || limpio === ".." ? null : limpio;
+}
+
+/**
+ * GET de un archivo (el reporte en PDF de W-17). Devuelve los bytes y el nombre que mandó el
+ * servidor, para que la pantalla no tenga que inventárselo.
+ *
+ * **Los errores pasan por `atenderRespuesta` igual que cualquier otra petición**: un 401 a
+ * mitad de la descarga lleva al inicio de sesión y un 403 PERMISO_DENEGADO a W-28. Es la razón
+ * de traer el archivo por aquí y no dejar que lo abra el navegador con un enlace, que además
+ * dejaría un 404 o un 503 sin forma de verse (llegan como JSON y no hay quién los lea).
+ *
+ * **Y se comprueba que la respuesta es lo que dice ser.** El cuerpo bueno ya no pasa por el
+ * analizador de JSON, así que aquí no sirve la red de seguridad de `solicitar` («un 2xx que no
+ * es 204 y no trae JSON es un error inesperado»). Sin esto, un proxy o un servidor de
+ * desarrollo que responda 200 con una página HTML se descargaría como un `.pdf` que al abrirlo
+ * no es un PDF. Se exigen dos cosas: que `Content-Type` declare `tipoEsperado` y que el cuerpo
+ * no venga vacío. Lo que es propio de cada formato —la firma del archivo— lo comprueba quien
+ * sabe qué formato pidió, en su módulo de `services/`.
+ *
+ * Descargar es una acción de la persona, nunca una consulta automática: `pasiva: false`.
+ */
+export async function solicitarBinario(
+  ruta: string,
+  opciones: OpcionesBinario
+): Promise<RespuestaBinaria> {
+  const { tipoEsperado, global = true } = opciones;
+
+  const instanteEnvio = performance.now();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${BASE}${ruta}`, { method: "GET", credentials: "same-origin" });
+  } catch {
+    throw new ErrorApi(null);
+  }
+  const instanteRecibido = performance.now();
+
+  // El cuerpo bueno no se lee como JSON (es el archivo); el de error sí, que es lo que
+  // `atenderRespuesta` necesita para componer el `ErrorApi`. Si no es 2xx, lanza.
+  atenderRespuesta<unknown>(
+    {
+      estado: respuesta.status,
+      ok: respuesta.ok,
+      cuerpo: respuesta.ok ? CUERPO_BINARIO : await leerCuerpoJson(respuesta),
+      fechaCabecera: respuesta.headers.get("Date"),
+      instanteRecibido,
+    },
+    { pasiva: false, global },
+    instanteEnvio
+  );
+
+  const declarado = (respuesta.headers.get("Content-Type") ?? "").split(";")[0]?.trim().toLowerCase();
+  if (declarado !== tipoEsperado.toLowerCase()) throw new ErrorApi(respuesta.status);
+
+  const datos = await respuesta.blob();
+  if (datos.size === 0) throw new ErrorApi(respuesta.status);
+
+  return {
+    datos,
+    nombreArchivo: nombreDeContentDisposition(respuesta.headers.get("Content-Disposition")),
+  };
 }
 
 /** POST /auth/login. Deja la cookie puesta y responde la etapa que sigue. */

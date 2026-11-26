@@ -65,10 +65,24 @@
   flex-shrink: 0;
 }
 
-/* En celular el botón ocupa el ancho y alcanza el objetivo táctil de 44 px. */
+/* Las acciones de la cabecera: en W-08 solo «Nuevo análisis», en W-17 también «Descargar
+   reporte» a su izquierda. En una línea, y si no caben, pasan a la siguiente. */
+.accionEncabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+/* En celular los botones se apilan a todo el ancho y alcanzan el objetivo táctil de 44 px. */
 @media (max-width: 767px) {
-  .accionEncabezado,
-  .accionEncabezado > a {
+  .accionEncabezado {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .accionEncabezado > a,
+  .accionEncabezado > button {
     width: 100%;
   }
 }

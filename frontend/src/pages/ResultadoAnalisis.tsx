@@ -44,6 +44,7 @@ import type { AnalisisDetalle, CaracteristicaResultado, MapaCalor, RegionInteres
 import { fechaHoraCorta } from "../utils/fechas";
 import { descripcionCalidad } from "./ProgresoAnalisis";
 import { fraccionEnBarra, porcentajeDeFraccion, porcentajeDirecto } from "../utils/numeros";
+import DescargaReporte from "./DescargaReporte";
 import ProcedenciaAnalisis from "./ProcedenciaAnalisis";
 import ResultadoExplicacion from "./ResultadoExplicacion";
 import ResultadoValoracion from "./ResultadoValoracion";
@@ -152,14 +153,16 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
   const { idAnalisis = "" } = useParams();
   const { detalle, cargando, recargando, noEncontrado, aviso, recargar } = useAnalisis(idAnalisis);
 
-  const accionNuevo = (
-    <div className={estilos.accionEncabezado}>
-      <EnlaceBoton jerarquia="primario" to="/nuevo-analisis">
-        <IconoMas className={estilos.iconoBoton} />
-        <span>Nuevo análisis</span>
-      </EnlaceBoton>
-    </div>
+  const enlaceNuevoAnalisis = (
+    <EnlaceBoton jerarquia="primario" to="/nuevo-analisis">
+      <IconoMas className={estilos.iconoBoton} />
+      <span>Nuevo análisis</span>
+    </EnlaceBoton>
   );
+
+  // Lo único que ve la rama FALLIDO. **Aquí no entra «Descargar reporte»**: ver la nota junto
+  // al encabezado de la rama COMPLETADO.
+  const accionNuevo = <div className={estilos.accionEncabezado}>{enlaceNuevoAnalisis}</div>;
 
   if (noEncontrado) {
     return (
@@ -260,9 +263,29 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
   const { imagen, mapa_calor: mapaCalor, caracteristicas, regiones, ninguna_supera_umbral } = detalle;
   const nombrePorId = new Map(caracteristicas.map((c) => [c.id, c.nombre]));
 
+  // W-17 dibuja dos acciones en la cabecera, «Volver al historial» y «Descargar reporte»; lo
+  // implementado tiene «Nuevo análisis» porque este mismo componente es también W-08. Se
+  // conserva «Nuevo análisis» como primario y «Descargar reporte» va a su izquierda, como botón
+  // secundario (en W-17e y W-17f está dibujado blanco con borde e icono, no relleno).
+  //
+  // **Solo en esta rama.** El reporte exige un análisis COMPLETADO (422 ANALISIS_SIN_RESULTADO
+  // si no lo está), así que en la rama FALLIDO el botón no existe, ni deshabilitado; y
+  // PROCESANDO redirige antes de llegar aquí. El identificador que viaja es `detalle.id` (el
+  // UUID que pide el POST), no el parámetro de la ruta.
+  const accionesResultado = (
+    <div className={estilos.accionEncabezado}>
+      <DescargaReporte idAnalisis={detalle.id} />
+      {enlaceNuevoAnalisis}
+    </div>
+  );
+
   return (
     <>
-      <EncabezadoPagina titulo="Resultado del análisis" descripcion={lineaDatos(detalle)} acciones={accionNuevo} />
+      <EncabezadoPagina
+        titulo="Resultado del análisis"
+        descripcion={lineaDatos(detalle)}
+        acciones={accionesResultado}
+      />
 
       {/* Falló una recarga con el resultado ya en pantalla: se avisa sin quitar lo que se lee. */}
       {aviso && (

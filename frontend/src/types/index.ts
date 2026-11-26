@@ -760,6 +760,29 @@ export interface AnalisisDetalle {
   aviso: AvisoApi;
 }
 
+// ------------------------------------------------- Reporte en PDF (W-17, RF-H02, contrato §4)
+
+/**
+ * Respuesta 201 de `POST /reportes`. Desde el detalle de un análisis se pide con
+ * `analisis_ids: [id]`; el reporte de todo un paciente (`caso_id`) es de W-16.
+ */
+export interface ReporteCreado {
+  id: string;
+  /** Siempre `"PDF"`: es el único formato del esquema del servidor. */
+  formato: string;
+  generado_en: string;
+  /** Cuántos análisis quedaron dentro. Desde esta pantalla, siempre 1. */
+  analisis: number;
+  /**
+   * Ruta de descarga **absoluta desde la raíz del sitio**: el servidor la compone con su
+   * `api_prefix`, así que ya viene con `/api/v1` delante. `solicitar` y `solicitarBinario`
+   * antepone su propio `BASE` («/api/v1»), de modo que pasarles este valor daría
+   * `/api/v1/api/v1/reportes/…` y un 404. La ruta se arma con `id` en `services/reportes.ts`;
+   * este campo queda tipado, documentado y sin usar.
+   */
+  descarga_url: string;
+}
+
 // ------------------------------------------- Dashboard clínico (W-15, RF-DB01, contrato §3.5)
 // `GET /dashboard/doctor`. Todo se calcula **solo con los análisis propios completados** (los
 // que hizo el doctor y siguen siendo suyos). Lo que recibió por traslado va aparte, en
