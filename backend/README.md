@@ -85,6 +85,11 @@ ficticios (CC desde 9000000000) para buscar el historial. Con el worker arriba y
 `HF_SIMULADO=true`, los análisis terminan COMPLETADOS en unos segundos. Solo corre con
 `ENVIRONMENT=development`.
 
+Ojo con Gemini: cada análisis que termina pide su explicación, y el nivel gratuito da 20
+peticiones al día por proyecto y modelo, compartidas por todo el equipo. Para sembrar sin
+gastarlas, deja `LLM_API_KEY` vacía en ese momento: la explicación queda FALLIDA con su aviso
+y el resultado del análisis no cambia (RF-R05 CA 3 y CA 5).
+
 ## Variables de entorno
 
 Todas están en `.env.example` con un valor de ejemplo y un comentario. Las que se generan

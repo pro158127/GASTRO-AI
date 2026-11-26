@@ -16,6 +16,10 @@ el caso igual cuenta como activo.
 
 Los documentos son inventados (CC desde 9000000000, al azar) y se imprimen para poder buscar
 el historial de esos pacientes. Se niega a correr si ENVIRONMENT no es «development».
+
+Cada análisis COMPLETADO le pide su explicación a Gemini, que en el nivel gratuito da 20
+peticiones al día para todo el proyecto. Para no gastarlas, corre el worker con LLM_API_KEY
+vacía mientras siembras: la explicación queda FALLIDA y el resultado no cambia.
 """
 
 import argparse
