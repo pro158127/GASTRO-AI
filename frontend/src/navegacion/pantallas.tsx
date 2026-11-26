@@ -129,7 +129,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/metricas-del-modelo",
     titulo: "Métricas del modelo",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // W-23
+    elemento: (titulo) => <MetricasModelo titulo={titulo} />, // W-23
   },
   {
     ruta: "/logs-tecnicos",
