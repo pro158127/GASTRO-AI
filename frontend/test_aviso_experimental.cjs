@@ -57,7 +57,7 @@ test('RF-R04: el componente no ofrece controles ni manejadores para ocultar el a
     for (const clave of Object.keys(elemento.props)) assert.ok(!/^on[A-Z]/.test(clave));
     React.Children.forEach(elemento.props.children, revisar);
   }
-  revisar(AvisoExperimental());
+  revisar(AvisoExperimental({}));
   assert.ok(texto.length > 0);
 });
 
