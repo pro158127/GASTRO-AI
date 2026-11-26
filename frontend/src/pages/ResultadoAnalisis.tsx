@@ -2,6 +2,12 @@
 // supera el umbral, 95:2376). Tableta T-08 (109:893) y celular M-08 (109:1147).
 // Solo rol DOCTOR. Sin TOPOLOGO: lo dice la nota de la pantalla en Figma.
 //
+// **Es también W-17**, el detalle abierto desde el historial o desde los casos recibidos: una
+// sola ruta y un solo render (`navegacion/pantallas.tsx`). Lo que distingue una lectura de la
+// otra no es la pantalla sino los datos de la respuesta. De ahí la tarjeta de procedencia
+// (`ProcedenciaAnalisis`), que no pinta nada cuando el análisis es propio y no llegó por
+// traslado, que es justo el caso de un análisis recién terminado.
+//
 // Alcance: el resultado en sí. La explicación en lenguaje natural (W-08c, W-08d) y la
 // valoración profesional (W-08e a W-08h) son de la tarea 6b; sus tarjetas no se dibujan,
 // aunque `explicacion` y `observaciones` ya vengan en la respuesta y estén tipadas.
@@ -38,6 +44,7 @@ import type { AnalisisDetalle, CaracteristicaResultado, MapaCalor, RegionInteres
 import { fechaHoraCorta } from "../utils/fechas";
 import { descripcionCalidad } from "./ProgresoAnalisis";
 import { fraccionEnBarra, porcentajeDeFraccion, porcentajeDirecto } from "../utils/numeros";
+import ProcedenciaAnalisis from "./ProcedenciaAnalisis";
 import ResultadoExplicacion from "./ResultadoExplicacion";
 import ResultadoValoracion from "./ResultadoValoracion";
 import { useAnalisis } from "./useAnalisis";
@@ -224,6 +231,9 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
           descripcion={lineaDatos(detalle)}
           acciones={accionNuevo}
         />
+        {/* Encima del contenido, igual que en la rama COMPLETADO: de quién es el análisis se
+            lee antes de leer el análisis. Ver la nota junto a la otra aparición. */}
+        <ProcedenciaAnalisis realizadoPor={detalle.realizado_por} trasladado={detalle.trasladado} />
         <section className={estilos.tarjeta} aria-labelledby="titulo-fallo">
           <h2 id="titulo-fallo" className={estilos.tituloTarjeta}>
             Este análisis no produjo resultado
@@ -260,6 +270,17 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
           {aviso.mensaje}
         </Alerta>
       )}
+
+      {/* W-17b. Va **encima** del contenido y a todo el ancho, no dentro de una columna, y en
+          esta rama y en la del fallo por el mismo principio: de quién es el análisis se lee
+          antes que el análisis. Dentro de `.columnaDerecha` competiría con «Características
+          identificadas» y en celular caería después de la imagen y del mapa, es decir después
+          de haber interpretado la imagen. Es además un dato del análisis entero, como la línea
+          del encabezado, y no de ninguna de las dos columnas.
+
+          Con un ejecutor propio y sin traslado el componente no pinta nada, que es el caso de
+          W-08 recién terminado un análisis: esa pantalla queda igual. */}
+      <ProcedenciaAnalisis realizadoPor={detalle.realizado_por} trasladado={detalle.trasladado} />
 
       <div className={estilos.columnas}>
         <section className={estilos.tarjeta} aria-labelledby="titulo-imagen">
@@ -361,8 +382,11 @@ export default function ResultadoAnalisis({ titulo }: { titulo: string }) {
           {/* W-08c y W-08d. Llega después del resultado y no lo bloquea (RF-R05 CA 3). */}
           <ResultadoExplicacion idAnalisis={idAnalisis} semilla={detalle.explicacion} />
 
-          {/* W-08e a W-08h. Solo cuenta la observación propia: las de otros doctores llegan
-              con un caso trasladado y se ven en W-17b, que W-08 no dibuja. */}
+          {/* W-08e a W-08h. Solo cuenta la observación propia para valorar: las de otros
+              doctores llegan con un caso trasladado y se listan aparte, sin poder editarse.
+              Que al terminar un análisis nuevo no se vea ninguna ajena no lo decide esta
+              pantalla —es la misma para W-08 y W-17 (`navegacion/pantallas.tsx`)— sino la
+              respuesta, que en ese momento no trae observaciones de nadie más. */}
           <ResultadoValoracion
             idAnalisis={idAnalisis}
             observacionPropia={detalle.observaciones.find((o) => o.es_mia) ?? null}

@@ -1,6 +1,9 @@
 // Tipos del contrato de la API (../ARCHITECTURE.md § 3.5). Los campos JSON conservan los
 // nombres que define el backend.
 
+// Los dos tipos del estado operativo (W-22) que este archivo reutiliza en vez de copiar.
+import type { AlertaOperativa, EstadoServicio } from "../services/estadoOperativo";
+
 /** Etapas del inicio de sesión: cada una solo abre sus endpoints; el resto exige ACTIVA. */
 export type EtapaSesion = "CAMBIO_CONTRASENA" | "VINCULAR_TOTP" | "PENDIENTE_2FA" | "ACTIVA";
 
@@ -939,4 +942,101 @@ export interface BusquedaRecibidos {
   origen_id?: string;
   /** Análisis por bloque; `0` los trae todos. */
   limite?: number;
+}
+
+// ------------------------------------------------ W-19 · dashboard técnico (RF-DB02, § 3.5)
+//
+// `EstadoServicio` y `AlertaOperativa` son los mismos del estado operativo (W-22) y se
+// importan de allí para no tener dos copias. El import es solo de tipos, así que no queda
+// ninguna dependencia de `types` hacia `services` en el código compilado.
+
+/** `usuarios`. Las cuentas eliminadas no cuentan (CA 1). */
+export interface UsuariosDashboardTecnico {
+  /** El backend siempre manda las tres claves, aunque el conteo sea 0. */
+  por_estado: Record<"PENDIENTE" | "ACTIVO" | "INACTIVO", number>;
+  /** No se dibuja en W-19; cuenta **todas** las cuentas no eliminadas, no solo las activas. */
+  por_rol: Record<"DOCTOR" | "ADMINISTRADOR", number>;
+  /**
+   * Cuentas PENDIENTE con la contraseña temporal vencida (RNF-27). **Es un subconjunto de
+   * `por_estado.PENDIENTE`**, no una cifra aparte: las dos tarjetas de la pantalla cuentan la
+   * misma cuenta, y por eso el detalle de la cuarta dice que sale de las pendientes.
+   */
+  pendientes_expiradas: number;
+}
+
+/** `seguridad` (CA 4). Es la única ventana de 24 horas de todo el contrato. */
+export interface SeguridadDashboardTecnico {
+  /** Inicios de sesión **y** verificaciones TOTP fallidas en 24 h, según la bitácora. */
+  accesos_fallidos_24h: number;
+  /** Cuentas con bloqueo temporal en curso (RF-U12), de cualquier estado no eliminado. */
+  cuentas_bloqueadas: number;
+}
+
+/** `analisis`. No se dibuja en W-19; queda para una sección propia si se decide pintarla. */
+export interface AnalisisDashboardTecnico {
+  /** Desde las 00:00 **en Colombia**, no en UTC. */
+  hoy: number;
+  ultimos_7_dias: number;
+  /** Fallidos por error técnico; no incluye los fallidos por calidad de imagen. */
+  con_error_7_dias: number;
+  calidad_insuficiente_7_dias: number;
+}
+
+/**
+ * `latencia_7d`: percentil 95 de los **últimos 7 días** (CA 6), no de 24 horas.
+ *
+ * Los dos percentiles son nulos cuando no hubo ninguna medición en la ventana. En el caso del
+ * modelo de lenguaje eso es lo normal: `percentile_cont` ignora los nulos, así que el p95 sale
+ * solo de las inferencias que sí pidieron explicación. Un nulo **no es un fallo**.
+ */
+export interface LatenciaDashboardTecnico {
+  vision_p95_ms: number | null;
+  llm_p95_ms: number | null;
+  inferencias: number;
+  /** Inferencias con estado ERROR o TIEMPO_AGOTADO. Las correctas son la resta. */
+  errores: number;
+}
+
+/**
+ * Un servicio en el resumen del dashboard. **No es `ServicioOperativo` de W-22**: aquí no hay
+ * `tiempo_respuesta_ms` ni `ultima_verificacion`, porque la hora de la medición es una sola y
+ * va en `verificado_en` del nivel superior.
+ */
+export interface ServicioResumen {
+  codigo: string;
+  /**
+   * El esquema del backend declara este campo como `str`, no como el enum, así que la pantalla
+   * no da por hecho que siempre llegue uno de los tres valores conocidos.
+   */
+  estado: EstadoServicio;
+  nombre: string;
+}
+
+/**
+ * `modelo_vigente`. **No es `ModeloDesplegado` de W-22**: `revision_corta` ya viene recortada a
+ * 7 caracteres por el servidor, y no es lo mismo que el `revision_sha` entero de aquella.
+ */
+export interface ModeloVigenteResumen {
+  repositorio_hf: string;
+  /** Los primeros 7 caracteres del SHA, ya recortados: no se vuelven a recortar. */
+  revision_corta: string;
+  desplegado_en: string;
+  /** RNF-29: la revisión vigente es la que está configurada. */
+  coincide_con_configuracion: boolean;
+}
+
+/** Respuesta de `GET /admin/dashboard`. Solo conteos: nada identifica un caso ni un paciente. */
+export interface DashboardTecnico {
+  usuarios: UsuariosDashboardTecnico;
+  seguridad: SeguridadDashboardTecnico;
+  analisis: AnalisisDashboardTecnico;
+  latencia_7d: LatenciaDashboardTecnico;
+  servicios: ServicioResumen[];
+  /** La alerta del estado operativo, redactada por el servidor; `null` si no hay nada. */
+  alerta: AlertaOperativa | null;
+  modelo_vigente: ModeloVigenteResumen | null;
+  /** No se dibuja en W-19; es un estado actual, sin ventana de tiempo. Su sitio es W-20. */
+  envios_credencial_fallidos: number;
+  /** Cuándo se midieron **los servicios**, no cuándo se pidió la pantalla. */
+  verificado_en: string;
 }
