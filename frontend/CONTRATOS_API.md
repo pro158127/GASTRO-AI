@@ -552,23 +552,29 @@ real es `../ARCHITECTURE.md` § 3.5 de esa rama.
 
 ### `recorrido_visto` en `GET /perfil` y `POST /perfil/recorrido-visto` · W-13, W-14x (RT-1)
 
-- **Estado:** **aceptado y en curso** en el equipo del backend. No es una propuesta nueva: está
-  pedido y alguien lo está implementando. Aquí queda anotado el formato con el que el frontend
-  ya está escrito.
-- **Por qué:** la columna existe (`Usuario.recorrido_visto_en`,
+- **Estado:** **implementado** (rama `feature/63-backend-base`, commit `a5b7afe`, PR #319). Ya no
+  es una propuesta: es el contrato, y el frontend lo consume.
+- **Por qué:** la columna ya existía (`Usuario.recorrido_visto_en`,
   `backend/app/models/usuarios.py:119-122`, migración 0003), pero ningún esquema ni endpoint la
-  expone, así que el frontend no puede saber si la persona ya vio el recorrido guiado.
-- **Formato:**
-  - `GET /perfil` devuelve un campo más, `recorrido_visto: bool` (verdadero si
-    `recorrido_visto_en` no es nulo).
-  - `POST /perfil/recorrido-visto` responde `204` y es idempetente: marca la fecha la primera
-    vez y no falla si ya estaba marcada.
-- **Qué hace el frontend mientras tanto:** toda la persistencia vive en
-  `src/pages/recorridoVisto.ts`, con las dos funciones ya en su forma definitiva
-  (`yaVioElRecorrido()` devuelve `null`, «no se puede saber», y `marcarRecorridoVisto()` ya se
-  llama al terminar u omitir el recorrido, sin hacer nada). **Consecuencia visible:** el
-  recorrido **no arranca solo** en el primer ingreso; solo se lanza desde «Ver recorrido» en Mi
-  perfil (W-18). El día que lleguen los dos endpoints se cambia ese único archivo.
+  exponía, así que el frontend no podía saber si la persona ya vio el recorrido guiado.
+- **Forma real:**
+  - `GET /perfil` devuelve un campo más, `recorrido_visto: bool`
+    (`backend/app/api/routers/perfil.py:28`), calculado como «`recorrido_visto_en` no es nulo»,
+    igual que `totp_vinculado`.
+  - `POST /perfil/recorrido-visto` responde `204`, cualquier rol
+    (`backend/app/api/routers/perfil.py:38-43`).
+- **Es idempotente de verdad:** `backend/app/services/perfil.py:21-25` solo escribe si el campo
+  era nulo. De ahí un matiz que no está escrito en ningún otro sitio: **la fecha es la de la
+  primera vez que lo vio, no la de la última.** Y, como llamarlo dos veces no cambia nada, el
+  frontend no necesita protegerse de la doble invocación de StrictMode en el POST.
+- **Qué hace el frontend:** toda la persistencia sigue viviendo en `src/pages/recorridoVisto.ts`,
+  que ahora sí llama a los dos endpoints (`yaVioElRecorrido()` y `marcarRecorridoVisto()`).
+  Con eso el recorrido **arranca solo en el primer ingreso** del doctor, y «Ver recorrido» en Mi
+  perfil (W-18) lo lanza siempre, sin consultar nada. Dos decisiones del frontend:
+  - `yaVioElRecorrido()` guarda el `true` en memoria del módulo para no repetir el `GET /perfil`
+    en lo que dure la página; un fallo no se cachea.
+  - Si el `POST` falla no se muestra ningún error y el recorrido se cierra igual: la consecuencia
+    es que volverá a aparecer en el próximo ingreso.
 
 ### Nota aparte: el 422 del período en `GET /admin/bitacora`
 

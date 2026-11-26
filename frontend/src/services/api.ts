@@ -678,6 +678,20 @@ export function obtenerPerfil(): Promise<Perfil> {
 }
 
 /**
+ * POST /perfil/recorrido-visto (204). Marca que la persona ya terminó u omitió el recorrido
+ * guiado (W-13, W-14x); cualquier rol. Sin cuerpo y sin respuesta.
+ *
+ * **Idempotente en el servidor:** solo escribe la fecha si estaba nula, así que llamarlo dos
+ * veces no cambia nada y no hace falta protegerse de la doble invocación.
+ *
+ * No es pasiva: la llama el final de un recorrido que la persona está mirando.
+ * Quien la use decide qué hacer con el fallo; ver `src/pages/recorridoVisto.ts`.
+ */
+export function marcarRecorridoVistoEnServidor(): Promise<void> {
+  return solicitar<void>("/perfil/recorrido-visto", { metodo: "POST" });
+}
+
+/**
  * PATCH /perfil (W-18). Envía solo `{nombre, apellido, telefono}`; nunca el correo ni el rol.
  * Responde el perfil con los valores normalizados (por ejemplo, el teléfono sin espacios).
  * 422 DATOS_INVALIDOS trae `campos` (`nombre`, `apellido` o `telefono`).

@@ -106,6 +106,12 @@ export interface Perfil {
   estado: string;
   creado_en: string;
   totp_vinculado: boolean;
+  /**
+   * Verdadero si ya terminó u omitió el recorrido guiado alguna vez. El backend lo calcula
+   * como «`recorrido_visto_en` no es nulo», y esa fecha es la de la **primera** vez: marcarlo
+   * otra vez no la cambia. Lo usa `src/pages/recorridoVisto.ts`, el único que lo lee.
+   */
+  recorrido_visto: boolean;
 }
 
 /**

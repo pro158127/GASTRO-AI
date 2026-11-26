@@ -37,6 +37,7 @@ import { porcentajeDirecto } from "../utils/numeros";
 import DashboardCasosRecientes from "./DashboardCasosRecientes";
 import DashboardFrecuencia from "./DashboardFrecuencia";
 import RecorridoDoctor from "./RecorridoDoctor";
+import { yaVioElRecorrido } from "./recorridoVisto";
 import { useDashboardDoctor } from "./useDashboardDoctor";
 import estilos from "./Dashboard.module.css";
 
@@ -238,9 +239,9 @@ export default function Dashboard({ titulo }: { titulo: string }) {
   // la URL: ese sobreviviría a la recarga, volvería a abrir el recorrido en cada F5 y se lo
   // abriría también a quien recibiera el enlace copiado.
   //
-  // Todavía no arranca solo en el primer ingreso: para eso hace falta saber si ya lo vio, y el
-  // endpoint no existe (ver `recorridoVisto.ts`). Cuando exista, la condición inicial pasa a ser
-  // «lo pidió Mi perfil, o `yaVioElRecorrido()` devolvió `false`».
+  // El arranque automático del primer ingreso no cabe aquí, en el estado inicial: saber si ya
+  // lo vio es una consulta (`recorridoVisto.ts`) y, sobre todo, el recorrido no puede abrirse
+  // sobre el esqueleto. Va en el efecto de más abajo.
   const [recorridoActivo, setRecorridoActivo] = useState(
     () => (ubicacion.state as { recorrido?: boolean } | null)?.recorrido === true
   );
@@ -253,6 +254,34 @@ export default function Dashboard({ titulo }: { titulo: string }) {
     }
     // Sin dependencias a propósito: solo al llegar a la pantalla.
   }, []);
+
+  // Arranque automático en el primer ingreso (W-13). Se engancha a la **misma condición que
+  // pinta el contenido** (`!cargando && !aviso && datos`, más abajo), no a que la respuesta haya
+  // llegado: si el recorrido se abriera sobre el esqueleto, los elementos `data-recorrido`
+  // todavía no existirían, `useAnclaRecorrido` devolvería `null` y todos los pasos con ancla se
+  // degradarían a tarjeta centrada, sin que nada falle. Al ser un efecto corre después del
+  // commit, así que las anclas ya están en el DOM.
+  const seIntentoElArranque = useRef(false);
+  useEffect(() => {
+    if (seIntentoElArranque.current) return;
+    // Si lo pidió Mi perfil, ya está abierto: ese camino no consulta nada.
+    if (seAbrioElRecorrido.current) {
+      seIntentoElArranque.current = true;
+      return;
+    }
+    if (cargando || aviso || !datos) return;
+    seIntentoElArranque.current = true;
+
+    let vigente = true;
+    void (async () => {
+      // `null` = no se pudo saber: entonces no se abre (ver `recorridoVisto.ts`).
+      if ((await yaVioElRecorrido()) !== false) return;
+      if (vigente) setRecorridoActivo(true);
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [cargando, aviso, datos]);
 
   // Al cerrar el recorrido el foco tiene que volver a la pantalla: quien lo abrió está en Mi
   // perfil y ya no existe, así que `useAtraparFoco` lo dejaría en el <body>. Este efecto corre

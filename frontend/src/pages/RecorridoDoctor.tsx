@@ -2,8 +2,8 @@
 //
 // Los nueve pasos ocurren sobre el dashboard clínico: el recorrido no navega. Se lanza desde
 // «Ver recorrido» en Mi perfil (W-18), que navega a /dashboard con el estado de navegación
-// `{ recorrido: true }`. Mientras no exista el endpoint del recorrido visto no arranca solo
-// (ver `recorridoVisto.ts`).
+// `{ recorrido: true }`, y también arranca solo en el primer ingreso, cuando el dashboard ya
+// tiene datos en pantalla (ver `recorridoVisto.ts` y el efecto de `Dashboard.tsx`).
 //
 // Los nueve pasos no son nueve componentes: este es el único, y los pasos son datos
 // (`pasosRecorridoDoctor.ts`).
