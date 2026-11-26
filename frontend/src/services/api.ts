@@ -171,7 +171,7 @@ export function registrarManejadoresGlobales(nuevos: ManejadoresGlobales | null)
 }
 
 export interface OpcionesSolicitud {
-  metodo?: "GET" | "POST" | "PATCH";
+  metodo?: "GET" | "POST" | "PUT" | "PATCH";
   cuerpo?: unknown;
   /** Consulta automática: no renueva la inactividad de la sesión (header X-Actividad-Pasiva: 1). */
   pasiva?: boolean;

@@ -1,0 +1,28 @@
+/* Pantalla W-26 · edición de umbrales globales o por característica. */
+.pagina { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-6); }
+.tarjeta { display: flex; width: min(100%, 640px); flex-direction: column; gap: var(--espacio-4); padding: var(--espacio-6); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-lg); background: var(--color-fondo-superficie); box-shadow: var(--sombra-elevacion-1-tarjeta); }
+.tituloSeccion { margin: 0; color: var(--color-texto-primario); font: var(--texto-titulo-h4); }
+.descripcion { margin: var(--espacio-2) 0 0; color: var(--color-texto-secundario); font: var(--texto-cuerpo-pequeno); }
+.modos { display: flex; flex-direction: column; gap: var(--espacio-3); margin: 0; padding: 0; border: 0; }
+.opcion { display: flex; align-items: flex-start; gap: var(--espacio-3); cursor: pointer; }
+.opcion input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--color-accion-primaria); flex: 0 0 auto; }
+.opcion span { display: flex; flex-direction: column; gap: var(--espacio-1); }
+.opcion strong { color: var(--color-texto-primario); font: var(--texto-cuerpo-pequeno-enfasis); }
+.opcion small { color: var(--color-texto-secundario); font: var(--texto-cuerpo-pequeno); }
+.campo { display: flex; width: min(100%, 240px); flex-direction: column; gap: var(--espacio-2); color: var(--color-texto-primario); font: var(--texto-cuerpo-pequeno-enfasis); }
+.campo input { min-height: 40px; padding: var(--espacio-2) var(--espacio-3); border: var(--borde-grosor) solid var(--color-borde-campo); border-radius: var(--radio-sm); background: var(--color-fondo-superficie); color: var(--color-texto-primario); font: var(--texto-cuerpo-base); }
+.campo input[aria-invalid="true"] { border-color: var(--color-estado-error-borde); }
+.campo small { color: var(--color-texto-terciario); font: var(--texto-cuerpo-pequeno); }
+.camposCaracteristicas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--espacio-4); }
+.ultimoCambio { margin: 0; color: var(--color-texto-terciario); font: var(--texto-leyenda); }
+.acciones { display: flex; flex-wrap: wrap; gap: var(--espacio-2); }
+.errorCarga { display: flex; max-width: 640px; flex-direction: column; align-items: flex-start; gap: var(--espacio-3); }
+.cargando { margin: 0; color: var(--color-texto-secundario); font: var(--texto-cuerpo-base); }
+.errorValidacion { margin: 0; color: var(--color-estado-error-texto); font: var(--texto-cuerpo-pequeno); }
+.soloLector { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 767px) {
+  .tarjeta { padding: var(--espacio-4); }
+  .camposCaracteristicas { grid-template-columns: minmax(0, 1fr); }
+  .acciones > * { flex: 1 1 100%; }
+}

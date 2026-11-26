@@ -16,6 +16,7 @@ import EstadoOperativo from "../pages/EstadoOperativo";
 import Historial from "../pages/Historial";
 import LogsTecnicos from "../pages/LogsTecnicos";
 import MetricasModelo from "../pages/MetricasModelo";
+import ParametrosInferencia from "../pages/ParametrosInferencia";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
@@ -160,7 +161,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/parametros",
     titulo: "Parámetros",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <ParametrosInferencia titulo={titulo} />, // W-26
   },
   {
     ruta: "/sin-permisos",

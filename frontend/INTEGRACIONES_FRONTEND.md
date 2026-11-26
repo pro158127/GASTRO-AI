@@ -83,6 +83,40 @@ verificaciones.
 - **Errores / limitaciones:** build aprobado; no se observaron errores de backend reproducibles. Queda pendiente validar respuestas con y sin reporte usando sesión administrativa.
 - **Desvíos / solicitudes al backend:** no registrados.
 
+## W-26 · Parámetros de inferencia
+
+- **Fecha:** 26/11/2026.
+- **Archivos de frontend:** `src/pages/ParametrosInferencia.tsx`,
+  `src/pages/ParametrosInferencia.module.css`, `src/services/configuracionInferencia.ts`,
+  `src/navegacion/pantallas.tsx` y `src/services/api.ts` (se habilitó el método HTTP `PUT`).
+- **Endpoints:** `GET /api/v1/admin/configuracion-inferencia` para cargar la configuración;
+  `PUT /api/v1/admin/configuracion-inferencia` para guardar umbral global o todos los umbrales
+  de características activas.
+- **Contrato revisado:** `backend/app/api/routers/configuracion.py`,
+  `backend/app/schemas/catalogo.py` y `backend/app/services/configuracion_inferencia.py`.
+  El backend valida el rango de 10 % a 90 %, requiere todos los umbrales activos en modo por
+  característica y registra el cambio en la bitácora. Los valores se envían como fracciones
+  entre 0.10 y 0.90.
+- **Estados cubiertos:** carga, error con reintento, modo global, modo por característica,
+  validación del rango, botón habilitado solo con cambios, confirmación antes de guardar,
+  estado de envío y aviso de éxito. «Restablecer valor inicial» usa 50 % o el valor de model
+  card disponible. Se informa que los análisis existentes no cambian.
+- **Build local:** `pnpm build` aprobado (`tsc --noEmit` y `vite build`). Docker Compose
+  reconstruyó y arrancó el servicio `frontend`; `GET http://localhost/` y
+  `GET http://localhost/parametros` respondieron `200`.
+- **Prueba del endpoint:** `GET /api/v1/admin/configuracion-inferencia` respondió `401`
+  sin cookie de sesión, control de acceso esperado. No se ejecutó el GET autenticado ni el PUT:
+  no había sesión administrativa disponible y no se quiso escribir una configuración real
+  solo como parte de la comprobación.
+- **Errores / límites encontrados:** la primera compilación señaló una referencia posiblemente
+  nula en el diálogo de confirmación (TS18047); se corrigió y la compilación final pasó. Se
+  intentó correr `tests/test_configuracion_inferencia_rnf20_qa.py` en el contenedor API, pero
+  esa imagen no tiene `pytest` instalado. No se encontró un error reproducible del endpoint;
+  quedan pendientes las comprobaciones autenticadas de lectura y guardado.
+- **Desvíos de diseño:** la fecha y el usuario se muestran como «Configuración vigente desde»
+  con los datos que realmente expone el backend; no se inventa el valor anterior del cambio.
+  El layout general de navegación y el aviso experimental se reutilizan del shell de la app.
+
 ## W-24 · Logs técnicos
 
 - **Fecha:** 25/11/2026.
