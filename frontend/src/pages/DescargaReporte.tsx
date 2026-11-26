@@ -23,7 +23,7 @@
 // el `id` para reintentar solo la descarga, así que cada fallo del GET deja un reporte huérfano
 // en el almacén (`reportes/{id}.pdf`). Se acepta por simplicidad: el PDF no identifica al
 // paciente y solo lo puede leer quien lo generó.
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Boton from "../components/Boton";
 import Notificacion from "../components/Notificacion";
 import type { TipoNotificacion } from "../components/Notificacion";
@@ -33,6 +33,7 @@ import { CodigoErrorApi } from "../services/codigosError";
 import { descargarArchivoReporte, generarReporteDeAnalisis } from "../services/reportes";
 import type { AvisoError } from "../utils/avisosError";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
+import { useEntregaDeArchivo } from "./useEntregaDeArchivo";
 import estilos from "./DescargaReporte.module.css";
 
 const ETIQUETA = "Descargar reporte";
@@ -56,20 +57,6 @@ const VOLVER_A_PULSAR = `Vuelva a pulsar «${ETIQUETA}» para intentarlo de nuev
 
 /** Solo para el atributo `download` cuando no se pudo leer el nombre real; no se muestra. */
 const NOMBRE_DE_RESPALDO = "reporte-gastroai.pdf";
-
-/**
- * Lo que tarda en revocarse la URL de objeto después del clic.
- *
- * **No se revoca en el mismo hilo del clic, y no es un olvido.** En varios navegadores la
- * descarga todavía no ha empezado a leer el blob cuando se revoca, y entonces la cancelan sin
- * avisar; con el diálogo «¿dónde guardar?» abierto, la lectura ocurre aún más tarde. El
- * síntoma es el peor: funciona en el navegador de quien lo escribió y falla en la demostración.
- * Así que se revoca fuera del hilo y con margen. Mientras tanto solo ocupa memoria de la
- * pestaña, y al desmontar el componente se revoca igual.
- *
- * Si alguien viene a «limpiar» esto: no lo pongas a 0 ni lo muevas junto al clic.
- */
-const ESPERA_REVOCAR_MS = 60_000;
 
 type AvisoFlotante = AvisoError & { tipo: TipoNotificacion };
 
@@ -119,33 +106,7 @@ function falloAlDescargar(causa: unknown): AvisoFlotante {
 export default function DescargaReporte({ idAnalisis }: { idAnalisis: string }) {
   const [generando, setGenerando] = useState(false);
   const [aviso, setAviso] = useState<AvisoFlotante | null>(null);
-
-  /** URLs de objeto vivas: se revocan al desmontar si el temporizador no llegó a hacerlo. */
-  const urlsVivas = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const urls = urlsVivas.current;
-    return () => {
-      for (const url of urls) URL.revokeObjectURL(url);
-      urls.clear();
-    };
-  }, []);
-
-  /** Entrega el archivo al navegador con un enlace temporal. Ver `ESPERA_REVOCAR_MS`. */
-  function entregarAlNavegador(blob: Blob, nombre: string) {
-    const url = URL.createObjectURL(blob);
-    urlsVivas.current.add(url);
-    const enlace = document.createElement("a");
-    enlace.href = url;
-    enlace.download = nombre;
-    enlace.rel = "noopener";
-    document.body.append(enlace);
-    enlace.click();
-    enlace.remove();
-    window.setTimeout(() => {
-      URL.revokeObjectURL(url);
-      urlsVivas.current.delete(url);
-    }, ESPERA_REVOCAR_MS);
-  }
+  const entregarAlNavegador = useEntregaDeArchivo();
 
   async function descargar() {
     if (generando) return;

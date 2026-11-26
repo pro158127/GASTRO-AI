@@ -8,14 +8,14 @@
 //
 // - W-19  (68:4170): con datos.
 // - W-19b (101:636, bloque «Cargando (aria-busy)» 101:800): esqueletos y «Cargando…» visible.
+// - W-19c (101:852) y W-19d (101:1097): el botón «Exportar auditoría» de la cabecera y sus dos
+//   estados, que viven en `ExportarAuditoria.tsx` junto con el diálogo del período.
 //
 // Para el fallo de carga no hay frame propio: se usan los estados globales W-30 (sin conexión)
 // y W-31 (error inesperado) en una alerta con «Reintentar», como en W-15.
 //
 // **Fuera de alcance, a propósito** (cada uno es otra tarea y otro endpoint):
 //
-// - El botón «Exportar auditoría» de la cabecera (W-19c, W-19d): `/admin/auditoria/exportar`
-//   y una descarga de CSV que el frontend todavía no tiene. No se dibuja ni deshabilitado.
 // - El bloque «Evaluación del modelo desplegado sobre el conjunto de prueba» y su estado vacío
 //   W-19q: salen de `/admin/modelo/metricas`, que es W-23.
 // - El recorrido guiado del administrador (W-19e a W-19p).
@@ -50,6 +50,7 @@ import type {
 } from "../types";
 import { fechaHoraCorta } from "../utils/fechas";
 import type { TipoInsignia } from "../utils/presentacionUsuario";
+import ExportarAuditoria from "./ExportarAuditoria";
 import { useDashboardTecnico } from "./useDashboardTecnico";
 import estilos from "./DashboardTecnico.module.css";
 
@@ -492,9 +493,13 @@ export default function DashboardTecnico({ titulo }: { titulo: string }) {
     <>
       {/* Sin banner de aviso experimental, al contrario que W-15: el frame no lo dibuja arriba,
           y el aviso del pie lo pone la disposición. */}
+      {/* «Exportar auditoría» va en la cabecera y **no depende de la carga del dashboard**: son
+          dos cosas distintas, y si `/admin/dashboard` falla, la auditoría se sigue pudiendo
+          exportar. Por eso está fuera de las ramas de `cargando` y `aviso`. */}
       <EncabezadoPagina
         titulo={titulo}
         descripcion="Estado de la plataforma y desempeño documentado del modelo. Sin datos clínicos."
+        acciones={<ExportarAuditoria />}
       />
 
       {cargando && <EsqueletoDashboardTecnico />}

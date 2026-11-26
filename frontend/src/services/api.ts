@@ -12,9 +12,9 @@
 // se pierde el manejo global de sesión y permisos.
 //
 // Ya hay uno: `solicitarBinario`, que nació para el reporte en PDF
-// (`GET /reportes/{id}/archivo`, W-17). **El CSV de la auditoría sigue pendiente** (el botón
-// de exportar de W-19, `GET /admin/auditoria/exportar`): cuando se construya, va por el mismo
-// transporte con su propio tipo de contenido.
+// (`GET /reportes/{id}/archivo`, W-17) y que hoy sirve también al CSV de la auditoría
+// (`GET /admin/auditoria/exportar`, W-19c/d), cada uno con su propio `tipoEsperado`. Un tercer
+// formato no necesita transporte nuevo: necesita su `tipoEsperado`.
 import type {
   CampoConError,
   EdicionPerfil,
@@ -68,6 +68,8 @@ interface DetalleError {
   minimo?: TamanoImagen | null;
   /** `max_intentos` de REINTENTOS_AGOTADOS: cuántos intentos de explicación permite el servidor. */
   maxIntentos?: number | null;
+  /** `max_dias` de PERIODO_INVALIDO: cuántos días puede abarcar el período de la auditoría. */
+  maxDias?: number | null;
 }
 
 /**
@@ -107,6 +109,13 @@ export class ErrorApi extends Error {
    * manda él para que el texto no repita un «3» escrito aquí que mañana puede no ser cierto.
    */
   readonly maxIntentos: number | null;
+  /**
+   * Días que puede abarcar el período, en el 422 PERIODO_INVALIDO del export de la auditoría
+   * (W-19c), **contando los dos extremos**: el servidor rechaza cuando la diferencia supera
+   * `max_dias - 1` días (`backend/app/services/bitacora.py:191`). Lo manda él para que el
+   * frontend no escriba un «366» que mañana puede no ser cierto.
+   */
+  readonly maxDias: number | null;
 
   constructor(estado: number | null, detalle: DetalleError = {}) {
     super(detalle.codigo ?? "Error de la API");
@@ -123,6 +132,7 @@ export class ErrorApi extends Error {
     this.permitidos = detalle.permitidos ?? [];
     this.minimo = detalle.minimo ?? null;
     this.maxIntentos = detalle.maxIntentos ?? null;
+    this.maxDias = detalle.maxDias ?? null;
   }
 
   /**
@@ -228,6 +238,7 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     permitidos: listaDe(detalle.permitidos, esTexto),
     minimo: tamanoONulo(detalle.minimo),
     maxIntentos: numeroONulo(detalle.max_intentos),
+    maxDias: numeroONulo(detalle.max_dias),
   });
 }
 

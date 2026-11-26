@@ -90,6 +90,16 @@ export const CodigoErrorApi = {
    */
   RANGO_FECHAS_INVALIDO: "RANGO_FECHAS_INVALIDO",
   /**
+   * 422 · `GET /admin/auditoria/exportar` (W-19c): falta uno de los dos extremos del período, o
+   * el período es más largo de la cuenta. **No trae `campos`**, al contrario que
+   * RANGO_FECHAS_INVALIDO: el servidor lo lanza con `extra=` y sin la lista de campos
+   * (`backend/app/services/bitacora.py:228-229`), así que el frontend elige dónde pintarlo.
+   *
+   * Trae `max_dias` (ver `ErrorApi.maxDias`): cuántos días puede abarcar el período contando
+   * los dos extremos. El número lo dice el servidor; aquí no se escribe ninguno.
+   */
+  PERIODO_INVALIDO: "PERIODO_INVALIDO",
+  /**
    * 422 · El destino no es otro doctor con la cuenta activa (también si es el propio origen).
    * Trae `campos` con `{campo: "destino_id"}`, así que se pinta en el desplegable de destino.
    */
