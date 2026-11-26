@@ -136,7 +136,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/logs-tecnicos",
     titulo: "Logs técnicos",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // W-24
+    elemento: (titulo) => <LogsTecnicos titulo={titulo} />, // W-24
   },
   {
     ruta: "/parametros",
