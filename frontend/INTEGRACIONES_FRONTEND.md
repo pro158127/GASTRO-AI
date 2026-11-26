@@ -82,3 +82,25 @@ verificaciones.
 - **Prueba en navegador:** flujo autenticado pendiente.
 - **Errores / limitaciones:** build aprobado; no se observaron errores de backend reproducibles. Queda pendiente validar respuestas con y sin reporte usando sesión administrativa.
 - **Desvíos / solicitudes al backend:** no registrados.
+
+## W-24 · Logs técnicos
+
+- **Fecha:** 25/11/2026.
+- **Archivos de frontend:** `src/pages/LogsTecnicos.tsx`,
+  `src/pages/LogsTecnicos.module.css` y `src/services/logsTecnicos.ts`.
+- **Endpoint:** `GET /api/v1/admin/logs-inferencia` con `estado`, `desde`, `hasta`,
+  `pagina` y `por_pagina=25`.
+- **Contrato revisado:** `backend/app/api/routers/admin_monitoreo.py`,
+  `backend/app/schemas/monitoreo.py`, `backend/app/repositories/monitoreo_repository.py`
+  y `backend/app/models/auditoria.py`. Las fechas se envían como días `YYYY-MM-DD`,
+  inclusivos en la zona de Colombia; el cliente comprueba que «Desde» no supere «Hasta».
+  La pantalla solo muestra tiempos y estado, sin `analisis_id`, códigos técnicos internos
+  ni resultados clínicos.
+- **Estados cubiertos:** carga, registros, vacío, filtro por estado/rango de fechas,
+  paginación, respuesta lenta, errores y reintento. Tabla en escritorio y tarjetas en
+  pantallas menores a 1280 px.
+- **Build (`pnpm build`):** aprobado el 25/11/2026.
+- **Prueba de endpoint:** API saludable (`/api/v1/health` `200`); `GET /api/v1/admin/logs-inferencia` devuelve `401` sin sesión, control esperado. Falta validar filtros y páginas con administrador.
+- **Prueba en navegador:** flujo autenticado pendiente.
+- **Errores / limitaciones:** build aprobado; no se observaron errores de backend reproducibles. Queda pendiente validar filtros, páginas y estados con sesión administrativa.
+- **Desvíos / solicitudes al backend:** no registrados.

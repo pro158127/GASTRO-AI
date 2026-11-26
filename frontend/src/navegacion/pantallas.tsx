@@ -8,6 +8,7 @@ import CrearUsuario from "../pages/CrearUsuario";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import EstadoOperativo from "../pages/EstadoOperativo";
+import LogsTecnicos from "../pages/LogsTecnicos";
 import MetricasModelo from "../pages/MetricasModelo";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
@@ -135,7 +136,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/logs-tecnicos",
     titulo: "Logs técnicos",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // W-24
+    elemento: (titulo) => <LogsTecnicos titulo={titulo} />, // W-24
   },
   {
     ruta: "/parametros",

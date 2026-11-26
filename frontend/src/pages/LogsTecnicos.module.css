@@ -1,0 +1,53 @@
+/* Pantalla W-24 · consulta de trazas técnicas de inferencia. */
+.pagina { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-6); }
+.filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--espacio-4); padding: var(--espacio-4); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-lg); background: var(--color-fondo-superficie); }
+.campo { display: flex; min-width: 180px; flex: 1 1 180px; flex-direction: column; gap: var(--espacio-2); }
+.campo label { color: var(--color-texto-primario); font: var(--texto-etiqueta-campo); }
+.campo input, .campo select { box-sizing: border-box; width: 100%; min-height: var(--tamano-control); padding: var(--espacio-2) var(--espacio-3); border: var(--borde-grosor) solid var(--color-borde-campo); border-radius: var(--radio-sm); background: var(--color-fondo-superficie); color: var(--color-texto-primario); font: var(--texto-cuerpo-base); }
+.campo input:focus-visible, .campo select:focus-visible { outline: var(--borde-grosor-foco) solid var(--color-foco-anillo); outline-offset: 2px; }
+.errorFiltro { display: flex; flex: 1 1 100%; align-items: flex-start; gap: var(--espacio-2); margin: 0; color: var(--color-estado-error-texto); font: var(--texto-cuerpo-pequeno); }
+.errorFiltro svg { flex: 0 0 16px; color: var(--color-estado-error-icono); }
+.campo input[aria-invalid="true"] { border-color: var(--color-estado-error-borde); outline-color: var(--color-estado-error-borde); }
+.errorCarga { display: flex; max-width: 640px; flex-direction: column; align-items: flex-start; gap: var(--espacio-3); }
+.seccionResultados { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-4); }
+.tituloSeccion { margin: 0; color: var(--color-texto-primario); font: var(--texto-titulo-h4); }
+.resultados { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-4); }
+.resultados:focus { outline: none; }
+.estadoResultados { min-height: 20px; margin: 0; color: var(--color-texto-secundario); font: var(--texto-cuerpo-pequeno); }
+.esqueletos { display: flex; flex-direction: column; gap: var(--espacio-2); }
+.marcoTabla { overflow-x: auto; border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-md); background: var(--color-fondo-superficie); }
+.tabla { width: 100%; border-collapse: collapse; color: var(--color-texto-primario); font: var(--texto-cuerpo-pequeno); text-align: left; }
+.tabla th, .tabla td { padding: var(--espacio-3); border-bottom: var(--borde-grosor) solid var(--color-borde-sutil); vertical-align: middle; }
+.tabla thead th { background: var(--color-fondo-superficie-sutil); font: var(--texto-cuerpo-pequeno-enfasis); white-space: nowrap; }
+.tabla tbody tr:last-child > * { border-bottom: 0; }
+.idLog { font: var(--texto-cuerpo-pequeno-enfasis); }
+.revision { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.numero { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.insignia { display: inline-flex; max-width: 100%; padding: 0 var(--espacio-2); border: var(--borde-grosor) solid; border-radius: var(--radio-completo); font: var(--texto-cuerpo-pequeno-enfasis); overflow-wrap: anywhere; }
+.exito { border-color: var(--color-estado-exito-borde); background: var(--color-estado-exito-fondo); color: var(--color-estado-exito-texto); }
+.advertencia { border-color: var(--color-estado-advertencia-borde); background: var(--color-estado-advertencia-fondo); color: var(--color-estado-advertencia-texto); }
+.error { border-color: var(--color-estado-error-borde); background: var(--color-estado-error-fondo); color: var(--color-estado-error-texto); }
+.tarjetas { display: none; }
+.tarjetaLog { min-width: 0; padding: var(--espacio-4); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-md); background: var(--color-fondo-superficie); }
+.encabezadoTarjeta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--espacio-2); }
+.encabezadoTarjeta h3 { min-width: 0; margin: 0; font: var(--texto-cuerpo-pequeno-enfasis); overflow-wrap: anywhere; }
+.tarjetaLog dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--espacio-3); margin: var(--espacio-3) 0 0; }
+.tarjetaLog dl div { min-width: 0; }
+.tarjetaLog dt { color: var(--color-texto-terciario); font: var(--texto-leyenda); }
+.tarjetaLog dd { margin: var(--espacio-1) 0 0; color: var(--color-texto-primario); font: var(--texto-cuerpo-pequeno); overflow-wrap: anywhere; }
+.vacio { margin: 0; padding: var(--espacio-6); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-md); background: var(--color-fondo-superficie); color: var(--color-texto-secundario); }
+.paginacion { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--espacio-3); }
+.ayudaPaginacion { flex: 1 1 100%; margin: 0; color: var(--color-texto-terciario); font: var(--texto-leyenda); text-align: right; }
+
+@media (max-width: 1279px) {
+  .marcoTabla { display: none; }
+  .tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--espacio-3); margin: 0; padding: 0; list-style: none; }
+}
+
+@media (max-width: 767px) {
+  .campo { min-width: 100%; flex-basis: 100%; }
+  .filtros > button { width: 100%; min-height: var(--tamano-control-tactil); }
+  .tarjetas { grid-template-columns: minmax(0, 1fr); }
+  .paginacion { justify-content: space-between; }
+  .ayudaPaginacion { text-align: left; }
+}
