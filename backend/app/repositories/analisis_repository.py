@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select, text, update
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -20,6 +20,7 @@ from app.models import (
     Traslado,
     TrasladoCaso,
 )
+from app.repositories.pacientes_repository import casos_del_paciente, tiene_historial
 
 # Espacio de candados del análisis (el primer int de pg_advisory_xact_lock(int, int)).
 # Postgres no mezcla esta forma de dos enteros con la de un bigint que usa usuarios.
@@ -56,21 +57,14 @@ class RepositorioAnalisis:
         """El caso más viejo del doctor con ese paciente (con cualquier versión de clave)."""
         return self.db.scalar(
             select(CasoPaciente)
-            .where(
-                CasoPaciente.doctor_asignado_id == doctor_id,
-                or_(
-                    *(
-                        and_(
-                            CasoPaciente.seudonimo == s.valor,
-                            CasoPaciente.version_clave == s.version_clave,
-                        )
-                        for s in seudonimos
-                    )
-                ),
-            )
+            .where(casos_del_paciente(doctor_id, seudonimos))
             .order_by(CasoPaciente.creado_en.asc())
             .limit(1)
         )
+
+    def paciente_con_historial(self, doctor_id: UUID, seudonimos: list[Seudonimo]) -> bool:
+        """La misma regla que POST /pacientes/consulta: al menos un análisis COMPLETADO."""
+        return bool(self.db.scalar(select(tiene_historial(doctor_id, seudonimos))))
 
     def siguiente_numero(self) -> int:
         """El NNNNNN de A-AAAA-NNNNNN. Una secuencia nunca repite, ni con rollback (RNF-24)."""
