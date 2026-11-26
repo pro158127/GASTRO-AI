@@ -10,7 +10,10 @@ import CrearUsuario from "../pages/CrearUsuario";
 import Dashboard from "../pages/Dashboard";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
+import EstadoOperativo from "../pages/EstadoOperativo";
 import Historial from "../pages/Historial";
+import LogsTecnicos from "../pages/LogsTecnicos";
+import MetricasModelo from "../pages/MetricasModelo";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
@@ -139,19 +142,19 @@ export const pantallas: Pantalla[] = [
     ruta: "/estado-operativo",
     titulo: "Estado operativo",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <EstadoOperativo titulo={titulo} />, // W-22
   },
   {
     ruta: "/metricas-del-modelo",
     titulo: "Métricas del modelo",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <MetricasModelo titulo={titulo} />, // W-23
   },
   {
     ruta: "/logs-tecnicos",
     titulo: "Logs técnicos",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <LogsTecnicos titulo={titulo} />, // W-24
   },
   {
     ruta: "/parametros",
