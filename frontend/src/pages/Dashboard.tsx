@@ -15,6 +15,8 @@
 //
 // Para el fallo de carga no hay frame propio: se usan los estados globales W-30 (sin conexión)
 // y W-31 (error inesperado) en una alerta con «Reintentar», como en W-16.
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import EncabezadoPagina from "../components/EncabezadoPagina";
 import Alerta from "../components/Alerta";
 import AvisoExperimental from "../components/AvisoExperimental";
@@ -34,6 +36,7 @@ import { fechaCorta, mesEnCurso } from "../utils/fechas";
 import { porcentajeDirecto } from "../utils/numeros";
 import DashboardCasosRecientes from "./DashboardCasosRecientes";
 import DashboardFrecuencia from "./DashboardFrecuencia";
+import RecorridoDoctor from "./RecorridoDoctor";
 import { useDashboardDoctor } from "./useDashboardDoctor";
 import estilos from "./Dashboard.module.css";
 
@@ -173,7 +176,7 @@ function Indicadores({ datos }: { datos: DashboardDoctor }) {
   const { resumen, concordancia, casos_recibidos, pacientes_con_seguimiento, primer_uso } = datos;
 
   return (
-    <ul className={estilos.indicadores}>
+    <ul className={estilos.indicadores} data-recorrido="indicadores">
       <TarjetaIndicador
         indicador="Análisis este mes"
         valor={String(resumen.analisis_mes)}
@@ -188,6 +191,8 @@ function Indicadores({ datos }: { datos: DashboardDoctor }) {
       />
       <TarjetaIndicador
         indicador="Concordancia con el modelo"
+        // El paso 6 del recorrido de TOPOLOGO (W-14c) ilumina esta tarjeta.
+        anclaRecorrido="concordancia"
         // `porcentaje` ya viene de 0 a 100 con un decimal; «—» mientras no haya valorado nada.
         valor={concordancia.porcentaje === null ? "—" : porcentajeDirecto(concordancia.porcentaje)}
         detalle={detalleConcordancia(concordancia)}
@@ -225,6 +230,47 @@ function EsqueletoDashboard() {
 
 export default function Dashboard({ titulo }: { titulo: string }) {
   const { datos, cargando, aviso, recargar } = useDashboardDoctor();
+  const ubicacion = useLocation();
+  const navegar = useNavigate();
+
+  // Recorrido guiado de TOPOLOGO (W-13, W-14x). Se lanza desde «Ver recorrido» en Mi perfil,
+  // que navega aquí con el estado de navegación `{ recorrido: true }`, y no con un parámetro en
+  // la URL: ese sobreviviría a la recarga, volvería a abrir el recorrido en cada F5 y se lo
+  // abriría también a quien recibiera el enlace copiado.
+  //
+  // Todavía no arranca solo en el primer ingreso: para eso hace falta saber si ya lo vio, y el
+  // endpoint no existe (ver `recorridoVisto.ts`). Cuando exista, la condición inicial pasa a ser
+  // «lo pidió Mi perfil, o `yaVioElRecorrido()` devolvió `false`».
+  const [recorridoActivo, setRecorridoActivo] = useState(
+    () => (ubicacion.state as { recorrido?: boolean } | null)?.recorrido === true
+  );
+  const seAbrioElRecorrido = useRef(recorridoActivo);
+
+  // El estado de navegación se consume una sola vez: así una recarga no lo vuelve a abrir.
+  useEffect(() => {
+    if ((ubicacion.state as { recorrido?: boolean } | null)?.recorrido) {
+      navegar(ubicacion.pathname, { replace: true, state: null });
+    }
+    // Sin dependencias a propósito: solo al llegar a la pantalla.
+  }, []);
+
+  // Al cerrar el recorrido el foco tiene que volver a la pantalla: quien lo abrió está en Mi
+  // perfil y ya no existe, así que `useAtraparFoco` lo dejaría en el <body>. Este efecto corre
+  // después de que el recorrido se desmonte, de modo que gana al foco que devuelve el hook.
+  useEffect(() => {
+    if (recorridoActivo) {
+      seAbrioElRecorrido.current = true;
+      return;
+    }
+    if (!seAbrioElRecorrido.current) return;
+    seAbrioElRecorrido.current = false;
+    // Sin envolver la pantalla en un contenedor propio, que cambiaría su disposición.
+    const encabezado = document.querySelector<HTMLElement>("main h1");
+    if (encabezado) {
+      encabezado.tabIndex = -1;
+      encabezado.focus();
+    }
+  }, [recorridoActivo]);
 
   return (
     <>
@@ -263,7 +309,9 @@ export default function Dashboard({ titulo }: { titulo: string }) {
 
           {datos.primer_uso ? (
             // W-12: sin ningún análisis no hay casos recientes ni gráfica (CA 10).
-            <div className={estilos.tarjetaVacia}>
+            // El paso 3 del recorrido ancla a la sección, no a su contenido: aquí el estado
+            // vacío y más abajo la lista de casos ocupan el mismo sitio.
+            <div className={estilos.tarjetaVacia} data-recorrido="casos-recientes">
               <EstadoVacio
                 nivelTitulo="h2"
                 titulo="Aún no hay análisis"
@@ -275,7 +323,7 @@ export default function Dashboard({ titulo }: { titulo: string }) {
               </EstadoVacio>
             </div>
           ) : (
-            <div className={estilos.casosYFrecuencia}>
+            <div className={estilos.casosYFrecuencia} data-recorrido="casos-recientes">
               <DashboardCasosRecientes recientes={datos.analisis_recientes} />
               <DashboardFrecuencia
                 rotulo={datos.frecuencia.rotulo}
@@ -286,6 +334,8 @@ export default function Dashboard({ titulo }: { titulo: string }) {
           )}
         </>
       )}
+
+      {recorridoActivo && <RecorridoDoctor alCerrar={() => setRecorridoActivo(false)} />}
     </>
   );
 }

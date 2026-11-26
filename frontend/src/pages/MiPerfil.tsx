@@ -11,8 +11,9 @@
 // avisos W-30/W-31 al cargar o guardar.
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useBlocker } from "react-router";
+import { useBlocker, useNavigate } from "react-router";
 import type { BlockerFunction } from "react-router";
+import mascota from "../assets/mascota-topologo.svg";
 import Alerta from "../components/Alerta";
 import Boton from "../components/Boton";
 import CampoTexto from "../components/CampoTexto";
@@ -115,15 +116,47 @@ export default function MiPerfil({ titulo }: { titulo: string }) {
         </div>
       )}
       {carga.fase === "listo" && (
-        <FormularioPerfil
-          perfilInicial={carga.perfil}
-          autenticado={autenticado}
-          alGuardar={(perfil) => actualizarUsuario({ nombre: perfil.nombre, apellido: perfil.apellido })}
-        />
+        <>
+          <FormularioPerfil
+            perfilInicial={carga.perfil}
+            autenticado={autenticado}
+            alGuardar={(perfil) => actualizarUsuario({ nombre: perfil.nombre, apellido: perfil.apellido })}
+          />
+          {/* Solo el doctor: el recorrido del administrador (W-19e…W-19p) todavía no existe, y
+              un «Ver recorrido» que no lleva a nada es peor que no tenerlo. Cuando exista, la
+              condición incluye ADMINISTRADOR y la tarjeta se pinta igual (Figma W-18f, 98:9891). */}
+          {carga.perfil.rol.codigo === "DOCTOR" && <TarjetaRecorrido />}
+        </>
       )}
-      {/* TEMPORAL: falta la tarjeta «Recorrido de la aplicación» (Figma 65:4106 / 98:9891) con
-          «Ver recorrido». Se agrega cuando exista el recorrido guiado (T-13/T-14, W-19e…). */}
     </>
+  );
+}
+
+/**
+ * Tarjeta «Recorrido de la aplicación» (Figma 65:4106). «Ver recorrido» navega al dashboard y
+ * arranca allí el recorrido guiado: los nueve pasos ocurren sobre esa pantalla.
+ *
+ * Va por el estado de navegación y no por un parámetro en la URL, que sobreviviría a la recarga
+ * (ver el comentario de `Dashboard.tsx`).
+ */
+function TarjetaRecorrido() {
+  const navegar = useNavigate();
+  const idTitulo = useId();
+
+  return (
+    <section className={estilos.recorrido} aria-labelledby={idTitulo}>
+      {/* La mascota es decorativa. */}
+      <img src={mascota} alt="" className={estilos.mascotaRecorrido} />
+      <div className={estilos.textoRecorrido}>
+        <h2 id={idTitulo} className={estilos.tituloTarjeta}>
+          Recorrido de la aplicación
+        </h2>
+        <p className={estilos.descripcionRecorrido}>Vuelva a ver el recorrido guiado de Gastro-AI.</p>
+      </div>
+      <Boton jerarquia="secundario" onClick={() => navegar("/dashboard", { state: { recorrido: true } })}>
+        Ver recorrido
+      </Boton>
+    </section>
   );
 }
 

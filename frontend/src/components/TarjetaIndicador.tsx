@@ -17,11 +17,22 @@ interface PropiedadesTarjetaIndicador {
   valor: string;
   /** La base o el periodo: «Octubre de 2026», «32 de 41 análisis valorados». */
   detalle: string;
+  /**
+   * Ancla para el recorrido guiado: se escribe como `data-recorrido` y el recorrido la busca
+   * por selector. Se marca la tarjeta concreta en vez de contarlas por su posición, que se
+   * rompería en silencio el día que alguien reordene el dashboard.
+   */
+  anclaRecorrido?: string;
 }
 
-export default function TarjetaIndicador({ indicador, valor, detalle }: PropiedadesTarjetaIndicador) {
+export default function TarjetaIndicador({
+  indicador,
+  valor,
+  detalle,
+  anclaRecorrido,
+}: PropiedadesTarjetaIndicador) {
   return (
-    <li className={estilos.tarjeta}>
+    <li className={estilos.tarjeta} data-recorrido={anclaRecorrido}>
       <p className={estilos.indicador}>{indicador}</p>
       <p className={estilos.valor}>{valor}</p>
       <p className={estilos.detalle}>{detalle}</p>
