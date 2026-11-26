@@ -5,6 +5,8 @@ administrador (CA 2). Solo nombre y apellido son obligatorios y el teléfono es 
 por minimización de datos (CA 3, Ley 1581).
 """
 
+from datetime import UTC, datetime
+
 from app.models import AccionBitacora, Usuario
 from app.repositories.unidad_trabajo import UnidadTrabajo
 from app.services.auditoria import EventoAuditoria, PublicadorEventos
@@ -15,6 +17,12 @@ class ServicioPerfil:
     def __init__(self, publicador: PublicadorEventos, unidad: UnidadTrabajo) -> None:
         self._publicador = publicador
         self._unidad = unidad
+
+    def marcar_recorrido_visto(self, usuario: Usuario) -> None:
+        """Guarda la primera visualización del recorrido; las llamadas repetidas no cambian nada."""
+        if usuario.recorrido_visto_en is None:
+            usuario.recorrido_visto_en = datetime.now(UTC)
+            self._unidad.confirmar()
 
     def editar(self, usuario: Usuario, cambios: CambiosCuenta, ip: str | None) -> Usuario:
         campos = []
