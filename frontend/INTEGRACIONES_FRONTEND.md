@@ -99,8 +99,9 @@ verificaciones.
   entre 0.10 y 0.90.
 - **Estados cubiertos:** carga, error con reintento, modo global, modo por característica,
   validación del rango, botón habilitado solo con cambios, confirmación antes de guardar,
-  estado de envío y aviso de éxito. «Restablecer valor inicial» usa 50 % o el valor de model
-  card disponible. Se informa que los análisis existentes no cambian.
+  estado de envío y aviso de éxito. Si falla el guardado, se cierra la confirmación para que el
+  error quede visible y se conservan los valores para reintentar. «Restablecer valor inicial» usa
+  50 % o el valor de model card disponible. Se informa que los análisis existentes no cambian.
 - **Build local:** `pnpm build` aprobado (`tsc --noEmit` y `vite build`). Docker Compose
   reconstruyó y arrancó el servicio `frontend`; `GET http://localhost/` y
   `GET http://localhost/parametros` respondieron `200`.

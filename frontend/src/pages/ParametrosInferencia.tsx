@@ -137,6 +137,7 @@ export default function ParametrosInferencia({ titulo }: { titulo: string }) {
       setConfirmacion(false);
       setExito(true);
     } catch (fallo: unknown) {
+      setConfirmacion(false);
       if (!esErrorGlobal(fallo)) setAviso(avisoDeError(fallo));
     } finally {
       setGuardando(false);
