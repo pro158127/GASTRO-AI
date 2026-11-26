@@ -104,10 +104,11 @@ def test_consulta_con_historial_devuelve_conteo_y_fecha(entorno):
 def test_documento_malformado_no_llega_al_servicio(entorno, ruta):
     client, _, _, consulta, historial = entorno
     client.cookies.set("gastro_sesion", "sesion-sintetica")
-    response = enviar(client, ruta, numero_documento="9" * 31)
+    invalido = "9" * 31
+    response = enviar(client, ruta, numero_documento=invalido)
     assert response.status_code == 422
     assert response.json()["error"]["codigo"] == "DATOS_INVALIDOS"
-    assert DOCUMENTO not in response.text
+    assert invalido not in response.text
     consulta.consultar.assert_not_called()
     historial.de_paciente.assert_not_called()
 

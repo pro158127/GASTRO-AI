@@ -1,7 +1,7 @@
 """RNF-20: orquestación del wrapper Celery, sin broker, Space ni Gemini reales."""
 
 from types import SimpleNamespace as NS
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, call
 from uuid import UUID
 
 import pytest
@@ -63,6 +63,9 @@ def test_registro_de_tareas_y_reconocimiento_tardio():
 
 
 def test_procesamiento_usa_uuid_y_explicacion_despues_del_resultado(piezas):
+    orden = Mock()
+    orden.attach_mock(piezas.processor_value.procesar, "procesar")
+    orden.attach_mock(piezas.explanation_value.generar, "explicar")
     tareas.procesar_analisis.run(str(ID))
     piezas.session.assert_called_once_with()
     piezas.storage.assert_called_once_with(piezas.settings_value)
@@ -79,6 +82,7 @@ def test_procesamiento_usa_uuid_y_explicacion_despues_del_resultado(piezas):
     piezas.processor_value.procesar.assert_called_once_with(ID)
     piezas.explanation.assert_called_once_with(piezas.db)
     piezas.explanation_value.generar.assert_called_once_with(ID)
+    assert orden.mock_calls == [call.procesar(ID), call.explicar(ID)]
     piezas.context.__exit__.assert_called_once_with(None, None, None)
 
 
