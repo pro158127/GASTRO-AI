@@ -6,6 +6,7 @@ Variable nueva = va aquí Y en .env.example, o el siguiente que clone el repo te
 
 import base64
 import binascii
+import logging
 import re
 from functools import lru_cache
 
@@ -103,9 +104,11 @@ class Settings(BaseSettings):
     llm_proveedor: str = "gemini"
     # 3.5-flash: en las pruebas del 2026-11-07 respondió en ~2 s; 3.7 y 3.8 se pasaban de 15 s
     llm_modelo: str = "gemini-3.5-flash"
-    # Cuánto «piensa» el modelo antes de contestar: LOW, MEDIUM o HIGH; vacío = lo que traiga
-    # el modelo. Los 3.x piensan harto por defecto y eso los vuelve lentos (RF-R05 CA 3: ≤ 10 s)
-    llm_razonamiento: str = "LOW"
+    # Cuánto «piensa» el modelo antes de contestar: MINIMAL, LOW, MEDIUM o HIGH; vacío = lo
+    # que traiga el modelo. Los 3.x piensan harto por defecto y eso los vuelve lentos
+    # (RF-R05 CA 3: ≤ 10 s). Para un párrafo sobre tres números basta MINIMAL (2026-11-25:
+    # 1,4 s); con LOW, 2 de 3 llamadas terminaron en 504 DEADLINE_EXCEEDED.
+    llm_razonamiento: str = "MINIMAL"
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_seconds: float = 15.0  # RF-R05 CA 4: si pasa de 15 s, lo soltamos
 
@@ -169,4 +172,12 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    ajustes = Settings()
+    # En desarrollo se arranca igual, pero sin esta llave vincular el TOTP falla al primer
+    # intento y no se entiende por qué (hallazgo de QA). Se nombra la variable, no el valor.
+    if ajustes.environment != PRODUCCION and not _llave_aes(ajustes.totp_clave_cifrado):
+        logging.getLogger("gastroia.config").warning(
+            "TOTP_CLAVE_CIFRADO no es una llave de 32 bytes en Base64: vincular el segundo "
+            "factor va a fallar. Genérala con el comando del README («Variables de entorno»)."
+        )
+    return ajustes

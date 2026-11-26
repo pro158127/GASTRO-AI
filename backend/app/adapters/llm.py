@@ -105,6 +105,9 @@ class AdaptadorProveedorLLM:
             response_schema=_RespuestaExplicacion,
             temperature=0.2,
             thinking_config=pensar,
+            # Sin herramientas no hay llamadas que encadenar; apagado explícito pa que el SDK
+            # no intente nada extra ni llene el log con «AFC is enabled»
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
     def explicar(self, resumen: dict[str, Any]) -> str:
