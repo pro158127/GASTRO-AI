@@ -60,6 +60,13 @@ export default function BarraSuperior({
       </div>
 
       <div className={estilos.movil}>
+        {/* `aria-haspopup="dialog"` se queda aunque el panel que abre el recorrido guiado no sea
+            un diálogo: describe lo que hace **este botón** al pulsarlo, y lo que abre la persona
+            sigue siendo un diálogo. El panel del recorrido no lo abre este botón —que además
+            queda debajo de la capa del recorrido y no se puede pulsar—, así que cambiar el
+            atributo describiría mal el botón para arreglar algo que no es suyo. `aria-expanded`
+            sí describe si el panel se ve, venga de donde venga, y la disposición le pasa el
+            estado de los dos casos. */}
         <button
           ref={botonMenuRef}
           type="button"

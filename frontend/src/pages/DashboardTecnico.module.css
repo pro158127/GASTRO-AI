@@ -48,6 +48,36 @@
   align-items: start;
 }
 
+/* Envoltorio del paso 3 del recorrido (W-19j): agrupa estado operativo, modelo y latencia para
+   que el anillo los abarque de una vez. Como son hijos de un contenedor nuevo y no del <main>,
+   pierden la separación y el `min-width: 0` que les daba la disposición interna
+   (`DisposicionInterna.module.css:19-31`): se repiten aquí, con las mismas tres medidas en los
+   mismos tres anchos, para que la pantalla se vea igual que antes del recorrido.
+
+   No puede ser `display: contents`: sin caja propia no se podría medir y el anillo no saldría
+   (ver `useAnclaRecorrido`). */
+.serviciosYModelo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
+.serviciosYModelo > * {
+  min-width: 0;
+}
+
+@media (max-width: 1279px) {
+  .serviciosYModelo {
+    gap: var(--espacio-5);
+  }
+}
+
+@media (max-width: 767px) {
+  .serviciosYModelo {
+    gap: var(--espacio-4);
+  }
+}
+
 /* ------------------------------------------------------- filas de servicio y de modelo */
 
 /* Sirve para el <ul> de servicios y para el <dl> del modelo: las dos son listas de

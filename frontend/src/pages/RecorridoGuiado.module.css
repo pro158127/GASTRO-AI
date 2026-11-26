@@ -1,18 +1,29 @@
-/* Recorrido de TOPOLOGO del doctor (W-13, W-14b…W-14h). */
+/* Recorrido de TOPOLOGO: doctor (W-13, W-14b…W-14h) y administrador (W-19e…W-19p), y sus
+   versiones de celular (M-13, M-14e, M-14g, M-14h, M-19e, M-19i, M-19f, M-19p). */
 
 /*
  * Capa que cubre toda la ventana. TRANSPARENTE a propósito: solo captura los clics, para que
  * nada de lo que está debajo —incluido el elemento iluminado— sea pulsable. El oscurecimiento
  * lo pone `.velo` o la sombra de `.hueco`.
  *
- * z-index 45: por encima de la barra lateral, de la barra superior y del panel del menú de
- * celular (40), pero por debajo de los diálogos (55) y del aviso de inactividad (60), que deben
- * poder aparecer sobre el recorrido.
+ * z-index 52: por encima de la barra lateral, de la barra superior, de la capa oscura del menú de
+ * celular (40) y **del panel de ese menú (50)**, que el recorrido abre en los pasos de ítem del
+ * menú; y por debajo de los diálogos (55) y del aviso de inactividad (60), que deben poder
+ * aparecer sobre el recorrido. Es el orden de los frames: en M-14h (127:5448) la «Capa del
+ * recorrido» va después del «Panel de navegación».
+ *
+ * Hasta esta tarea era 45, por debajo del panel, y el comentario decía que estaba por encima
+ * «del panel del menú de celular (40)»: confundía el panel con su capa oscura. Con el menú
+ * abierto, el panel tapaba el recorrido.
+ *
+ * Que la capa esté por encima del panel es también lo que impide que se pueda tocar el ítem
+ * resaltado: sus `onActivar` navegarían y dejarían el recorrido anclado a un DOM que ya no
+ * existe.
  */
 .capa {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 52;
 }
 
 /* Pasos que no iluminan nada (1 y 5, y los que no encuentran su elemento). */
@@ -109,19 +120,29 @@
   flex: 1 1 0;
 }
 
+/* En tableta y escritorio los tres botones son hermanos en una fila: la caja de «Anterior» y
+   «Siguiente» no genera caja y no cambia nada. */
+.navegacion {
+  display: contents;
+}
+
 /* ---------- Celular (< 768 px) ----------
-   Una tarjeta flotante junto a un elemento iluminado no cabe a 320 px: se ancla al pie de la
-   ventana, de ancho completo. El elemento iluminado sigue trayéndose a la vista, y el anillo
-   queda arriba, sin que la tarjeta lo tape. */
+   Panel fijo abajo, no globo flotante: una tarjeta junto al elemento no cabe a 320 px. Medidas
+   de M-13 (127:7699) y M-14h (127:8378), idénticas en los dos: 16 px de margen a los lados y
+   abajo (358 px de ancho en una ventana de 390), la mascota a ×2 **encima** de la tarjeta y
+   alineada a la izquierda, y las acciones en dos filas. El elemento iluminado se trae al
+   principio de la ventana (`useAnclaRecorrido`), así que el anillo queda arriba y el panel no lo
+   tapa. */
 @media (max-width: 767px) {
   .tarjeta,
   .centrada,
   .flotante {
     top: auto;
-    right: var(--espacio-2);
-    bottom: var(--espacio-2);
-    left: var(--espacio-2);
-    align-items: flex-end;
+    right: var(--espacio-4);
+    bottom: var(--espacio-4);
+    left: var(--espacio-4);
+    flex-direction: column;
+    align-items: flex-start;
     transform: none;
   }
 
@@ -131,19 +152,36 @@
   }
 
   .globo {
-    width: auto;
-    flex: 1 1 0;
+    width: 100%;
+    /* En columna, `flex: 1 1 0` estiraría el alto: la tarjeta crece con su texto. */
+    flex: none;
     min-width: 0;
     padding: var(--espacio-4);
   }
 
-  /* Objetivos táctiles de 44 px; si los tres controles no caben, se apilan. */
+  /* «Omitir recorrido» en su propia fila y, debajo, «Anterior» y «Siguiente» al 50 %. */
   .acciones {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
+  .espacio {
+    display: none;
+  }
+
+  .navegacion {
+    display: flex;
+    width: 100%;
+    gap: var(--espacio-2);
+  }
+
+  /* Objetivos táctiles de 44 px (WCAG 2.5.8 y la nota de reglas de Figma). */
   .acciones button {
     min-height: var(--tamano-control-tactil);
+  }
+
+  .navegacion button {
+    flex: 1 1 0;
   }
 }
 

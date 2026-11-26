@@ -24,7 +24,7 @@ import Notificacion from "../components/Notificacion";
 import { ErrorApi, actualizarPerfil, obtenerPerfil } from "../services/api";
 import { CodigoErrorApi } from "../services/codigosError";
 import { useSesion } from "../sesion/ProveedorSesion";
-import type { Perfil } from "../types";
+import type { Perfil, RolUsuario } from "../types";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
 import { esTelefonoValido, normalizarTelefono } from "../utils/validacionUsuario";
@@ -122,10 +122,9 @@ export default function MiPerfil({ titulo }: { titulo: string }) {
             autenticado={autenticado}
             alGuardar={(perfil) => actualizarUsuario({ nombre: perfil.nombre, apellido: perfil.apellido })}
           />
-          {/* Solo el doctor: el recorrido del administrador (W-19e…W-19p) todavía no existe, y
-              un «Ver recorrido» que no lleva a nada es peor que no tenerlo. Cuando exista, la
-              condición incluye ADMINISTRADOR y la tarjeta se pinta igual (Figma W-18f, 98:9891). */}
-          {carga.perfil.rol.codigo === "DOCTOR" && <TarjetaRecorrido />}
+          {/* Los dos roles: el doctor (W-18, 65:4106) y el administrador (W-18f, 98:9891), cada
+              uno al recorrido de su dashboard. */}
+          <TarjetaRecorrido rol={carga.perfil.rol.codigo} />
         </>
       )}
     </>
@@ -133,15 +132,24 @@ export default function MiPerfil({ titulo }: { titulo: string }) {
 }
 
 /**
- * Tarjeta «Recorrido de la aplicación» (Figma 65:4106). «Ver recorrido» navega al dashboard y
- * arranca allí el recorrido guiado: los nueve pasos ocurren sobre esa pantalla.
+ * Tarjeta «Recorrido de la aplicación» (Figma 65:4106 para el doctor, 98:9891 para el
+ * administrador). «Ver recorrido» navega al dashboard y arranca allí el recorrido guiado: los
+ * nueve pasos del doctor o los doce del administrador ocurren sobre esa pantalla, y es la misma
+ * ruta para los dos roles porque `/dashboard` reparte por rol (`navegacion/pantallas.tsx`).
+ *
+ * Los dos frames son idénticos salvo **una frase**, la descripción, porque lo que el recorrido
+ * recorre es distinto. El título y el botón son los mismos.
  *
  * Va por el estado de navegación y no por un parámetro en la URL, que sobreviviría a la recarga
- * (ver el comentario de `Dashboard.tsx`).
+ * (ver el comentario de `useRecorridoGuiado.ts`).
  */
-function TarjetaRecorrido() {
+function TarjetaRecorrido({ rol }: { rol: RolUsuario }) {
   const navegar = useNavigate();
   const idTitulo = useId();
+  const descripcion =
+    rol === "ADMINISTRADOR"
+      ? "Vuelva a ver el recorrido guiado de las herramientas de administración."
+      : "Vuelva a ver el recorrido guiado de Gastro-AI.";
 
   return (
     <section className={estilos.recorrido} aria-labelledby={idTitulo}>
@@ -151,7 +159,7 @@ function TarjetaRecorrido() {
         <h2 id={idTitulo} className={estilos.tituloTarjeta}>
           Recorrido de la aplicación
         </h2>
-        <p className={estilos.descripcionRecorrido}>Vuelva a ver el recorrido guiado de Gastro-AI.</p>
+        <p className={estilos.descripcionRecorrido}>{descripcion}</p>
       </div>
       <Boton jerarquia="secundario" onClick={() => navegar("/dashboard", { state: { recorrido: true } })}>
         Ver recorrido

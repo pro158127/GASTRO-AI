@@ -18,7 +18,9 @@
 //   W-19q viven en `EvaluacionModelo.tsx`, porque son **otra petición**
 //   (`/admin/modelo/metricas`) con su propia carga y su propio error.
 //
-// **Fuera de alcance, a propósito:** el recorrido guiado del administrador (W-19e a W-19p).
+// - El recorrido guiado de TOPOLOGO del administrador (W-19e a W-19p) ocurre **sobre esta
+//   pantalla**, sus doce pasos. Aquí solo está el montaje y dos `data-recorrido`; los pasos son
+//   datos (`pasosRecorridoAdministrador.ts`) y la capa es `RecorridoGuiado.tsx`.
 //
 // **Tres duplicaciones conscientes con W-22 (`EstadoOperativo.tsx`), que no se puede tocar**
 // porque es de otra persona y tiene correcciones en curso. Unificarlas es un refactor
@@ -52,7 +54,10 @@ import { fechaHoraCorta } from "../utils/fechas";
 import type { TipoInsignia } from "../utils/presentacionUsuario";
 import EvaluacionModelo from "./EvaluacionModelo";
 import ExportarAuditoria from "./ExportarAuditoria";
+import RecorridoGuiado from "./RecorridoGuiado";
+import { PASOS_RECORRIDO_ADMINISTRADOR } from "./pasosRecorridoAdministrador";
 import { useDashboardTecnico } from "./useDashboardTecnico";
+import { useRecorridoGuiado } from "./useRecorridoGuiado";
 import estilos from "./DashboardTecnico.module.css";
 
 /**
@@ -177,7 +182,9 @@ function Cuentas({ usuarios }: { usuarios: UsuariosDashboardTecnico }) {
       <h2 className={estilos.tituloSeccion} id={idTitulo}>
         Cuentas de usuario
       </h2>
-      <ul className={estilos.indicadores}>
+      {/* El paso 2 del recorrido del administrador (W-19i) ilumina las cuatro tarjetas a la vez:
+          el anillo del frame abarca la fila entera, no una tarjeta. */}
+      <ul className={estilos.indicadores} data-recorrido="cuentas">
         <TarjetaIndicador
           indicador="Activas"
           valor={String(usuarios.por_estado.ACTIVO)}
@@ -294,7 +301,9 @@ function EstadoOperativo({
   const verificado = fechaHoraCorta(verificadoEn);
 
   return (
-    <section className={estilos.tarjeta} aria-labelledby={idTitulo}>
+    // En celular el paso 3 del recorrido resalta **solo esta tarjeta** y no la zona entera, que
+    // no cabe en la pantalla (tabla 132:8706, fila 132:8788).
+    <section className={estilos.tarjeta} aria-labelledby={idTitulo} data-recorrido="estado-operativo">
       <div className={estilos.tituloTarjeta}>
         <h2 className={estilos.tituloBloque} id={idTitulo}>
           Estado operativo
@@ -490,6 +499,16 @@ function EsqueletoDashboardTecnico() {
 export default function DashboardTecnico({ titulo }: { titulo: string }) {
   const { datos, cargando, aviso, recargar } = useDashboardTecnico();
 
+  // Recorrido guiado de TOPOLOGO del administrador (W-19e a W-19p), con las mismas dos puertas
+  // de entrada que el del doctor: «Ver recorrido» en Mi perfil y el primer ingreso.
+  //
+  // Se engancha a la **misma condición que pinta el contenido** (`!cargando && !aviso && datos`,
+  // más abajo) y **no** a la carga de `/admin/modelo/metricas`, que es otra petición: si esperara
+  // a ella el recorrido no arrancaría nunca mientras ese endpoint devuelva `disponible: false`, y
+  // si arrancara sobre el esqueleto las anclas de los pasos 2 y 3 todavía no existirían y los
+  // pasos se degradarían a tarjeta centrada sin que nada falle.
+  const { recorridoActivo, cerrarRecorrido } = useRecorridoGuiado(!cargando && !aviso && !!datos);
+
   return (
     <>
       {/* Sin banner de aviso experimental, al contrario que W-15: el frame no lo dibuja arriba,
@@ -542,12 +561,19 @@ export default function DashboardTecnico({ titulo }: { titulo: string }) {
 
           <ActividadAnalisis analisis={datos.analisis} />
 
-          <div className={estilos.estadoYModelo}>
-            <EstadoOperativo servicios={datos.servicios} verificadoEn={datos.verificado_en} />
-            <ModeloDesplegado modelo={datos.modelo_vigente} />
-          </div>
+          {/* El paso 3 del recorrido (W-19j) ilumina los tres bloques a la vez. El envoltorio
+              no tiene estilos: solo existe para que el anillo los abarque, y por eso es un `div`
+              contenedor nuevo con la misma separación que les daba la disposición interna, para
+              que la pantalla se vea igual. Por qué **no** incluye la evaluación del modelo, que
+              el frame sí abarca: ver el paso en `pasosRecorridoAdministrador.ts`. */}
+          <div className={estilos.serviciosYModelo} data-recorrido="servicios-y-modelo">
+            <div className={estilos.estadoYModelo}>
+              <EstadoOperativo servicios={datos.servicios} verificadoEn={datos.verificado_en} />
+              <ModeloDesplegado modelo={datos.modelo_vigente} />
+            </div>
 
-          <Latencia latencia={datos.latencia_7d} />
+            <Latencia latencia={datos.latencia_7d} />
+          </div>
         </>
       )}
 
@@ -558,6 +584,10 @@ export default function DashboardTecnico({ titulo }: { titulo: string }) {
           porque se dibujó antes de que el bloque existiera, pero son dos peticiones distintas y
           se ven como dos. */}
       <EvaluacionModelo />
+
+      {recorridoActivo && (
+        <RecorridoGuiado pasos={PASOS_RECORRIDO_ADMINISTRADOR} alCerrar={cerrarRecorrido} />
+      )}
     </>
   );
 }
