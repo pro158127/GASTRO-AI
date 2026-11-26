@@ -93,10 +93,11 @@
 
 /* ------------------------------------------------------------------- cuadrículas de cifras */
 
-/* Cuatro tarjetas de cuentas en escritorio, dos en tableta y celular. Por debajo de 360 px una
-   sola columna: es lo que evita el desplazamiento horizontal a 320 px (WCAG 1.4.10) con una
-   cifra de 32 px dentro de la tarjeta. El bloque de latencia tiene tres y usa la misma regla,
-   porque `auto-fit` con un mínimo las reparte igual sin una clase aparte. */
+/* Cuatro tarjetas en escritorio, dos en tableta y celular. Por debajo de 360 px una sola
+   columna: es lo que evita el desplazamiento horizontal a 320 px (WCAG 1.4.10) con una cifra de
+   32 px dentro de la tarjeta. La usan los tres bloques de cifras —cuentas y actividad de
+   análisis con cuatro, latencia con tres— porque `auto-fit` con un mínimo las reparte igual sin
+   una clase aparte. */
 .indicadores {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

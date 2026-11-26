@@ -981,12 +981,23 @@ export interface SeguridadDashboardTecnico {
   cuentas_bloqueadas: number;
 }
 
-/** `analisis`. No se dibuja en W-19; queda para una sección propia si se decide pintarla. */
+/**
+ * `analisis`. Se pinta en la sección «Actividad de análisis» de W-19, que **no está dibujada en
+ * Figma**: los rótulos los redacta el frontend.
+ *
+ * Los cuatro conteos son por `solicitado_en` y **no se suman**: `ultimos_7_dias` contiene a los
+ * otros tres (incluidos los que siguen PROCESANDO), y las dos cifras de fallo son disjuntas
+ * entre sí.
+ */
 export interface AnalisisDashboardTecnico {
   /** Desde las 00:00 **en Colombia**, no en UTC. */
   hoy: number;
   ultimos_7_dias: number;
-  /** Fallidos por error técnico; no incluye los fallidos por calidad de imagen. */
+  /**
+   * FALLIDO cuya `calidad_suficiente` no es `false`, lo que **incluye los nulos**: un fallo de
+   * encolado deja el análisis FALLIDO sin que nadie haya evaluado la imagen. No significa que la
+   * imagen estuviera bien, solo que el fallo no se atribuye a su calidad.
+   */
   con_error_7_dias: number;
   calidad_insuficiente_7_dias: number;
 }

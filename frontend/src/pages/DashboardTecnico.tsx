@@ -41,6 +41,7 @@ import Insignia from "../components/Insignia";
 import TarjetaIndicador from "../components/TarjetaIndicador";
 import type { EstadoServicio } from "../services/estadoOperativo";
 import type {
+  AnalisisDashboardTecnico,
   LatenciaDashboardTecnico,
   ModeloVigenteResumen,
   SeguridadDashboardTecnico,
@@ -52,9 +53,15 @@ import type { TipoInsignia } from "../utils/presentacionUsuario";
 import { useDashboardTecnico } from "./useDashboardTecnico";
 import estilos from "./DashboardTecnico.module.css";
 
-/** W-19b dibuja cuatro tarjetas, luego dos, y luego cuatro filas. */
-const TARJETAS_ESQUELETO_FILA_1 = 4;
-const TARJETAS_ESQUELETO_FILA_2 = 2;
+/**
+ * W-19b dibuja cuatro tarjetas, luego dos, y luego cuatro filas.
+ *
+ * La fila de cuatro se repite: la pantalla tiene **dos** bloques de cuatro tarjetas («Cuentas de
+ * usuario» y «Actividad de análisis»), así que el esqueleto dibuja dos, con la misma clase.
+ */
+const TARJETAS_ESQUELETO_CUATRO = 4;
+const FILAS_TARJETAS_ESQUELETO_CUATRO = 2;
+const TARJETAS_ESQUELETO_ANCHAS = 2;
 const FILAS_ESQUELETO = 4;
 
 /**
@@ -188,6 +195,78 @@ function Cuentas({ usuarios }: { usuarios: UsuariosDashboardTecnico }) {
           indicador="Contraseña temporal expirada"
           valor={String(usuarios.pendientes_expiradas)}
           detalle="De las pendientes, más de 72 horas sin uso (RNF-27)"
+        />
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Las cuatro cifras de `analisis`.
+ *
+ * **Esta sección no está dibujada en Figma**: el frame de W-19 no la incluye. Los cuatro
+ * rótulos y sus detalles los redacta el frontend, como `textoActividadDeAcceso`. Se construye
+ * porque el dato ya viene en la misma respuesta de `/admin/dashboard` y porque se aprobó
+ * explícitamente; los códigos de pantalla y el resto del frame no cambian.
+ *
+ * **Las cuatro cifras no se suman, y eso lo tiene que decir el texto.** El servidor las calcula
+ * todas por `solicitado_en` (`dashboard_tecnico_repository.py:149-161`), de modo que:
+ *
+ *  - `ultimos_7_dias` **contiene a las otras tres**. No son «análisis completados»: incluye los
+ *    que siguen PROCESANDO y los FALLIDO.
+ *  - `hoy` es un subconjunto suyo. La ventana de 7 días es rodante desde `ahora`, así que
+ *    `inicio_hoy >= hace_7_dias` siempre y la contención se cumple sin excepción.
+ *  - Las dos cifras de fallo son subconjuntos suyos y **disjuntas entre sí**: juntas son todos
+ *    los FALLIDO de los 7 días, partidos por `calidad_suficiente`.
+ *
+ * Por eso cada `detalle` declara su base de cálculo. Es la misma solución que en `Cuentas`, con
+ * tres subconjuntos en vez de uno. No hay tarjeta de «total», ni porcentajes, ni restas.
+ *
+ * **«Hoy» es el día de Colombia, no el del navegador**: lo fija `inicio_del_dia()`
+ * (`backend/app/services/dashboard_tecnico.py:42-44`). Un administrador que mire desde otra zona
+ * horaria vería un «hoy» que no es el que se está contando, así que el detalle lo dice.
+ *
+ * **El detalle de «error técnico» no afirma que la imagen estuviera bien.** El filtro del
+ * servidor es `calidad_suficiente IS NOT false`, y un nulo ahí no significa «la imagen servía»
+ * sino **que la calidad nunca se evaluó**: un fallo de encolado deja el análisis FALLIDO con
+ * `COLA_NO_DISPONIBLE` antes de que nada mire la imagen (`app/services/analisis.py`). Decir «la
+ * imagen sí servía» sería convertir ese nulo en una afirmación positiva que el dato no sostiene,
+ * el mismo error que convertirlo en una advertencia. El texto habla de a qué se atribuye el
+ * fallo, no de la imagen.
+ *
+ * **Cero color de alarma.** Los dos conteos de fallo son operación normal: `TarjetaIndicador` no
+ * tiene variante de estado y aquí no se le añade ninguna insignia ni alerta alrededor.
+ */
+function ActividadAnalisis({ analisis }: { analisis: AnalisisDashboardTecnico }) {
+  const idTitulo = useId();
+
+  return (
+    <section aria-labelledby={idTitulo}>
+      <h2 className={estilos.tituloSeccion} id={idTitulo}>
+        Actividad de análisis
+      </h2>
+      <ul className={estilos.indicadores}>
+        {/* Son conteos: `0` es un valor legítimo y se pinta como `0`. El «—» de
+            `TarjetaIndicador` es para cuando no hay dato, y aquí siempre lo hay. */}
+        <TarjetaIndicador
+          indicador="Solicitados hoy"
+          valor={String(analisis.hoy)}
+          detalle="Desde las 00:00 en Colombia; también están en los 7 días"
+        />
+        <TarjetaIndicador
+          indicador="Solicitados en 7 días"
+          valor={String(analisis.ultimos_7_dias)}
+          detalle="Por fecha de solicitud; incluye los que siguen en proceso y los fallidos"
+        />
+        <TarjetaIndicador
+          indicador="Fallidos por error técnico"
+          valor={String(analisis.con_error_7_dias)}
+          detalle="De esos 7 días; fallos no atribuidos a la calidad de la imagen"
+        />
+        <TarjetaIndicador
+          indicador="Fallidos por calidad insuficiente"
+          valor={String(analisis.calidad_insuficiente_7_dias)}
+          detalle="De esos 7 días; la imagen no superó los mínimos de calidad"
         />
       </ul>
     </section>
@@ -375,7 +454,9 @@ function Latencia({ latencia }: { latencia: LatenciaDashboardTecnico }) {
 }
 
 /**
- * W-19b (101:800): cuatro esqueletos de tarjeta, dos más y cuatro filas, con «Cargando…».
+ * W-19b (101:800): dos filas de cuatro esqueletos de tarjeta, dos anchos y cuatro filas, con
+ * «Cargando…». El frame dibuja una sola fila de cuatro porque se dibujó antes de que la pantalla
+ * tuviera dos bloques de cuatro tarjetas; el esqueleto sigue a la pantalla.
  *
  * El contenedor lleva `aria-busy="true"`, que es lo que documenta el propio `Esqueleto`. Por eso
  * el «Cargando…» va como `<p>` **sin `role`**: `aria-busy` silencia cualquier región live que
@@ -384,13 +465,15 @@ function Latencia({ latencia }: { latencia: LatenciaDashboardTecnico }) {
 function EsqueletoDashboardTecnico() {
   return (
     <div className={estilos.cargando} aria-busy="true">
-      <div className={estilos.esqueletoTarjetas} aria-hidden="true">
-        {Array.from({ length: TARJETAS_ESQUELETO_FILA_1 }, (_, indice) => (
-          <Esqueleto key={indice} forma="tarjeta-indicador" />
-        ))}
-      </div>
+      {Array.from({ length: FILAS_TARJETAS_ESQUELETO_CUATRO }, (_, fila) => (
+        <div className={estilos.esqueletoTarjetas} key={fila} aria-hidden="true">
+          {Array.from({ length: TARJETAS_ESQUELETO_CUATRO }, (_, indice) => (
+            <Esqueleto key={indice} forma="tarjeta-indicador" />
+          ))}
+        </div>
+      ))}
       <div className={estilos.esqueletoTarjetasAnchas} aria-hidden="true">
-        {Array.from({ length: TARJETAS_ESQUELETO_FILA_2 }, (_, indice) => (
+        {Array.from({ length: TARJETAS_ESQUELETO_ANCHAS }, (_, indice) => (
           <Esqueleto key={indice} forma="tarjeta-indicador" />
         ))}
       </div>
@@ -450,6 +533,8 @@ export default function DashboardTecnico({ titulo }: { titulo: string }) {
           )}
 
           <Cuentas usuarios={datos.usuarios} />
+
+          <ActividadAnalisis analisis={datos.analisis} />
 
           <div className={estilos.estadoYModelo}>
             <EstadoOperativo servicios={datos.servicios} verificadoEn={datos.verificado_en} />
