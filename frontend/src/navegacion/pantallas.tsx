@@ -8,6 +8,7 @@ import { useUsuarioActual } from "../sesion/UsuarioActual";
 import CasosRecibidos from "../pages/CasosRecibidos";
 import CrearUsuario from "../pages/CrearUsuario";
 import Dashboard from "../pages/Dashboard";
+import DashboardTecnico from "../pages/DashboardTecnico";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import EstadoOperativo from "../pages/EstadoOperativo";
@@ -39,15 +40,13 @@ const SOLO_ADMINISTRADOR: RolInterfaz[] = ["administrador"];
 
 /**
  * `/dashboard` es una ruta con dos pantallas distintas: W-15 para el doctor y W-19 para el
- * administrador. El doctor ya tiene la suya; la del administrador sigue pendiente, así que el
- * reparto se hace aquí y no duplicando la ruta. La autorización real la hace el backend: cada
- * dashboard es un endpoint distinto y con su rol.
+ * administrador. El reparto se hace aquí y no duplicando la ruta. La autorización real la hace
+ * el backend: cada dashboard es un endpoint distinto y con su rol.
  */
 function DashboardPorRol({ titulo }: { titulo: string }) {
   const { rol } = useUsuarioActual();
   if (rol === "doctor") return <Dashboard titulo={titulo} />;
-  // TEMPORAL: reemplazar antes de la entrega (W-19)
-  return <PantallaPendiente titulo={titulo} />;
+  return <DashboardTecnico titulo={titulo} />;
 }
 
 export const pantallas: Pantalla[] = [
@@ -55,7 +54,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/dashboard",
     titulo: { doctor: "Dashboard", administrador: "Dashboard técnico" },
     roles: AMBOS,
-    elemento: (titulo) => <DashboardPorRol titulo={titulo} />, // W-15 (doctor) / W-19 (pendiente)
+    elemento: (titulo) => <DashboardPorRol titulo={titulo} />, // W-15 (doctor) / W-19 (administrador)
   },
   {
     ruta: "/nuevo-analisis",

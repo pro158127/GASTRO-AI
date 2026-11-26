@@ -698,7 +698,11 @@ export interface ObservacionAnalisis {
   registrada_en: string;
 }
 
-/** Quién hizo el análisis. No está dibujado en W-08 (es de W-17b). */
+/**
+ * Quién hizo el análisis. Lo dibuja la tarjeta «Procedencia de este análisis» (W-17b, etiqueta
+ * interna del código, sin maqueta), y **solo cuando `es_propio` es `false`**: a nadie se le
+ * dice que un análisis lo hizo él mismo.
+ */
 export interface RealizadoPor {
   nombre: string;
   apellido: string;
@@ -706,7 +710,12 @@ export interface RealizadoPor {
   es_propio: boolean;
 }
 
-/** De quién llegó el caso por traslado. No está dibujado en W-08 (es de W-17b). */
+/**
+ * De quién llegó el caso por traslado. Lo dibuja la misma tarjeta que `RealizadoPor` (W-17b),
+ * como un dato **aparte**: `desde` puede ser otra persona que el ejecutor, porque el servidor
+ * manda el último traslado del caso. `cuenta_eliminada` es la de quien trasladó, independiente
+ * de la de `RealizadoPor`.
+ */
 export interface TrasladoAnalisis {
   desde: { nombre: string; apellido: string };
   cuenta_eliminada: boolean;
