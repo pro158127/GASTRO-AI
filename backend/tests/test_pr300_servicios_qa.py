@@ -11,6 +11,7 @@ import pytest
 from app.adapters.salud import INFERENCIA_VISION, Chequeo
 from app.models import CodigoRol, EstadoEnvio, EstadoUsuario, NombreMetrica
 from app.schemas.reporte_evaluacion import ReporteEvaluacion
+from app.services import carga_metricas as carga_metricas_mod
 from app.services import estado_operativo as estado_mod
 from app.services import recuperacion_admin as recuperacion_mod
 from app.services.carga_metricas import ErrorCargaMetricas, ServicioCargaMetricas, _hoy
@@ -47,7 +48,24 @@ def test_cargar_metricas_validas_y_avisa_modelo_no_vigente():
     modelo_id, conjunto, fecha, filas = repo.reemplazar.call_args.args
     assert (modelo_id, conjunto, fecha) == (7, "set-test", date(2026, 11, 20))
     assert filas == [(None, NombreMetrica.F1, 0.8123), (4, NombreMetrica.SENSIBILIDAD, 0.9)]
-    assert _hoy() <= date(2026, 11, 24)
+
+
+@pytest.mark.parametrize(
+    ("instante_utc", "fecha_colombia"),
+    [
+        (datetime(2026, 11, 25, 4, 59, tzinfo=UTC), date(2026, 11, 24)),
+        (datetime(2026, 11, 25, 5, 0, tzinfo=UTC), date(2026, 11, 25)),
+    ],
+)
+def test_hoy_usa_fecha_de_colombia(monkeypatch, instante_utc, fecha_colombia):
+    class FechaHoraControlada(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is UTC
+            return instante_utc
+
+    monkeypatch.setattr(carga_metricas_mod, "datetime", FechaHoraControlada)
+    assert _hoy() == fecha_colombia
 
 
 @pytest.mark.parametrize(

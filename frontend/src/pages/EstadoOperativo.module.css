@@ -1,0 +1,262 @@
+/* Pantalla W-22 · Estado operativo. La estructura global la aporta DisposicionInterna. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+  min-width: 0;
+}
+
+.accionesEncabezado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--espacio-1);
+}
+
+.ayudaActualizacion {
+  max-width: 260px;
+  margin: 0;
+  color: var(--color-texto-terciario);
+  font: var(--texto-leyenda);
+  text-align: right;
+}
+
+.alerta {
+  width: 100%;
+}
+
+.seccion {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.tituloSeccion {
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+}
+
+.resumenVerificacion {
+  margin: calc(-1 * var(--espacio-4)) 0 0;
+  color: var(--color-texto-secundario);
+  font: var(--texto-cuerpo-pequeno);
+}
+
+.marcoTabla {
+  overflow: hidden;
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--color-texto-primario);
+  font: var(--texto-cuerpo-pequeno);
+  text-align: left;
+}
+
+.tabla th,
+.tabla td {
+  padding: var(--espacio-3);
+  border-bottom: var(--borde-grosor) solid var(--color-borde-sutil);
+  vertical-align: middle;
+}
+
+.tabla th {
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.servicio {
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  overflow-wrap: anywhere;
+}
+
+.datoNumerico {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.insignia {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 0 var(--espacio-2);
+  border: var(--borde-grosor) solid;
+  border-radius: var(--radio-completo);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  overflow-wrap: anywhere;
+}
+
+.operativo {
+  border-color: var(--color-estado-exito-borde);
+  background: var(--color-estado-exito-fondo);
+  color: var(--color-estado-exito-texto);
+}
+
+.lento {
+  border-color: var(--color-estado-advertencia-borde);
+  background: var(--color-estado-advertencia-fondo);
+  color: var(--color-estado-advertencia-texto);
+}
+
+.sinRespuesta {
+  border-color: var(--color-estado-error-borde);
+  background: var(--color-estado-error-fondo);
+  color: var(--color-estado-error-texto);
+}
+
+.tarjetas {
+  display: none;
+}
+
+.tarjetaServicio {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+}
+
+.nombreTarjeta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  overflow-wrap: anywhere;
+}
+
+.datosTarjeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espacio-3);
+  margin: 0;
+}
+
+.datosTarjeta div {
+  min-width: 0;
+}
+
+.datosTarjeta dt {
+  color: var(--color-texto-terciario);
+  font: var(--texto-leyenda);
+}
+
+.datosTarjeta dd {
+  margin: var(--espacio-1) 0 0;
+  color: var(--color-texto-primario);
+  font: var(--texto-cuerpo-pequeno);
+  overflow-wrap: anywhere;
+}
+
+.identificacion {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.filaDato {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: var(--espacio-4);
+  padding: var(--espacio-3) 0;
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+}
+
+.filaDato dt {
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+.filaDato dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.revision {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+.huella {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.nota {
+  margin: 0;
+  color: var(--color-texto-terciario);
+  font: var(--texto-leyenda);
+}
+
+.vacioModelo {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+.cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+}
+
+.mensajeEstado {
+  margin: 0;
+  color: var(--color-texto-secundario);
+}
+
+@media (max-width: 1279px) {
+  .marcoTabla {
+    display: none;
+  }
+
+  .tarjetas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--espacio-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .accionesEncabezado {
+    align-items: stretch;
+  }
+
+  .ayudaActualizacion {
+    max-width: none;
+    text-align: left;
+  }
+
+  .seccion {
+    padding: var(--espacio-4);
+  }
+
+  .tarjetas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filaDato {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--espacio-1);
+  }
+}
