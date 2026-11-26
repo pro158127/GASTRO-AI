@@ -171,28 +171,32 @@ export default function EstadoOperativo({ titulo }: { titulo: string }) {
         </Alerta>
       )}
 
-      <section className={estilos.seccion} aria-labelledby="titulo-servicios" aria-busy={cargando || actualizando}>
+      <section className={estilos.seccion} aria-labelledby="titulo-servicios">
         <h2 id="titulo-servicios" className={estilos.tituloSeccion}>Servicios de la plataforma</h2>
         {estado && <p className={estilos.resumenVerificacion}>Verificado el {fechaLegible(estado.verificado_en)}</p>}
 
-        {cargando && !estado ? (
-          <div className={estilos.cargando} role="status">
-            <p className={estilos.mensajeEstado}>Consultando el estado de los servicios…</p>
-            {Array.from({ length: 5 }, (_, indice) => <Esqueleto key={indice} forma="fila-tabla" />)}
-          </div>
-        ) : estado ? (
-          <>
-            <div className={estilos.marcoTabla}>
-              <table className={estilos.tabla}>
-                <thead><tr><th scope="col">Servicio</th><th scope="col">Estado</th><th scope="col">Tiempo de respuesta</th><th scope="col">Última verificación</th></tr></thead>
-                <tbody>{estado.servicios.map((servicio) => <FilaServicio key={servicio.codigo} servicio={servicio} />)}</tbody>
-              </table>
+        {cargando && !estado && (
+          <p className={estilos.mensajeEstado} role="status">Consultando el estado de los servicios…</p>
+        )}
+        <div className={estilos.contenidoServicios} aria-busy={cargando || actualizando}>
+          {cargando && !estado ? (
+            <div className={estilos.cargando} aria-label="Cargando servicios">
+              {Array.from({ length: 5 }, (_, indice) => <Esqueleto key={indice} forma="fila-tabla" />)}
             </div>
-            <ul className={estilos.tarjetas} aria-label="Servicios de la plataforma">
-              {estado.servicios.map((servicio) => <TarjetaServicio key={servicio.codigo} servicio={servicio} />)}
-            </ul>
-          </>
-        ) : !error ? <p className={estilos.mensajeEstado}>No hay datos de estado disponibles.</p> : null}
+          ) : estado ? (
+            <>
+              <div className={estilos.marcoTabla}>
+                <table className={estilos.tabla}>
+                  <thead><tr><th scope="col">Servicio</th><th scope="col">Estado</th><th scope="col">Tiempo de respuesta</th><th scope="col">Última verificación</th></tr></thead>
+                  <tbody>{estado.servicios.map((servicio) => <FilaServicio key={servicio.codigo} servicio={servicio} />)}</tbody>
+                </table>
+              </div>
+              <ul className={estilos.tarjetas} aria-label="Servicios de la plataforma">
+                {estado.servicios.map((servicio) => <TarjetaServicio key={servicio.codigo} servicio={servicio} />)}
+              </ul>
+            </>
+          ) : !error ? <p className={estilos.mensajeEstado}>No hay datos de estado disponibles.</p> : null}
+        </div>
       </section>
 
       <section className={estilos.seccion} aria-labelledby="titulo-modelo">

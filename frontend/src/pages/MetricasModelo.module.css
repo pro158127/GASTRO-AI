@@ -1,5 +1,6 @@
 /* Pantalla W-23 · evaluación agregada del modelo, sin información clínica. */
 .pagina { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-6); }
+.contenidoReporte { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-6); }
 .soloLector { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .tarjeta { display: flex; min-width: 0; flex-direction: column; gap: var(--espacio-4); padding: var(--espacio-6); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-lg); background: var(--color-fondo-superficie); box-shadow: var(--sombra-elevacion-1-tarjeta); }
 .tituloSeccion { margin: 0; font: var(--texto-titulo-h4); color: var(--color-texto-primario); overflow-wrap: anywhere; }

@@ -87,9 +87,11 @@ export default function MetricasModelo({ titulo }: { titulo: string }) {
         </div>
       )}
 
-      {cargando && !reporte ? (
-        <p className={estilos.estadoCarga} role="status" aria-busy="true">Cargando el reporte de evaluación…</p>
-      ) : reporte && !disponible ? (
+      {cargando && !reporte && (
+        <p className={estilos.estadoCarga} role="status">Cargando el reporte de evaluación…</p>
+      )}
+      <div className={estilos.contenidoReporte} aria-busy={cargando}>
+        {reporte && !disponible ? (
         <section className={estilos.tarjeta} aria-labelledby="titulo-sin-reporte">
           {modelo && <p className={estilos.modeloEvaluado}>{modelo.repositorio_hf} · {modelo.revision_sha.slice(0, 7)}</p>}
           <span id="titulo-sin-reporte" className={estilos.soloLector}>Estado del reporte de evaluación</span>
@@ -171,7 +173,8 @@ export default function MetricasModelo({ titulo }: { titulo: string }) {
             ) : <p className={estilos.estadoCarga}>El reporte no incluye métricas por característica.</p>}
           </section>
         </>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
