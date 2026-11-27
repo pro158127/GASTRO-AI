@@ -29,6 +29,18 @@ celery_app.conf.update(
     broker_connection_timeout=3,
     # Un análisis a la vez por proceso: son pesados y así acks_late reparte parejo
     worker_prefetch_multiplier=1,
+    # Si el proceso hijo muere (OOM, kill, límite duro), el mensaje vuelve a la cola en vez
+    # de quedar como FAILURE con el análisis en PROCESANDO. El tope de reentregas lo pone
+    # ServicioProcesamiento (MAX_ENTREGAS) con el contador de adapters/entregas.py.
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    # Space 30 s + Gemini 15 s + MinIO: 120 s sobran. El límite duro mata el proceso y cuenta
+    # como una entrega perdida. Ojo: con --pool=solo (Windows) Celery no aplica los límites.
+    task_soft_time_limit=120,
+    task_time_limit=150,
+    # Si se cae el worker completo, el mensaje sin confirmar vuelve a los 5 min (no a la
+    # hora que trae Redis por defecto). Debe ser mayor que task_time_limit.
+    broker_transport_options={"visibility_timeout": 300},
 )
 
 
