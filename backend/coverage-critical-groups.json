@@ -1,0 +1,65 @@
+{
+  "global_min_percent": 70,
+  "group_min_percent": 70,
+  "expected_unique_files": 41,
+  "groups": {
+    "Autenticación y control de acceso": [
+      "app/api/deps.py",
+      "app/api/routers/admin_usuarios.py",
+      "app/api/routers/auth.py",
+      "app/core/seguridad.py",
+      "app/repositories/credenciales_repository.py",
+      "app/repositories/sesiones_repository.py",
+      "app/repositories/usuarios_repository.py",
+      "app/services/autenticacion.py",
+      "app/services/credenciales.py",
+      "app/services/estado_cuenta.py",
+      "app/services/politica_contrasena.py",
+      "app/services/usuarios.py"
+    ],
+    "Carga y seudonimización de imágenes": [
+      "app/adapters/almacen.py",
+      "app/api/routers/imagenes.py",
+      "app/services/imagenes.py",
+      "app/services/verificadores_imagen.py"
+    ],
+    "Pipeline de procesamiento": [
+      "app/adapters/cola.py",
+      "app/core/seudonimo.py",
+      "app/repositories/analisis_repository.py",
+      "app/services/analisis.py",
+      "app/services/calidad_imagen.py",
+      "app/services/procesamiento.py",
+      "app/workers/celery_app.py",
+      "app/workers/tareas.py"
+    ],
+    "Ejecución del modelo": [
+      "app/adapters/inferencia.py",
+      "app/services/clasificacion.py",
+      "app/services/configuracion_inferencia.py",
+      "app/services/politica_umbral.py"
+    ],
+    "Resultados, historial y PDF": [
+      "app/api/routers/analisis.py",
+      "app/api/routers/pacientes.py",
+      "app/api/routers/reportes.py",
+      "app/repositories/analisis_repository.py",
+      "app/repositories/historial_repository.py",
+      "app/repositories/pacientes_repository.py",
+      "app/repositories/reportes_repository.py",
+      "app/schemas/analisis.py",
+      "app/services/constructor_reporte.py",
+      "app/services/historial.py",
+      "app/services/pacientes.py",
+      "app/services/reportes.py"
+    ],
+    "Aviso experimental backend": [
+      "app/api/routers/analisis.py",
+      "app/api/routers/dashboard.py",
+      "app/api/routers/reportes.py",
+      "app/schemas/analisis.py",
+      "app/schemas/dashboard.py",
+      "app/services/constructor_reporte.py"
+    ]
+  }
+}
