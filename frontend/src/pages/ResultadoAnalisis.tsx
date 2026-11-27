@@ -142,10 +142,10 @@ function motivoDelFallo(detalle: AnalisisDetalle): string {
   );
 }
 
-/** «ID A-2026-000123 · 19/10/2026 10:42 · Modelo: usuario/modelo @ 3e1f9c0» */
+/** «ID A-2026-000123 · 19/10/2026 10:42 · Modelo: usuario/modelo @ <SHA completo>» */
 function lineaDatos(detalle: AnalisisDetalle): string {
   const cuando = fechaHoraCorta(detalle.completado_en ?? detalle.solicitado_en);
-  const modelo = `${detalle.modelo.repositorio_hf} @ ${detalle.modelo.revision_corta}`;
+  const modelo = `${detalle.modelo.repositorio_hf} @ ${detalle.modelo.revision_sha}`;
   return [`ID ${detalle.codigo}`, cuando, `Modelo: ${modelo}`].filter(Boolean).join(" · ");
 }
 
