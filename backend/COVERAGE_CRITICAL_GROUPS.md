@@ -21,4 +21,6 @@ El artefacto `cobertura.json` del run [46024187628](https://github.com/pro158127
 
 La cobertura global fue 4.886/6.122 = 79,810519 %. Ocho archivos del mapa quedaron bajo 70 % individual y ninguno en 0 %. Se enumeran como avisos en la salida del job.
 
-El job de cobertura conserva el nombre de check `Backend cobertura global >=70%`, que ya es requerido por la protección estricta de `testing/qa-branch`; así el gate de grupo queda incluido en el mismo check obligatorio. La aprobación formal del mapa y la asignación de responsables/planes para los ocho archivos individuales siguen siendo decisiones de revisión del requisito y no se declaran resueltas por el workflow.
+El job de cobertura conserva el nombre de check `Backend cobertura global >=70%`, que ya es requerido por la protección estricta de `testing/qa-branch`; así el gate de grupo queda incluido en el mismo check obligatorio.
+
+El 2026-11-27, Cristian David Sánchez aprobó el mapa propuesto de seis grupos/41 rutas y el criterio de tratar las coberturas individuales bajo 70% (incluido 0%) como hallazgos con plan de mejora, mientras el bloqueo CI se aplica al global y a cada grupo. El mismo responsable quedó asignado a los ocho archivos bajo 70% del artefacto de referencia. Los planes verificables por archivo, con líneas base y casos a cubrir, están en [`COVERAGE_FILE_REMEDIATION.md`](COVERAGE_FILE_REMEDIATION.md). La aprobación del mapa no significa que los ocho planes ya se hayan ejecutado.
