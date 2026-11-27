@@ -24,7 +24,8 @@ def entorno(monkeypatch):
         correo="qa@example.invalid", telefono=None,
         rol=SimpleNamespace(codigo=CodigoRol.DOCTOR, nombre="Doctor"),
         estado=EstadoUsuario.ACTIVO, creado_en=datetime(2026, 1, 1, tzinfo=UTC),
-        totp_vinculado_en=None, secreto_no_publicable="dato-sintetico",
+        totp_vinculado_en=None, recorrido_visto_en=None,
+        secreto_no_publicable="dato-sintetico",
     )
     auth, servicio = Mock(), Mock()
     auth.validar_sesion.return_value = SimpleNamespace(usuario=usuario)
@@ -48,10 +49,12 @@ def entorno(monkeypatch):
 
 @pytest.mark.parametrize("rol", [CodigoRol.DOCTOR, CodigoRol.ADMINISTRADOR])
 @pytest.mark.parametrize("vinculado", [False, True])
-def test_ver_perfil_ambos_roles_y_estado_totp(entorno, rol, vinculado):
+@pytest.mark.parametrize("visto", [False, True])
+def test_ver_perfil_ambos_roles_y_estados_totp_y_recorrido(entorno, rol, vinculado, visto):
     cliente, usuario, auth, servicio = entorno
     usuario.rol.codigo = rol
     usuario.totp_vinculado_en = usuario.creado_en if vinculado else None
+    usuario.recorrido_visto_en = usuario.creado_en if visto else None
     respuesta = cliente.get("/api/v1/perfil")
     assert respuesta.status_code == 200
     assert respuesta.json() == {
@@ -59,9 +62,21 @@ def test_ver_perfil_ambos_roles_y_estado_totp(entorno, rol, vinculado):
         "correo": "qa@example.invalid", "telefono": None,
         "rol": {"codigo": rol.value, "nombre": "Doctor"}, "estado": "ACTIVO",
         "creado_en": "2026-01-01T00:00:00Z", "totp_vinculado": vinculado,
+        "recorrido_visto": visto,
     }
     auth.validar_sesion.assert_called_once_with(None, (EtapaSesion.ACTIVA,), False)
     servicio.editar.assert_not_called()
+
+
+@pytest.mark.parametrize("rol", [CodigoRol.DOCTOR, CodigoRol.ADMINISTRADOR])
+def test_marcar_recorrido_visto_admite_ambos_roles_y_devuelve_204(entorno, rol):
+    cliente, usuario, auth, servicio = entorno
+    usuario.rol.codigo = rol
+    respuesta = cliente.post("/api/v1/perfil/recorrido-visto")
+    assert respuesta.status_code == 204
+    assert respuesta.content == b""
+    servicio.marcar_recorrido_visto.assert_called_once_with(usuario)
+    auth.validar_sesion.assert_called_once_with(None, (EtapaSesion.ACTIVA,), False)
 
 
 def test_edicion_normaliza_y_devuelve_resultado_servicio(entorno):
@@ -69,7 +84,9 @@ def test_edicion_normaliza_y_devuelve_resultado_servicio(entorno):
     actualizado = SimpleNamespace(**vars(usuario))
     actualizado.nombre = "Nuevo"
     servicio.editar.return_value = actualizado
-    respuesta = cliente.patch("/api/v1/perfil", json={"nombre": " Nuevo ", "telefono": "+123 456-7890"})
+    respuesta = cliente.patch(
+        "/api/v1/perfil", json={"nombre": " Nuevo ", "telefono": "+123 456-7890"}
+    )
     assert respuesta.status_code == 200
     assert respuesta.json()["nombre"] == "Nuevo"
     persona, cambios, ip = servicio.editar.call_args.args
@@ -87,7 +104,9 @@ def test_distingue_telefono_omitido_de_borrado(entorno, entrada, borrar):
 
 def test_no_transfiere_correo_ni_rol_editables(entorno):
     cliente, usuario, _, servicio = entorno
-    respuesta = cliente.patch("/api/v1/perfil", json={"correo": "otro@example.invalid", "rol": "ADMINISTRADOR"})
+    respuesta = cliente.patch(
+        "/api/v1/perfil", json={"correo": "otro@example.invalid", "rol": "ADMINISTRADOR"}
+    )
     assert respuesta.status_code == 200
     cambios = servicio.editar.call_args.args[1]
     assert cambios.correo is None
@@ -96,7 +115,10 @@ def test_no_transfiere_correo_ni_rol_editables(entorno):
     assert respuesta.json()["rol"]["codigo"] == "DOCTOR"
 
 
-@pytest.mark.parametrize("entrada", [{"nombre": " "}, {"apellido": "x" * 101}, {"telefono": "NO-TELEFONO-SINTETICO"}])
+@pytest.mark.parametrize(
+    "entrada",
+    [{"nombre": " "}, {"apellido": "x" * 101}, {"telefono": "NO-TELEFONO-SINTETICO"}],
+)
 def test_entrada_invalida_no_invoca_servicio(entorno, entrada):
     cliente, _, _, servicio = entorno
     respuesta = cliente.patch("/api/v1/perfil", json=entrada)
@@ -106,15 +128,21 @@ def test_entrada_invalida_no_invoca_servicio(entorno, entrada):
     servicio.editar.assert_not_called()
 
 
-@pytest.mark.parametrize("metodo", ["get", "patch"])
+@pytest.mark.parametrize("metodo,ruta", [
+    ("get", "/api/v1/perfil"),
+    ("patch", "/api/v1/perfil"),
+    ("post", "/api/v1/perfil/recorrido-visto"),
+])
 @pytest.mark.parametrize("estado,codigo", [(401, "SESION_EXPIRADA"), (403, "ETAPA_INVALIDA")])
-def test_rechazo_autenticacion_impide_operacion(entorno, metodo, estado, codigo):
+def test_rechazo_autenticacion_impide_operacion(entorno, metodo, ruta, estado, codigo):
     cliente, _, auth, servicio = entorno
     auth.validar_sesion.side_effect = ErrorApi(estado, codigo, "Rechazo simulado")
-    respuesta = cliente.request(metodo, "/api/v1/perfil", **({"json": {"nombre": "Nuevo"}} if metodo == "patch" else {}))
+    opciones = {"json": {"nombre": "Nuevo"}} if metodo == "patch" else {}
+    respuesta = cliente.request(metodo, ruta, **opciones)
     assert respuesta.status_code == estado
     assert respuesta.json()["error"]["codigo"] == codigo
     servicio.editar.assert_not_called()
+    servicio.marcar_recorrido_visto.assert_not_called()
 
 
 def test_error_servicio_conserva_codigo_controlado(entorno):
