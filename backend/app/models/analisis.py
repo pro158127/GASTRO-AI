@@ -119,7 +119,7 @@ class Analisis(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # El A-AAAA-NNNNNN que ve el doctor; sale de la secuencia analisis_codigo_seq (RNF-24)
     codigo: Mapped[str] = mapped_column(Text, unique=True)
-    # Tampoco cambia nunca: trigger analisis_caso_fijo en 0002
+    # Tampoco cambia nunca: trigger analisis_identificador_fijo en 0005
     caso_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("CasoPaciente.id", ondelete="RESTRICT", onupdate="CASCADE")
     )
