@@ -211,7 +211,7 @@ export default function LogsTecnicos({ titulo }: { titulo: string }) {
       )}
 
       <section className={estilos.seccionResultados} aria-labelledby="titulo-resultados">
-        <h2 id="titulo-resultados" className={estilos.tituloSeccion}>Logs técnicos de inferencia</h2>
+        <h2 id="titulo-resultados" className={estilos.tituloSeccion}>Registros técnicos de inferencia</h2>
         <p className={estilos.estadoResultados} role="status" aria-live="polite">
           {cargando ? "Buscando registros…" : estadoResultados}
         </p>
@@ -234,7 +234,7 @@ export default function LogsTecnicos({ titulo }: { titulo: string }) {
             </>
           ) : paginaResultado ? (
             <p className={estilos.vacio}>No hay registros de inferencia para los filtros seleccionados.</p>
-          ) : !error ? <p className={estilos.vacio}>No hay datos de logs disponibles.</p> : null}
+          ) : !error ? <p className={estilos.vacio}>No hay registros técnicos disponibles.</p> : null}
         </div>
 
         <div className={estilos.paginacion}>

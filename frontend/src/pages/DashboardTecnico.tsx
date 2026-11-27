@@ -427,7 +427,7 @@ function Latencia({ latencia }: { latencia: LatenciaDashboardTecnico }) {
         <h2 className={estilos.tituloBloque} id={idTitulo}>
           Latencia de inferencia · últimos 7 días
         </h2>
-        <EnlaceBoton to="/logs-tecnicos">Ver logs técnicos</EnlaceBoton>
+        <EnlaceBoton to="/logs-tecnicos">Ver registros técnicos</EnlaceBoton>
       </div>
       <ul className={estilos.indicadores}>
         <TarjetaIndicador

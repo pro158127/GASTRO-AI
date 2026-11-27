@@ -130,13 +130,13 @@ export const PASOS_RECORRIDO_ADMINISTRADOR: PasoRecorrido[] = [
     tipo: "item-menu",
     titulo: "Métricas del modelo",
     texto:
-      "Es el reporte técnico de evaluación del modelo desplegado, publicado con su ficha (model card). No usa datos clínicos de los casos.",
+      "Es el reporte técnico de evaluación del modelo desplegado, publicado con su ficha del modelo. No usa datos clínicos de los casos.",
     ancla: 'nav[aria-label="Principal"] a[href="/metricas-del-modelo"]',
   },
   {
     clave: "logs-tecnicos",
     tipo: "item-menu",
-    titulo: "Logs técnicos",
+    titulo: "Registros técnicos",
     texto:
       "Registra cada inferencia con sus tiempos y su estado. No contiene cédulas ni resultados clínicos, así que sirve para revisar fallas sin exponer pacientes.",
     ancla: 'nav[aria-label="Principal"] a[href="/logs-tecnicos"]',

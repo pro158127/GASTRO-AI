@@ -38,8 +38,8 @@ export default function DisposicionInterna() {
 
   const pantalla = buscarPantalla(ubicacion.pathname);
   const tituloPantalla = pantalla ? tituloDePantalla(pantalla, rol) : undefined;
-  // La barra superior muestra el nombre del ítem del menú («Dashboard», aunque el h1 del
-  // administrador sea «Dashboard técnico»); fuera del menú (Mi perfil) usa el título de la pantalla.
+  // La barra superior muestra el nombre del ítem del menú («Panel de control», aunque el h1 del
+  // administrador sea «Panel técnico»); fuera del menú (Mi perfil) usa el título de la pantalla.
   const tituloBarra = items.find((item) => item.ruta === ubicacion.pathname)?.etiqueta ?? tituloPantalla ?? "";
 
   // Título de la pestaña por ruta (WCAG 2.4.2).

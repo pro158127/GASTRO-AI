@@ -85,7 +85,7 @@ export default function MetricasModelo({ titulo }: { titulo: string }) {
                 {modelo && <p className={estilos.modeloEvaluado}>{modelo.repositorio_hf} · {modelo.revision_sha.slice(0, 7)}</p>}
               </div>
               {reporte.model_card_url && (
-                <a href={reporte.model_card_url} target="_blank" rel="noreferrer">Abrir model card</a>
+                <a href={reporte.model_card_url} target="_blank" rel="noreferrer">Abrir ficha del modelo</a>
               )}
             </div>
 

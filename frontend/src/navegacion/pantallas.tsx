@@ -54,7 +54,7 @@ function DashboardPorRol({ titulo }: { titulo: string }) {
 export const pantallas: Pantalla[] = [
   {
     ruta: "/dashboard",
-    titulo: { doctor: "Dashboard", administrador: "Dashboard técnico" },
+    titulo: { doctor: "Panel de control", administrador: "Panel técnico" },
     roles: AMBOS,
     elemento: (titulo) => <DashboardPorRol titulo={titulo} />, // W-15 (doctor) / W-19 (administrador)
   },
@@ -153,7 +153,7 @@ export const pantallas: Pantalla[] = [
   },
   {
     ruta: "/logs-tecnicos",
-    titulo: "Logs técnicos",
+    titulo: "Registros técnicos",
     roles: SOLO_ADMINISTRADOR,
     elemento: (titulo) => <LogsTecnicos titulo={titulo} />, // W-24
   },
