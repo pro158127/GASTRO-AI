@@ -1,6 +1,6 @@
 """Controlador de /perfil: el propio usuario, cualquiera de los dos roles (RF-U04)."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.api.deps import IpCliente, ServicioMiPerfil, SesionActiva
 from app.models import Usuario
@@ -23,6 +23,7 @@ def _perfil(usuario: Usuario) -> Perfil:
         estado=usuario.estado,
         creado_en=usuario.creado_en,
         totp_vinculado=usuario.totp_vinculado_en is not None,
+        recorrido_visto=usuario.recorrido_visto_en is not None,
     )
 
 
@@ -30,6 +31,13 @@ def _perfil(usuario: Usuario) -> Perfil:
 def ver(sesion: SesionActiva):
     """Mis datos. El correo y el rol se ven pero no se editan aquí (RF-U04 CA 2)."""
     return _perfil(sesion.usuario)
+
+
+@router.post("/recorrido-visto", status_code=204, response_class=Response, responses=ERRORES)
+def marcar_recorrido_visto(sesion: SesionActiva, servicio: ServicioMiPerfil) -> Response:
+    """Marca como visto el recorrido inicial, sin importar el rol de la cuenta."""
+    servicio.marcar_recorrido_visto(sesion.usuario)
+    return Response(status_code=204)
 
 
 @router.patch("", response_model=Perfil, responses=ERRORES)
