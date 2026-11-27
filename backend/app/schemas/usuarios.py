@@ -121,6 +121,7 @@ class Perfil(BaseModel):
     estado: EstadoUsuario
     creado_en: datetime
     totp_vinculado: bool
+    recorrido_visto: bool
 
 
 class Credencial(BaseModel):

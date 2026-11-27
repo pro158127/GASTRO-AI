@@ -282,8 +282,9 @@ Cada etapa solo abre sus endpoints; el resto del sistema exige `ACTIVA`. Roles: 
 | GET | `/auth/sesion` | Cualquier etapa | — | `{etapa, usuario, inactividad, casos_recibidos_nuevos}` |
 | POST | `/auth/sesion/continuar` | Cualquier etapa | — | `{ultima_actividad_en}` |
 | POST | `/auth/logout` | Cualquiera (o ninguna) | `{motivo?}` | `204`, borra la cookie |
-| GET | `/perfil` | Cualquier rol | — | `{id, nombre, apellido, correo, telefono, rol: {codigo, nombre}, estado, creado_en, totp_vinculado}` |
+| GET | `/perfil` | Cualquier rol | — | `{id, nombre, apellido, correo, telefono, rol: {codigo, nombre}, estado, creado_en, totp_vinculado, recorrido_visto}` |
 | PATCH | `/perfil` | Cualquier rol | `{nombre?, apellido?, telefono?}` | el perfil (correo y rol se ignoran) |
+| POST | `/perfil/recorrido-visto` | Cualquier rol | — | `204`; idempotente, registra la primera visualización del recorrido |
 | GET | `/admin/usuarios` | `ADMINISTRADOR` | `?q&rol&estado&excluir&orden&pagina&por_pagina` | `{items, paginacion, conteos}` |
 | POST | `/admin/usuarios` | `ADMINISTRADOR` | `{nombre, apellido, correo, telefono?, rol}` | `201 {usuario, credencial}` |
 | GET | `/admin/usuarios/{id}` | `ADMINISTRADOR` | — | usuario + `casos_activos, totp_vinculado, intentos_fallidos, bloqueado_hasta, bloqueado_en, desactivado_en, ultimo_traslado, envios_credencial` |
