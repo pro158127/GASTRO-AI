@@ -14,7 +14,7 @@ ID = UUID("12345678-1234-5678-9abc-123456789abc")
 
 @pytest.fixture
 def piezas(monkeypatch):
-    settings = object()
+    settings = NS(redis_url="redis://redis:6379/0")
     db = object()
     context = MagicMock()
     context.__enter__.return_value = db
@@ -28,6 +28,10 @@ def piezas(monkeypatch):
     classifier = object()
     processor = Mock()
     explanation = Mock()
+    deliveries = Mock()
+    deliveries.sumar.return_value = 1
+    delivery_factory = Mock()
+    delivery_factory.desde_url.return_value = deliveries
     mocks = {
         "settings": Mock(return_value=settings),
         "session": session,
@@ -39,9 +43,11 @@ def piezas(monkeypatch):
         "classifier": Mock(return_value=classifier),
         "processor": Mock(return_value=processor),
         "explanation": Mock(return_value=explanation),
+        "delivery_factory": delivery_factory,
     }
     for name, target in (
         ("get_settings", "settings"), ("SessionLocal", "session"),
+        ("ContadorEntregasRedis", "delivery_factory"),
         ("crear_almacen", "storage"), ("crear_inferencia", "inference"),
         ("RepositorioAnalisis", "analyses"), ("RepositorioCatalogo", "catalogue"),
         ("UnidadTrabajo", "unit"), ("ServicioClasificacion", "classifier"),
@@ -49,6 +55,7 @@ def piezas(monkeypatch):
     ):
         monkeypatch.setattr(tareas, name, mocks[target])
     return NS(**mocks, db=db, context=context, settings_value=settings,
+              deliveries=deliveries,
               storage_value=storage, inference_value=inference,
               analyses_value=analyses, catalogue_value=catalogue, unit_value=unit,
               classifier_value=classifier, processor_value=processor,
@@ -79,10 +86,13 @@ def test_procesamiento_usa_uuid_y_explicacion_despues_del_resultado(piezas):
         piezas.analyses_value, piezas.storage_value, piezas.unit_value,
         piezas.classifier_value,
     )
-    piezas.processor_value.procesar.assert_called_once_with(ID)
+    piezas.delivery_factory.desde_url.assert_called_once_with(piezas.settings_value.redis_url)
+    piezas.deliveries.sumar.assert_called_once_with(ID)
+    piezas.processor_value.procesar.assert_called_once_with(ID, 1)
     piezas.explanation.assert_called_once_with(piezas.db)
     piezas.explanation_value.generar.assert_called_once_with(ID)
-    assert orden.mock_calls == [call.procesar(ID), call.explicar(ID)]
+    piezas.deliveries.olvidar.assert_called_once_with(ID)
+    assert orden.mock_calls == [call.procesar(ID, 1), call.explicar(ID)]
     piezas.context.__exit__.assert_called_once_with(None, None, None)
 
 
@@ -93,6 +103,7 @@ def test_fallo_de_procesamiento_no_inicia_explicacion_y_cierra_sesion(piezas):
         tareas.procesar_analisis.run(str(ID))
     assert raised.value is failure
     piezas.explanation.assert_not_called()
+    piezas.deliveries.olvidar.assert_not_called()
     args = piezas.context.__exit__.call_args.args
     assert args[0] is RuntimeError and args[1] is failure
 

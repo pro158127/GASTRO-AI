@@ -705,7 +705,7 @@ servicio confirma con la unidad de trabajo (`repositories/unidad_trabajo.py`).
 
 Celery con Redis como intermediario. Comando en compose:
 `celery -A app.workers.celery_app worker --loglevel=info` (en Windows, `--pool=solo`).
-Tarea `gastroia.procesar_analisis` (`app/workers/tareas.py`, con `acks_late`), etapa por
+Tarea `gastroia.procesar_analisis` (`app/workers/tareas.py`, con `acks_late` y reentrega si muere el proceso), etapa por
 etapa:
 
 1. **ANONIMIZAR:** revisa que la imagen guardada siga sin metadatos.
@@ -720,6 +720,26 @@ etapa:
 
 Cada inferencia deja un renglón en `LogInferencia` (estado `EXITO`, `ERROR` o
 `TIEMPO_AGOTADO`, latencia y el motivo técnico), sin datos clínicos (RF-M03).
+
+**Si el worker muere a la mitad** (hallazgo de QA del #296):
+
+- `task_acks_late` y `task_reject_on_worker_lost`: si el proceso hijo muere (OOM, kill,
+  límite duro), el mensaje vuelve a la cola en vez de quedar como `FAILURE` con el análisis
+  en `PROCESANDO`.
+- Retomar es seguro: `procesar()` solo actúa si el análisis sigue `PROCESANDO`; resultados,
+  regiones y `LogInferencia` se guardan en un solo commit al final, y los mapas usan claves
+  fijas en MinIO.
+- Tope de 3 entregas por análisis (`MAX_ENTREGAS`), contadas en Redis
+  (`entregas:analisis:<id>`, vence en 24 h; `app/adapters/entregas.py`). Al pasarlo:
+  `FALLIDO` con `ERR-1002` y `LogInferencia` con `WORKER_PERDIDO`, sin llamar al Space. El
+  contador se borra cuando la tarea termina, así el reintento del doctor empieza en 1.
+- Tiempos: `task_soft_time_limit` 120 s, `task_time_limit` 150 s y `visibility_timeout` de
+  Redis 300 s (si se cae el worker entero, el mensaje vuelve a los 5 min, no a la hora).
+  Con `--pool=solo` (Windows) Celery no aplica los límites de tiempo.
+- `Analisis.procesando_desde` (migración `0004`) se renueva al pedir, al reintentar y en cada
+  entrega. Si pasan 10 min sin renovarse (el mensaje se perdió), `GET /analisis/{id}`,
+  `/estado` y `/reintento` lo cierran como `FALLIDO` con `ERR-1002` y `LogInferencia` con
+  `SIN_RESPUESTA_WORKER`; desde ahí el doctor puede reintentar.
 
 **Contrato con el Space privado de Hugging Face** (modelo Fold 2, lo implementa el equipo
 de ML en `Model_CNN/Code-to-deploy-model/app.py`):

@@ -35,6 +35,10 @@ class RepositorioAnalisis:
             select(ModeloDesplegado).where(ModeloDesplegado.es_vigente.is_(True)).limit(1)
         )
 
+    def bloquear(self, analisis: Analisis) -> None:
+        """SELECT … FOR UPDATE de la fila y la recarga: el worker no la cambia mientras tanto."""
+        self.db.refresh(analisis, with_for_update=True)
+
     def tomar_candado_paciente(self, seudonimo: str) -> None:
         """Candado de transacción por paciente: dos POST /analisis a la vez con el mismo
         documento no crean dos casos (contrato, migración 0003). Se suelta con el commit.
