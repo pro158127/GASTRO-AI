@@ -37,8 +37,8 @@ import type { AvisoError } from "../utils/avisosError";
 import { fechaReporte, metricas, valorMetrica } from "../utils/formatoMetricas";
 import estilos from "./DashboardTecnico.module.css";
 
-const FUENTE = "fuente: model card en Hugging Face (RM-06). No es el desempeño en producción.";
-const FUENTE_SIN_FECHA = "Fuente: model card en Hugging Face (RM-06). No es el desempeño en producción.";
+const FUENTE = "fuente: ficha del modelo en Hugging Face (RM-06). No es el desempeño en producción.";
+const FUENTE_SIN_FECHA = "Fuente: ficha del modelo en Hugging Face (RM-06). No es el desempeño en producción.";
 
 /** Lo que devuelve `fechaReporte` cuando la fecha no viene o no se puede partir. */
 const SIN_FECHA = "No incluida";

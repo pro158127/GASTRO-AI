@@ -179,7 +179,7 @@ export default function ParametrosInferencia({ titulo }: { titulo: string }) {
             </label>
             <label className={estilos.opcion}>
               <input type="radio" name="modo-umbral" checked={borrador.porCaracteristica} onChange={() => { setExito(false); setBorrador((b) => b && ({ ...b, porCaracteristica: true })); }} />
-              <span><strong>Un umbral por característica</strong><small>Un valor distinto para cada característica, por ejemplo los del model card.</small></span>
+              <span><strong>Un umbral por característica</strong><small>Un valor distinto para cada característica, por ejemplo los de la ficha del modelo.</small></span>
             </label>
           </fieldset>
 
@@ -195,7 +195,7 @@ export default function ParametrosInferencia({ titulo }: { titulo: string }) {
                 <label className={estilos.campo} key={c.id} htmlFor={`umbral-${c.id}`}>
                   <span>{c.nombre} (%)</span>
                   <input id={`umbral-${c.id}`} type="number" min={rangoMin} max={rangoMax} step="1" value={borrador.caracteristicas[c.id] ?? ""} aria-invalid={Number(borrador.caracteristicas[c.id]) < rangoMin || Number(borrador.caracteristicas[c.id]) > rangoMax} onChange={(e) => actualizarCampo(c.id, e.target.value)} />
-                  <small>Valor vigente: {porcentaje(c.umbral)} · Model card: {porcentaje(c.umbral_por_defecto)}. Entre {rangoMin} % y {rangoMax} %.</small>
+                  <small>Valor vigente: {porcentaje(c.umbral)} · Ficha del modelo: {porcentaje(c.umbral_por_defecto)}. Entre {rangoMin} % y {rangoMax} %.</small>
                 </label>
               ))}
             </div>

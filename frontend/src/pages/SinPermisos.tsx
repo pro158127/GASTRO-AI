@@ -17,7 +17,7 @@ export default function SinPermisos() {
         mensaje={`Esta sección es solo para ${paraQuien}. Si cree que es un error, comuníquese con el administrador de la plataforma.`}
       >
         <EnlaceBoton to="/dashboard" jerarquia="primario">
-          Ir a mi dashboard
+          Ir al panel de control
         </EnlaceBoton>
       </EstadoVacio>
     </div>

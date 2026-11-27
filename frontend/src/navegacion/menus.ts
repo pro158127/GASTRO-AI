@@ -32,7 +32,7 @@ export interface ItemMenu {
 
 export const menusPorRol: Record<RolInterfaz, ItemMenu[]> = {
   doctor: [
-    { id: "dashboard", etiqueta: "Dashboard", ruta: "/dashboard", Icono: IconoInicio },
+    { id: "dashboard", etiqueta: "Panel de control", ruta: "/dashboard", Icono: IconoInicio },
     {
       id: "nuevo-analisis",
       etiqueta: "Nuevo análisis",
@@ -51,14 +51,14 @@ export const menusPorRol: Record<RolInterfaz, ItemMenu[]> = {
     },
   ],
   administrador: [
-    { id: "dashboard", etiqueta: "Dashboard", ruta: "/dashboard", Icono: IconoInicio },
+    { id: "dashboard", etiqueta: "Panel de control", ruta: "/dashboard", Icono: IconoInicio },
     { id: "usuarios", etiqueta: "Usuarios", ruta: "/usuarios", Icono: IconoUsuarios, incluyeSubrutas: true },
     { id: "cuentas-pendientes", etiqueta: "Cuentas pendientes", ruta: "/cuentas-pendientes", Icono: IconoUsuario },
     { id: "bitacora", etiqueta: "Bitácora", ruta: "/bitacora", Icono: IconoBitacora },
     { id: "estado-operativo", etiqueta: "Estado operativo", ruta: "/estado-operativo", Icono: IconoEstado },
     { id: "metricas-del-modelo", etiqueta: "Métricas del modelo", ruta: "/metricas-del-modelo", Icono: IconoMetricas },
     // Figma usa el mismo ícono que Bitácora.
-    { id: "logs-tecnicos", etiqueta: "Logs técnicos", ruta: "/logs-tecnicos", Icono: IconoBitacora },
+    { id: "logs-tecnicos", etiqueta: "Registros técnicos", ruta: "/logs-tecnicos", Icono: IconoBitacora },
     { id: "parametros", etiqueta: "Parámetros", ruta: "/parametros", Icono: IconoAjustes },
   ],
 };

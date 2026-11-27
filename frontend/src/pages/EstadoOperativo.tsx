@@ -228,7 +228,7 @@ export default function EstadoOperativo({ titulo }: { titulo: string }) {
               </div>
               <div className={estilos.filaDato}><dt>Desplegado el</dt><dd>{fechaLegible(modelo.desplegado_en)}</dd></div>
             </dl>
-            {modelo.model_card_url && <p><a href={modelo.model_card_url} target="_blank" rel="noreferrer">Abrir model card</a></p>}
+            {modelo.model_card_url && <p><a href={modelo.model_card_url} target="_blank" rel="noreferrer">Abrir ficha del modelo</a></p>}
           </>
         ) : cargando ? (
           <p className={estilos.mensajeEstado} role="status">Cargando información del modelo…</p>
