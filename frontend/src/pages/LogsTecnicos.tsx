@@ -21,13 +21,10 @@ const FORMATO_TIEMPO = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1
 const ETIQUETA_ESTADO: Record<EstadoLogTecnico, string> = {
   EXITO: "Correcto",
   ERROR: "Error de inferencia",
-  TIEMPO_AGOTADO: "Error de inferencia",
+  TIEMPO_AGOTADO: "Tiempo agotado",
 };
 
 function estadoDeLog(log: LogTecnico): { etiqueta: string; clase: string } {
-  if (log.estado === "EXITO" && log.latencia_llm_ms === null) {
-    return { etiqueta: "Explicación no disponible", clase: estilos.advertencia };
-  }
   return {
     etiqueta: ETIQUETA_ESTADO[log.estado],
     clase: log.estado === "EXITO" ? estilos.exito : estilos.error,
@@ -45,7 +42,12 @@ function segundos(ms: number | null): string {
 
 function InsigniaLog({ log }: { log: LogTecnico }) {
   const estado = estadoDeLog(log);
-  return <span className={`${estilos.insignia} ${estado.clase}`}>{estado.etiqueta}</span>;
+  return (
+    <div className={estilos.estadoLog}>
+      <span className={`${estilos.insignia} ${estado.clase}`}>{estado.etiqueta}</span>
+      {log.codigo_error !== null && <code className={estilos.codigoError}>Código: {log.codigo_error}</code>}
+    </div>
+  );
 }
 
 function FilaLog({ log }: { log: LogTecnico }) {
@@ -208,12 +210,12 @@ export default function LogsTecnicos({ titulo }: { titulo: string }) {
         </div>
       )}
 
-      <section className={estilos.seccionResultados} aria-labelledby="titulo-resultados" aria-busy={cargando}>
+      <section className={estilos.seccionResultados} aria-labelledby="titulo-resultados">
         <h2 id="titulo-resultados" className={estilos.tituloSeccion}>Logs técnicos de inferencia</h2>
-        <div className={estilos.resultados} ref={resultadosRef} tabIndex={-1}>
-          <p className={estilos.estadoResultados} role="status" aria-live="polite">
-            {cargando && resultado ? "Buscando registros…" : estadoResultados}
-          </p>
+        <p className={estilos.estadoResultados} role="status" aria-live="polite">
+          {cargando ? "Buscando registros…" : estadoResultados}
+        </p>
+        <div className={estilos.resultados} ref={resultadosRef} tabIndex={-1} aria-busy={cargando}>
           {esqueletoVisible && cargando ? (
             <div className={estilos.esqueletos} aria-label="Cargando registros">
               {Array.from({ length: 5 }, (_, indice) => <Esqueleto key={indice} forma="fila-tabla" />)}

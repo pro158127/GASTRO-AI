@@ -1,6 +1,9 @@
 // Tipos del contrato de la API (../ARCHITECTURE.md § 3.5). Los campos JSON conservan los
 // nombres que define el backend.
 
+// Los dos tipos del estado operativo (W-22) que este archivo reutiliza en vez de copiar.
+import type { AlertaOperativa, EstadoServicio } from "../services/estadoOperativo";
+
 /** Etapas del inicio de sesión: cada una solo abre sus endpoints; el resto exige ACTIVA. */
 export type EtapaSesion = "CAMBIO_CONTRASENA" | "VINCULAR_TOTP" | "PENDIENTE_2FA" | "ACTIVA";
 
@@ -44,6 +47,15 @@ export interface RespuestaSesion {
   etapa: EtapaSesion;
   usuario: UsuarioActual;
   inactividad: Inactividad;
+  /**
+   * Contador del ítem «Casos recibidos» del menú: **traslados** que el doctor no ha abierto,
+   * no casos (`casos_recibidos_nuevos` de `RespuestaSesion` en el backend). Es el mismo número
+   * que `casos_recibidos.traslados_nuevos` del dashboard, pero viene aquí porque el menú se ve
+   * en todas las pantallas y el dashboard solo se carga en la suya.
+   *
+   * `null` cuando no aplica: sin la etapa ACTIVA o con un rol que no es doctor.
+   */
+  casos_recibidos_nuevos: number | null;
 }
 
 /** Respuesta de `POST /auth/sesion/continuar` (W-05, «Seguir conectado»). */
@@ -94,6 +106,12 @@ export interface Perfil {
   estado: string;
   creado_en: string;
   totp_vinculado: boolean;
+  /**
+   * Verdadero si ya terminó u omitió el recorrido guiado alguna vez. El backend lo calcula
+   * como «`recorrido_visto_en` no es nulo», y esa fecha es la de la **primera** vez: marcarlo
+   * otra vez no la cambia. Lo usa `src/pages/recorridoVisto.ts`, el único que lo lee.
+   */
+  recorrido_visto: boolean;
 }
 
 /**
@@ -341,11 +359,6 @@ export interface HealthResponse {
   database: "ok" | "error";
 }
 
-/** Propuesta `GET /api/v1/casos-recibidos/resumen` (ver CONTRATOS_API.md). */
-export interface ResumenCasosRecibidos {
-  sin_revisar: number;
-}
-
 // ---------------------------------------------------- Imagen, paciente y análisis (W-06, W-07)
 // ../ARCHITECTURE.md § 3.5, «Paciente y documento» e «Imagen y análisis». Ningún tipo de salida
 // lleva el documento ni el seudónimo del paciente: el documento solo viaja en el cuerpo de un
@@ -466,4 +479,677 @@ export interface EstadoAnalisisRespuesta {
    * interfaz: la navegación del frontend no sale de aquí.
    */
   resultado_url?: string | null;
+}
+
+// --------------------------------------------- Detalle del resultado (W-08, W-08b, W-17b)
+// `GET /analisis/{id}` → `AnalisisSalida` (../ARCHITECTURE.md § 3.5).
+//
+// **Dos escalas distintas en la misma respuesta.** `probabilidad`, `umbral_aplicado`,
+// `confianza` y las cuatro medidas de `caja` van de 0 a 1; `area_porcentaje` va de 0 a 100
+// (la base de datos lo obliga: `caja_* BETWEEN 0 AND 1` y `area_porcentaje BETWEEN 0 AND
+// 100`). Por eso `src/utils/numeros.ts` tiene dos funciones y no una.
+
+/** Modelo que produjo el resultado. `revision_corta` son los 7 primeros del sha (RNF-25). */
+export interface ModeloUsado {
+  repositorio_hf: string;
+  revision_sha: string;
+  revision_corta: string;
+}
+
+/** La imagen del análisis, ya anonimizada. `url` es firmada y vence a los 5 minutos. */
+export interface ImagenAnalisis {
+  url: string;
+  formato: string;
+  ancho: number;
+  alto: number;
+}
+
+/**
+ * Mapa de calor principal: el de la primera región de la característica más probable. Llega
+ * `null` exactamente cuando `regiones` está vacío, que es el caso de W-08b.
+ */
+export interface MapaCalor {
+  url: string;
+  /**
+   * Texto del servidor que aclara que Grad-CAM es una visualización y no una segmentación
+   * clínica. **Se pinta tal cual**, junto al mapa: es una advertencia sobre el modelo, no
+   * texto de interfaz, y si cambia con una revisión cambia en el servidor sin tocar el
+   * frontend. Es la excepción a `CLAUDE.md` § 7; lo decidió Mónica.
+   */
+  aviso: string;
+}
+
+/** Una característica evaluada, con la probabilidad y el umbral que se le aplicó. */
+export interface CaracteristicaResultado {
+  id: number;
+  codigo: string;
+  nombre: string;
+  /** 0 a 1. */
+  probabilidad: number;
+  /**
+   * 0 a 1. **Es el umbral del momento en que se hizo el análisis, no el de hoy**
+   * (RF-A01 CA 2): nunca se presenta como «el umbral actual».
+   */
+  umbral_aplicado: number;
+  supera_umbral: boolean;
+}
+
+/** Caja normalizada (0 a 1) de una región. Figma no la dibuja sobre la imagen. */
+export interface CajaRegion {
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+}
+
+/** Una región de interés. Solo llegan las de las características que superan el umbral. */
+export interface RegionInteres {
+  orden: number;
+  caracteristica_id: number;
+  caja: CajaRegion;
+  /** 0 a 100. */
+  area_porcentaje: number;
+  /**
+   * 0 a 1. **Es la misma `probabilidad` de su característica, copiada por el servidor**, no
+   * una segunda medición. No se muestra: repetir el número con otro nombre haría creer que
+   * son dos medidas que coinciden.
+   */
+  confianza: number;
+  mapa_calor_url: string;
+}
+
+/**
+ * Los cuatro estados de la explicación (`EstadoExplicacion` del backend,
+ * `backend/app/models/analisis.py`). No hay más.
+ */
+export type EstadoExplicacion = "PENDIENTE" | "GENERADA" | "FALLIDA" | "RECHAZADA";
+
+/** Explicación del LLM tal como viene dentro de `GET /analisis/{id}`. */
+export interface ExplicacionAnalisis {
+  estado: EstadoExplicacion;
+  texto: string | null;
+  generada_en: string | null;
+  intentos: number;
+}
+
+/**
+ * Respuesta de `GET /analisis/{id}/explicacion` (W-08c, W-08d).
+ *
+ * El endpoint usa `response_model_exclude_none=True`: **los campos nulos no vienen en el
+ * JSON**, así que aquí son opcionales de verdad. Si todavía no hay fila de explicación, la
+ * respuesta es `{estado: "PENDIENTE"}` a secas.
+ */
+export interface ExplicacionEstado {
+  estado: EstadoExplicacion;
+  texto?: string | null;
+  generada_en?: string | null;
+  /** `ERR-3001` (no disponible) o `ERR-3002` (texto rechazado). No se le muestra a la persona. */
+  codigo_error?: string | null;
+  /**
+   * Mensaje estándar de indisponibilidad (RF-R05 CA 5). Solo llega en FALLIDA y RECHAZADA.
+   * **Se pinta tal cual**, como `MapaCalor.aviso`: lo escribe el servidor, no el frontend.
+   */
+  mensaje?: string | null;
+  intentos: number;
+  /**
+   * Lo calcula el servidor (`estado ∈ (FALLIDA, RECHAZADA)` y `intentos < 3`). **Es lo que
+   * habilita el botón «Reintentar»**; el frontend no repite esa cuenta.
+   */
+  puede_reintentar: boolean;
+}
+
+/** Respuesta de `POST /analisis/{id}/explicacion/reintentar` (202). */
+export interface ExplicacionReintentada {
+  estado: EstadoExplicacion;
+  intentos: number;
+}
+
+/** Las tres valoraciones posibles (`Valoracion` del backend). */
+export type Valoracion = "COINCIDE" | "NO_COINCIDE" | "NO_CONCLUYENTE";
+
+/** Tope de `texto` en una observación (`TEXTO_OBSERVACION_MAXIMO` del backend). */
+export const TEXTO_OBSERVACION_MAXIMO = 2000;
+
+/** Cuerpo de `POST /analisis/{id}/observaciones`. */
+export interface ObservacionEntrada {
+  valoracion: Valoracion;
+  texto?: string;
+}
+
+/** La observación tal como la devuelve el 201. El autor trae `id`, a diferencia del detalle. */
+export interface ObservacionGuardada {
+  id: string;
+  valoracion: Valoracion;
+  texto: string | null;
+  autor: { id: string; nombre: string; apellido: string };
+  registrada_en: string;
+}
+
+/** Respuesta de `POST /analisis/{id}/observaciones` (201). */
+export interface ObservacionCreada {
+  observacion: ObservacionGuardada;
+}
+
+// ------------------------------------------------------------ Historial (W-16, contrato §4)
+// Dos endpoints con la misma fila: `GET /analisis` («Mis análisis») y
+// `POST /pacientes/analisis/buscar` («Buscar por paciente»).
+//
+// **`GET /analisis` nunca lleva datos del paciente**: lo dice su docstring en el backend.
+// Ninguna de las dos respuestas trae documento ni seudónimo.
+
+/** `origen` de «Mis análisis» (RF-A07 CA 5). Van en minúscula: es un `StrEnum` del backend. */
+export type OrigenHistorial = "todos" | "propios" | "recibidos";
+
+/** `orden` de las dos consultas. Con «-» delante, del más reciente al más antiguo. */
+export type OrdenHistorial = "solicitado_en" | "-solicitado_en";
+
+/** Quién hizo el análisis, en una fila del historial. */
+export interface RealizadoPorResumen {
+  nombre: string;
+  apellido: string;
+  /** «(cuenta eliminada)» junto al nombre (RF-A07 CA 4). */
+  cuenta_eliminada: boolean;
+}
+
+/** Una fila de «Mis análisis» o de «Buscar por paciente». */
+export interface FilaHistorial {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /** Nombres de las que superan el umbral, de mayor a menor probabilidad. */
+  caracteristicas_que_superan: string[];
+  /** `null` significa «sin característica sobre el umbral»; no se pinta en blanco. */
+  caracteristica_principal: string | null;
+  /** 0 a 1, como el resto de probabilidades de la API. */
+  probabilidad_principal: number | null;
+  /** La del doctor que consulta, no la de otros. */
+  tiene_observacion: boolean;
+  observacion: string | null;
+  modelo_revision: string;
+  /** Lo hizo otro doctor y llegó por traslado (RF-A07 CA 5). */
+  trasladado: boolean;
+  realizado_por: RealizadoPorResumen;
+}
+
+/** Respuesta de `GET /analisis`. */
+export interface PaginaHistorial {
+  items: FilaHistorial[];
+  paginacion: Paginacion;
+}
+
+/**
+ * Respuesta de `POST /pacientes/analisis/buscar`: lo mismo más los casos del paciente.
+ *
+ * Un paciente ajeno o inexistente responde **200 con `items: []`**, no 404 (RF-H01 CA 5):
+ * el vacío no puede dejar deducir si el paciente existe.
+ */
+export interface PaginaHistorialPaciente extends PaginaHistorial {
+  /** El caso más reciente; es lo que usaría «Descargar reporte de este paciente». */
+  caso_id: string | null;
+  /** Todos, si recibió por traslado un paciente que ya tenía. */
+  caso_ids: string[];
+}
+
+/**
+ * Observación de un profesional dentro de `GET /analisis/{id}`. `es_mia` es lo que decide si
+ * W-08 muestra el formulario o la valoración ya registrada en solo lectura.
+ */
+export interface ObservacionAnalisis {
+  id: string;
+  es_mia: boolean;
+  valoracion: Valoracion;
+  texto: string | null;
+  autor: { nombre: string; apellido: string };
+  registrada_en: string;
+}
+
+/**
+ * Quién hizo el análisis. Lo dibuja la tarjeta «Procedencia de este análisis» (W-17b, etiqueta
+ * interna del código, sin maqueta), y **solo cuando `es_propio` es `false`**: a nadie se le
+ * dice que un análisis lo hizo él mismo.
+ */
+export interface RealizadoPor {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+  es_propio: boolean;
+}
+
+/**
+ * De quién llegó el caso por traslado. Lo dibuja la misma tarjeta que `RealizadoPor` (W-17b),
+ * como un dato **aparte**: `desde` puede ser otra persona que el ejecutor, porque el servidor
+ * manda el último traslado del caso. `cuenta_eliminada` es la de quien trasladó, independiente
+ * de la de `RealizadoPor`.
+ */
+export interface TrasladoAnalisis {
+  desde: { nombre: string; apellido: string };
+  cuenta_eliminada: boolean;
+  fecha: string;
+}
+
+/** El aviso experimental de RF-R04 tal como lo manda la API. */
+export interface AvisoApi {
+  etiqueta: string;
+  texto: string;
+}
+
+/**
+ * Respuesta de `GET /analisis/{id}`. Se tipa completa aunque W-08 no dibuje todo, para que
+ * la tarea 6b (explicación y observaciones) no tenga que tocar los tipos.
+ *
+ * `caracteristicas` viene ordenada por probabilidad descendente y `regiones` por la
+ * probabilidad de su característica: el frontend no reordena.
+ */
+export interface AnalisisDetalle {
+  id: string;
+  codigo: string;
+  estado: EstadoAnalisis;
+  solicitado_en: string;
+  completado_en: string | null;
+  codigo_error: string | null;
+  modelo: ModeloUsado;
+  imagen: ImagenAnalisis;
+  mapa_calor: MapaCalor | null;
+  calidad: CalidadImagen;
+  caracteristicas: CaracteristicaResultado[];
+  /**
+   * Activa el aviso de W-08b. Ojo: es `false` cuando `caracteristicas` llega vacía, así que
+   * «lista vacía» no es W-08b y se atiende aparte.
+   */
+  ninguna_supera_umbral: boolean;
+  regiones: RegionInteres[];
+  explicacion: ExplicacionAnalisis | null;
+  observaciones: ObservacionAnalisis[];
+  realizado_por: RealizadoPor;
+  trasladado: TrasladoAnalisis | null;
+  aviso: AvisoApi;
+}
+
+// ------------------------------------------------- Reporte en PDF (W-17, RF-H02, contrato §4)
+
+/**
+ * Respuesta 201 de `POST /reportes`. Desde el detalle de un análisis se pide con
+ * `analisis_ids: [id]`; el reporte de todo un paciente (`caso_id`) es de W-16.
+ */
+export interface ReporteCreado {
+  id: string;
+  /** Siempre `"PDF"`: es el único formato del esquema del servidor. */
+  formato: string;
+  generado_en: string;
+  /** Cuántos análisis quedaron dentro. Desde esta pantalla, siempre 1. */
+  analisis: number;
+  /**
+   * Ruta de descarga **absoluta desde la raíz del sitio**: el servidor la compone con su
+   * `api_prefix`, así que ya viene con `/api/v1` delante. `solicitar` y `solicitarBinario`
+   * antepone su propio `BASE` («/api/v1»), de modo que pasarles este valor daría
+   * `/api/v1/api/v1/reportes/…` y un 404. La ruta se arma con `id` en `services/reportes.ts`;
+   * este campo queda tipado, documentado y sin usar.
+   */
+  descarga_url: string;
+}
+
+// ------------------------------------------- Dashboard clínico (W-15, RF-DB01, contrato §3.5)
+// `GET /dashboard/doctor`. Todo se calcula **solo con los análisis propios completados** (los
+// que hizo el doctor y siguen siendo suyos). Lo que recibió por traslado va aparte, en
+// `casos_recibidos` y `avisos_traslado`, y no cambia sus indicadores (RF-A07 CA 2). Nada de
+// datos del paciente: los análisis se identifican por su código (RF-DB01 CA 2, RNF-24).
+
+/** Las cuatro cifras del resumen del doctor. */
+export interface ResumenDoctor {
+  /** Acumulado de completados propios (RF-DB01 CA 1). */
+  total_analisis: number;
+  /** Mes en curso en hora de Colombia, no la del navegador (RF-DB01 CA 1). */
+  analisis_mes: number;
+  /** El servidor lo calcula, pero W-15 no lo dibuja. Ver CONTRATOS_API.md. */
+  ultimos_7_dias: number;
+  /** Completados sin la observación del doctor. Tampoco está dibujado en W-15. */
+  sin_valoracion: number;
+}
+
+/** Una de las 5 filas de «Casos recientes» (RF-DB01 CA 2). Vienen en cualquier estado. */
+export interface AnalisisReciente {
+  id: string;
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /**
+   * `null` significa dos cosas distintas: ninguna característica superó el umbral, **o** el
+   * análisis todavía no termina. Se distinguen con `estado`, nunca mostrando el mismo texto.
+   */
+  caracteristica_principal: string | null;
+  /** Nombres de las que superan el umbral, de mayor a menor probabilidad. */
+  caracteristicas_que_superan: string[];
+}
+
+/** Una barra de la gráfica de frecuencia. Vienen todas las características activas, las de 0 también. */
+export interface BarraFrecuencia {
+  caracteristica_id: number;
+  codigo: string;
+  nombre: string;
+  /** En cuántos análisis propios superó el umbral que regía ese día (RF-A01 CA 2). */
+  analisis: number;
+}
+
+/** Gráfica de **barras**, nunca circular (RF-DB01 CA 3). */
+export interface Frecuencia {
+  /** Rótulo exigido por RF-DB01 CA 4. Lo manda el servidor; no se escribe en el frontend. */
+  rotulo: string;
+  barras: BarraFrecuencia[];
+}
+
+/** Concordancia del doctor con el modelo (RF-DB01 CA 5). */
+export interface ConcordanciaDoctor {
+  /** De 0 a 100 con un decimal: coincide / (coincide + no coincide). `null` si no valoró nada. */
+  porcentaje: number | null;
+  coincide: number;
+  no_coincide: number;
+  /** **No entra en el porcentaje**: se informa aparte para que la cifra no parezca mal calculada. */
+  no_concluyente: number;
+}
+
+/** Quién trasladó los casos. `cuenta_eliminada` añade «(cuenta eliminada)» (RF-A07 CA 4). */
+export interface OrigenTraslado {
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+/** Un traslado recibido que el doctor todavía no ha abierto. */
+export interface AvisoTraslado {
+  traslado_id: string;
+  /** Por ejemplo `DESACTIVACION`. W-15 no lo muestra. */
+  tipo: string;
+  cantidad_casos: number;
+  origen: OrigenTraslado;
+  ejecutado_en: string;
+}
+
+/** Lo recibido por traslado, aparte de los indicadores propios (RF-A07 CA 2). */
+export interface CasosRecibidos {
+  /** Traslados sin abrir; es el número que puede nombrar el aviso, no el total de traslados. */
+  traslados_nuevos: number;
+  /** Total de casos recibidos, nuevos y ya vistos. */
+  casos: number;
+}
+
+/** Respuesta de `GET /dashboard/doctor`. */
+export interface DashboardDoctor {
+  /** Sin ningún análisis: estado vacío «Realizar el primer análisis», sin gráficas (CA 10). */
+  primer_uso: boolean;
+  resumen: ResumenDoctor;
+  /** Los 5 más recientes. */
+  analisis_recientes: AnalisisReciente[];
+  frecuencia: Frecuencia;
+  concordancia: ConcordanciaDoctor;
+  /** Casos con 2 o más análisis propios (RF-DB01 CA 6). */
+  pacientes_con_seguimiento: number;
+  avisos_traslado: AvisoTraslado[];
+  casos_recibidos: CasosRecibidos;
+  /** RF-DB01 CA 9. */
+  aviso: AvisoApi;
+}
+
+// ---------------------------------------------------------------- casos recibidos (W-27)
+//
+// Bandeja de casos recibidos por traslado: `GET /casos-recibidos`, `POST /casos-recibidos/buscar`
+// y `POST /traslados/{id}/visto` (ARCHITECTURE.md § 3.5, RF-A07). Es **un bloque por traslado**,
+// el más reciente primero, no una lista plana de análisis.
+//
+// Ojo con los nombres parecidos: `CasosRecibidos` (arriba) es la tarjeta del dashboard
+// (`{traslados_nuevos, casos}`) y no tiene nada que ver con `BandejaRecibidos`.
+
+/**
+ * Doctor de origen de un traslado, o quien hizo un análisis. El nombre se conserva aunque la
+ * cuenta se haya eliminado: entonces se escribe «(cuenta eliminada)» (RF-A07 CA 4). Nunca trae
+ * `id`, y nunca se dice qué administrador hizo el traslado.
+ */
+export type PersonaOrigen = OrigenTraslado;
+
+/** Una opción del filtro «Doctor de origen». Es `PersonaOrigen` con el `id` para `origen_id`. */
+export interface DoctorOrigen extends PersonaOrigen {
+  id: string;
+}
+
+/** Un caso (paciente) dentro de un traslado. Lo que cuenta `total_casos`. */
+export interface CasoRecibido {
+  caso_id: string;
+  total_analisis: number;
+  /** `null` si el caso no tiene ningún análisis. */
+  ultimo_analisis_en: string | null;
+}
+
+/** Una fila de la tabla de un bloque. */
+export interface AnalisisRecibido {
+  id: string;
+  /** Por ejemplo `A-2026-000152`. */
+  codigo: string;
+  solicitado_en: string;
+  estado: EstadoAnalisis;
+  /** `null` cuando ninguna característica supera el umbral. */
+  caracteristica_principal: string | null;
+  /** De 0 a 1. `null` junto con `caracteristica_principal`. */
+  probabilidad_principal: number | null;
+  /**
+   * Quien hizo el análisis, cuando no es el doctor de origen del traslado ni el que consulta:
+   * es el caso trasladado dos veces, e imprime «Originalmente de …» (trazabilidad RNF-25).
+   */
+  originalmente_de: PersonaOrigen | null;
+}
+
+/** Un bloque de la bandeja: todo lo que llegó en un mismo traslado. */
+export interface TrasladoRecibido {
+  id: string;
+  tipo: TipoTraslado;
+  ejecutado_en: string;
+  /** El doctor todavía no lo ha abierto: insignia «Nuevo». `visto_en` nulo en el servidor. */
+  nuevo: boolean;
+  origen: PersonaOrigen;
+  casos: CasoRecibido[];
+  /** Total de análisis del bloque, **sin** aplicar `limite`: es el «de N» del pie. */
+  analisis_total: number;
+  /** Los primeros `limite` análisis, del más reciente al más antiguo. */
+  analisis: AnalisisRecibido[];
+}
+
+/** Respuesta de `GET /casos-recibidos` y de `POST /casos-recibidos/buscar`. */
+export interface BandejaRecibidos {
+  /**
+   * Traslados sin abrir. **Siempre global**: no lo filtran ni `origen_id` ni la búsqueda por
+   * paciente, así que es el mismo número que la insignia del menú y se puede volcar al contexto
+   * de sesión desde cualquier carga.
+   */
+  nuevos: number;
+  /** Ya filtrados por `origen_id` o por paciente, al contrario que `nuevos`. */
+  total_traslados: number;
+  total_casos: number;
+  /** Opciones del filtro. También global, con todo el que haya trasladado algo alguna vez. */
+  doctores_origen: DoctorOrigen[];
+  traslados: TrasladoRecibido[];
+  /**
+   * Cuántos análisis de ese paciente hizo el propio doctor, para el aviso «también tiene N
+   * suyos». Solo en la búsqueda; en la bandeja llega `null`.
+   */
+  analisis_propios_paciente: number | null;
+}
+
+/** Cuerpo de `POST /casos-recibidos/buscar`. El documento nunca va en la URL. */
+export interface BusquedaRecibidos {
+  tipo_documento: string;
+  numero_documento: string;
+  origen_id?: string;
+  /** Análisis por bloque; `0` los trae todos. */
+  limite?: number;
+}
+
+// ------------------------------------------------ W-19 · dashboard técnico (RF-DB02, § 3.5)
+//
+// `EstadoServicio` y `AlertaOperativa` son los mismos del estado operativo (W-22) y se
+// importan de allí para no tener dos copias. El import es solo de tipos, así que no queda
+// ninguna dependencia de `types` hacia `services` en el código compilado.
+
+/** `usuarios`. Las cuentas eliminadas no cuentan (CA 1). */
+export interface UsuariosDashboardTecnico {
+  /** El backend siempre manda las tres claves, aunque el conteo sea 0. */
+  por_estado: Record<"PENDIENTE" | "ACTIVO" | "INACTIVO", number>;
+  /** No se dibuja en W-19; cuenta **todas** las cuentas no eliminadas, no solo las activas. */
+  por_rol: Record<"DOCTOR" | "ADMINISTRADOR", number>;
+  /**
+   * Cuentas PENDIENTE con la contraseña temporal vencida (RNF-27). **Es un subconjunto de
+   * `por_estado.PENDIENTE`**, no una cifra aparte: las dos tarjetas de la pantalla cuentan la
+   * misma cuenta, y por eso el detalle de la cuarta dice que sale de las pendientes.
+   */
+  pendientes_expiradas: number;
+}
+
+/** `seguridad` (CA 4). Es la única ventana de 24 horas de todo el contrato. */
+export interface SeguridadDashboardTecnico {
+  /** Inicios de sesión **y** verificaciones TOTP fallidas en 24 h, según la bitácora. */
+  accesos_fallidos_24h: number;
+  /** Cuentas con bloqueo temporal en curso (RF-U12), de cualquier estado no eliminado. */
+  cuentas_bloqueadas: number;
+}
+
+/**
+ * `analisis`. Se pinta en la sección «Actividad de análisis» de W-19, que **no está dibujada en
+ * Figma**: los rótulos los redacta el frontend.
+ *
+ * Los cuatro conteos son por `solicitado_en` y **no se suman**: `ultimos_7_dias` contiene a los
+ * otros tres (incluidos los que siguen PROCESANDO), y las dos cifras de fallo son disjuntas
+ * entre sí.
+ */
+export interface AnalisisDashboardTecnico {
+  /** Desde las 00:00 **en Colombia**, no en UTC. */
+  hoy: number;
+  ultimos_7_dias: number;
+  /**
+   * FALLIDO cuya `calidad_suficiente` no es `false`, lo que **incluye los nulos**: un fallo de
+   * encolado deja el análisis FALLIDO sin que nadie haya evaluado la imagen. No significa que la
+   * imagen estuviera bien, solo que el fallo no se atribuye a su calidad.
+   */
+  con_error_7_dias: number;
+  calidad_insuficiente_7_dias: number;
+}
+
+/**
+ * `latencia_7d`: percentil 95 de los **últimos 7 días** (CA 6), no de 24 horas.
+ *
+ * Los dos percentiles son nulos cuando no hubo ninguna medición en la ventana. En el caso del
+ * modelo de lenguaje eso es lo normal: `percentile_cont` ignora los nulos, así que el p95 sale
+ * solo de las inferencias que sí pidieron explicación. Un nulo **no es un fallo**.
+ */
+export interface LatenciaDashboardTecnico {
+  vision_p95_ms: number | null;
+  llm_p95_ms: number | null;
+  inferencias: number;
+  /** Inferencias con estado ERROR o TIEMPO_AGOTADO. Las correctas son la resta. */
+  errores: number;
+}
+
+/**
+ * Un servicio en el resumen del dashboard. **No es `ServicioOperativo` de W-22**: aquí no hay
+ * `tiempo_respuesta_ms` ni `ultima_verificacion`, porque la hora de la medición es una sola y
+ * va en `verificado_en` del nivel superior.
+ */
+export interface ServicioResumen {
+  codigo: string;
+  /**
+   * El esquema del backend declara este campo como `str`, no como el enum, así que la pantalla
+   * no da por hecho que siempre llegue uno de los tres valores conocidos.
+   */
+  estado: EstadoServicio;
+  nombre: string;
+}
+
+/**
+ * `modelo_vigente`. **No es `ModeloDesplegado` de W-22**: `revision_corta` ya viene recortada a
+ * 7 caracteres por el servidor, y no es lo mismo que el `revision_sha` entero de aquella.
+ */
+export interface ModeloVigenteResumen {
+  repositorio_hf: string;
+  /** Los primeros 7 caracteres del SHA, ya recortados: no se vuelven a recortar. */
+  revision_corta: string;
+  desplegado_en: string;
+  /** RNF-29: la revisión vigente es la que está configurada. */
+  coincide_con_configuracion: boolean;
+}
+
+/** Respuesta de `GET /admin/dashboard`. Solo conteos: nada identifica un caso ni un paciente. */
+export interface DashboardTecnico {
+  usuarios: UsuariosDashboardTecnico;
+  seguridad: SeguridadDashboardTecnico;
+  analisis: AnalisisDashboardTecnico;
+  latencia_7d: LatenciaDashboardTecnico;
+  servicios: ServicioResumen[];
+  /** La alerta del estado operativo, redactada por el servidor; `null` si no hay nada. */
+  alerta: AlertaOperativa | null;
+  modelo_vigente: ModeloVigenteResumen | null;
+  /** No se dibuja en W-19; es un estado actual, sin ventana de tiempo. Su sitio es W-20. */
+  envios_credencial_fallidos: number;
+  /** Cuándo se midieron **los servicios**, no cuándo se pidió la pantalla. */
+  verificado_en: string;
+}
+
+/* ------------------------------------------------------------------ W-21 · Bitácora (RF-A02)
+
+   `GET /admin/bitacora` y `GET /admin/bitacora/filtros`, los dos solo ADMINISTRADOR y solo
+   lectura: no hay POST, PUT ni DELETE, y la base lo impide con triggers. */
+
+/** Quién hizo la acción (`actor`) o sobre quién se hizo (`objetivo`). */
+export interface PersonaBitacora {
+  id: string;
+  nombre: string;
+  apellido: string;
+  cuenta_eliminada: boolean;
+}
+
+export type ResultadoBitacora = "EXITO" | "FALLO";
+
+/** Una fila de la bitácora. Los textos los redacta el servidor; aquí se pintan tal cual. */
+export interface EntradaBitacora {
+  /**
+   * Un `bigint` que el servidor manda **como texto a propósito**, para que JavaScript no
+   * pierda precisión. Es la clave de React y nada más: no se convierte a número.
+   */
+  id: string;
+  ocurrido_en: string;
+  /** `null` = sin sesión: el intento no llegó a identificar a nadie. No es un dato que falte. */
+  actor: PersonaBitacora | null;
+  /** El código crudo (`CUENTA_BLOQUEADA`). Sirve para filtrar; no se muestra nunca. */
+  accion: string;
+  /** El texto ya redactado por el servidor («Bloqueo temporal de cuenta»). Se pinta tal cual. */
+  accion_texto: string;
+  resultado: ResultadoBitacora;
+  /** La cuenta sobre la que se hizo la acción, si aplica. */
+  objetivo: PersonaBitacora | null;
+  /** Texto ya armado por el servidor a partir del JSON guardado; `null` si no hay nada. */
+  detalle: string | null;
+  ip: string | null;
+}
+
+export interface PaginaBitacora {
+  items: EntradaBitacora[];
+  paginacion: Paginacion;
+}
+
+/** Una opción del desplegable «Tipo de evento». */
+export interface AccionFiltro {
+  codigo: string;
+  texto: string;
+}
+
+/**
+ * Una opción del desplegable «Usuario». **El nombre llega ya compuesto** («Ana Pérez») y sin
+ * `apellido`, al revés que `PersonaBitacora`.
+ */
+export interface UsuarioFiltro {
+  id: string;
+  nombre: string;
+  cuenta_eliminada: boolean;
+}
+
+/** Respuesta de `GET /admin/bitacora/filtros`: las opciones de los dos desplegables. */
+export interface FiltrosBitacora {
+  acciones: AccionFiltro[];
+  usuarios: UsuarioFiltro[];
 }

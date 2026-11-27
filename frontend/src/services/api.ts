@@ -6,11 +6,15 @@
 // `atenderRespuesta`, y un 2xx que no es 204 y no trae JSON se trata como error inesperado
 // (W-31). El envío sí puede no ser JSON: por eso existe `enviarMultipart`.
 //
-// Consecuencia para quien venga después: un endpoint que devuelva otra cosa —el reporte en
-// PDF (`/analisis/{id}/reporte`) o el CSV de la auditoría son los candidatos— necesita un
+// Consecuencia para quien venga después: un endpoint que devuelva otra cosa necesita un
 // transporte propio. Ese transporte debe seguir usando `atenderRespuesta` para los errores
 // (el cuerpo de error sí es JSON) y quedarse solo con la lectura del cuerpo bueno; si no,
 // se pierde el manejo global de sesión y permisos.
+//
+// Ya hay uno: `solicitarBinario`, que nació para el reporte en PDF
+// (`GET /reportes/{id}/archivo`, W-17) y que hoy sirve también al CSV de la auditoría
+// (`GET /admin/auditoria/exportar`, W-19c/d), cada uno con su propio `tipoEsperado`. Un tercer
+// formato no necesita transporte nuevo: necesita su `tipoEsperado`.
 import type {
   CampoConError,
   EdicionPerfil,
@@ -62,6 +66,10 @@ interface DetalleError {
   permitidos?: string[];
   /** `minimo` de IMAGEN_RESOLUCION_INSUFICIENTE: el tamaño mínimo en píxeles. */
   minimo?: TamanoImagen | null;
+  /** `max_intentos` de REINTENTOS_AGOTADOS: cuántos intentos de explicación permite el servidor. */
+  maxIntentos?: number | null;
+  /** `max_dias` de PERIODO_INVALIDO: cuántos días puede abarcar el período de la auditoría. */
+  maxDias?: number | null;
 }
 
 /**
@@ -96,6 +104,18 @@ export class ErrorApi extends Error {
   readonly permitidos: string[];
   /** Tamaño mínimo del 422 IMAGEN_RESOLUCION_INSUFICIENTE, en píxeles. */
   readonly minimo: TamanoImagen | null;
+  /**
+   * Intentos que permite el servidor, en el 429 REINTENTOS_AGOTADOS de la explicación. Lo
+   * manda él para que el texto no repita un «3» escrito aquí que mañana puede no ser cierto.
+   */
+  readonly maxIntentos: number | null;
+  /**
+   * Días que puede abarcar el período, en el 422 PERIODO_INVALIDO del export de la auditoría
+   * (W-19c), **contando los dos extremos**: el servidor rechaza cuando la diferencia supera
+   * `max_dias - 1` días (`backend/app/services/bitacora.py:191`). Lo manda él para que el
+   * frontend no escriba un «366» que mañana puede no ser cierto.
+   */
+  readonly maxDias: number | null;
 
   constructor(estado: number | null, detalle: DetalleError = {}) {
     super(detalle.codigo ?? "Error de la API");
@@ -111,6 +131,8 @@ export class ErrorApi extends Error {
     this.maxBytes = detalle.maxBytes ?? null;
     this.permitidos = detalle.permitidos ?? [];
     this.minimo = detalle.minimo ?? null;
+    this.maxIntentos = detalle.maxIntentos ?? null;
+    this.maxDias = detalle.maxDias ?? null;
   }
 
   /**
@@ -149,7 +171,7 @@ export function registrarManejadoresGlobales(nuevos: ManejadoresGlobales | null)
 }
 
 export interface OpcionesSolicitud {
-  metodo?: "GET" | "POST" | "PATCH";
+  metodo?: "GET" | "POST" | "PUT" | "PATCH";
   cuerpo?: unknown;
   /** Consulta automática: no renueva la inactividad de la sesión (header X-Actividad-Pasiva: 1). */
   pasiva?: boolean;
@@ -215,6 +237,8 @@ function errorDesdeCuerpo(estado: number, cuerpo: unknown): ErrorApi {
     maxBytes: numeroONulo(detalle.max_bytes),
     permitidos: listaDe(detalle.permitidos, esTexto),
     minimo: tamanoONulo(detalle.minimo),
+    maxIntentos: numeroONulo(detalle.max_intentos),
+    maxDias: numeroONulo(detalle.max_dias),
   });
 }
 
@@ -430,6 +454,120 @@ export async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {
   return (await solicitarCompleta<T>(ruta, opciones)).datos;
 }
 
+/**
+ * Ocupa el lugar del cuerpo en `atenderRespuesta` cuando la respuesta es un archivo. Ese
+ * paso solo distingue «hay cuerpo» de «no hay cuerpo» (`cuerpo === null`, el 2xx fuera del
+ * contrato); los bytes se leen después y lo que traen se comprueba aparte.
+ */
+const CUERPO_BINARIO = Object.freeze({ binario: true });
+
+export interface OpcionesBinario {
+  /**
+   * Tipo de contenido que la respuesta **tiene que declarar** (por ejemplo `application/pdf`).
+   * No es un adorno: es lo único que separa un archivo de una página de error con 200.
+   */
+  tipoEsperado: string;
+  /** Si es `false`, el error no dispara los manejadores globales (lo atiende quien llama). */
+  global?: boolean;
+}
+
+export interface RespuestaBinaria {
+  datos: Blob;
+  /** `filename` de `Content-Disposition`, o `null` si no vino o no se pudo leer. */
+  nombreArchivo: string | null;
+}
+
+/**
+ * `filename` de `Content-Disposition`, o `null`. Acepta la forma extendida
+ * (`filename*=UTF-8''…`) y la entrecomillada, que es la que manda el servidor.
+ *
+ * Se queda solo con el nombre base: el servidor lo compone él
+ * (`Reporte_GastroAI_{codigo}.pdf`), pero este valor acaba en el atributo `download` de un
+ * enlace y en un texto en pantalla, así que no se confía en que no traiga rutas ni caracteres
+ * de control.
+ */
+function nombreDeContentDisposition(cabecera: string | null): string | null {
+  if (!cabecera) return null;
+  const extendido = /filename\*\s*=\s*utf-8''([^;]+)/i.exec(cabecera);
+  const entreComillas = /filename\s*=\s*"([^"]*)"/i.exec(cabecera);
+  const suelto = /filename\s*=\s*([^;]+)/i.exec(cabecera);
+  let valor = extendido?.[1] ?? entreComillas?.[1] ?? suelto?.[1] ?? "";
+  if (extendido) {
+    try {
+      valor = decodeURIComponent(valor);
+    } catch {
+      return null;
+    }
+  }
+  const base = valor.trim().split(/[\\/]/).pop() ?? "";
+  // Sin regex de caracteres de control: se filtran por código, que además es más claro.
+  const limpio = Array.from(base)
+    .filter((caracter) => caracter >= " " && caracter !== "\u007f")
+    .join("")
+    .trim();
+  return limpio === "" || limpio === "." || limpio === ".." ? null : limpio;
+}
+
+/**
+ * GET de un archivo (el reporte en PDF de W-17). Devuelve los bytes y el nombre que mandó el
+ * servidor, para que la pantalla no tenga que inventárselo.
+ *
+ * **Los errores pasan por `atenderRespuesta` igual que cualquier otra petición**: un 401 a
+ * mitad de la descarga lleva al inicio de sesión y un 403 PERMISO_DENEGADO a W-28. Es la razón
+ * de traer el archivo por aquí y no dejar que lo abra el navegador con un enlace, que además
+ * dejaría un 404 o un 503 sin forma de verse (llegan como JSON y no hay quién los lea).
+ *
+ * **Y se comprueba que la respuesta es lo que dice ser.** El cuerpo bueno ya no pasa por el
+ * analizador de JSON, así que aquí no sirve la red de seguridad de `solicitar` («un 2xx que no
+ * es 204 y no trae JSON es un error inesperado»). Sin esto, un proxy o un servidor de
+ * desarrollo que responda 200 con una página HTML se descargaría como un `.pdf` que al abrirlo
+ * no es un PDF. Se exigen dos cosas: que `Content-Type` declare `tipoEsperado` y que el cuerpo
+ * no venga vacío. Lo que es propio de cada formato —la firma del archivo— lo comprueba quien
+ * sabe qué formato pidió, en su módulo de `services/`.
+ *
+ * Descargar es una acción de la persona, nunca una consulta automática: `pasiva: false`.
+ */
+export async function solicitarBinario(
+  ruta: string,
+  opciones: OpcionesBinario
+): Promise<RespuestaBinaria> {
+  const { tipoEsperado, global = true } = opciones;
+
+  const instanteEnvio = performance.now();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${BASE}${ruta}`, { method: "GET", credentials: "same-origin" });
+  } catch {
+    throw new ErrorApi(null);
+  }
+  const instanteRecibido = performance.now();
+
+  // El cuerpo bueno no se lee como JSON (es el archivo); el de error sí, que es lo que
+  // `atenderRespuesta` necesita para componer el `ErrorApi`. Si no es 2xx, lanza.
+  atenderRespuesta<unknown>(
+    {
+      estado: respuesta.status,
+      ok: respuesta.ok,
+      cuerpo: respuesta.ok ? CUERPO_BINARIO : await leerCuerpoJson(respuesta),
+      fechaCabecera: respuesta.headers.get("Date"),
+      instanteRecibido,
+    },
+    { pasiva: false, global },
+    instanteEnvio
+  );
+
+  const declarado = (respuesta.headers.get("Content-Type") ?? "").split(";")[0]?.trim().toLowerCase();
+  if (declarado !== tipoEsperado.toLowerCase()) throw new ErrorApi(respuesta.status);
+
+  const datos = await respuesta.blob();
+  if (datos.size === 0) throw new ErrorApi(respuesta.status);
+
+  return {
+    datos,
+    nombreArchivo: nombreDeContentDisposition(respuesta.headers.get("Content-Disposition")),
+  };
+}
+
 /** POST /auth/login. Deja la cookie puesta y responde la etapa que sigue. */
 export function login(correo: string, contrasena: string): Promise<RespuestaEtapa> {
   // Los errores de aquí (AUTH_CREDENCIALES_INVALIDAS, AUTH_TEMPORAL_EXPIRADA y 429) los atiende
@@ -537,6 +675,20 @@ export function cerrarSesionEnServidor(motivo: "manual" | "inactividad" = "manua
 /** GET /perfil (W-18). Datos del propio usuario; cualquier rol. Contiene datos personales: no se registran. */
 export function obtenerPerfil(): Promise<Perfil> {
   return solicitar<Perfil>("/perfil");
+}
+
+/**
+ * POST /perfil/recorrido-visto (204). Marca que la persona ya terminó u omitió el recorrido
+ * guiado (W-13, W-14x); cualquier rol. Sin cuerpo y sin respuesta.
+ *
+ * **Idempotente en el servidor:** solo escribe la fecha si estaba nula, así que llamarlo dos
+ * veces no cambia nada y no hace falta protegerse de la doble invocación.
+ *
+ * No es pasiva: la llama el final de un recorrido que la persona está mirando.
+ * Quien la use decide qué hacer con el fallo; ver `src/pages/recorridoVisto.ts`.
+ */
+export function marcarRecorridoVistoEnServidor(): Promise<void> {
+  return solicitar<void>("/perfil/recorrido-visto", { metodo: "POST" });
 }
 
 /**

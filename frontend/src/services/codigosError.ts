@@ -83,6 +83,23 @@ export const CodigoErrorApi = {
   SIN_CASOS_ACTIVOS: "SIN_CASOS_ACTIVOS",
   DATOS_INVALIDOS: "DATOS_INVALIDOS",
   /**
+   * 422 · Un período con la fecha inicial posterior a la final. Lo lanza `limites_de_fechas`
+   * del backend, que comparten `GET /analisis` (W-16) y `GET /admin/bitacora` (W-21). Trae
+   * `campos` con el campo que señala el servidor (`desde`) y su mensaje: se pinta ahí, no en
+   * una alerta suelta. **W-16 todavía no lo trata** y lo manda a la alerta genérica.
+   */
+  RANGO_FECHAS_INVALIDO: "RANGO_FECHAS_INVALIDO",
+  /**
+   * 422 · `GET /admin/auditoria/exportar` (W-19c): falta uno de los dos extremos del período, o
+   * el período es más largo de la cuenta. **No trae `campos`**, al contrario que
+   * RANGO_FECHAS_INVALIDO: el servidor lo lanza con `extra=` y sin la lista de campos
+   * (`backend/app/services/bitacora.py:228-229`), así que el frontend elige dónde pintarlo.
+   *
+   * Trae `max_dias` (ver `ErrorApi.maxDias`): cuántos días puede abarcar el período contando
+   * los dos extremos. El número lo dice el servidor; aquí no se escribe ninguno.
+   */
+  PERIODO_INVALIDO: "PERIODO_INVALIDO",
+  /**
    * 422 · El destino no es otro doctor con la cuenta activa (también si es el propio origen).
    * Trae `campos` con `{campo: "destino_id"}`, así que se pinta en el desplegable de destino.
    */
@@ -95,6 +112,25 @@ export const CodigoErrorApi = {
   CASOS_INVALIDOS: "CASOS_INVALIDOS",
   /** 422 · W-02b: trae `campos` y `requisitos`. */
   CONTRASENA_NO_CUMPLE_POLITICA: "CONTRASENA_NO_CUMPLE_POLITICA",
+  /**
+   * 409 · `POST /analisis/{id}/observaciones`: este doctor ya registró su valoración de este
+   * análisis. **No se sobrescribe**: hay una por análisis y por persona, y no se edita
+   * (RF-D04). Pasa, por ejemplo, con dos pestañas abiertas → W-08.
+   */
+  OBSERVACION_YA_REGISTRADA: "OBSERVACION_YA_REGISTRADA",
+  /** 409 · Valorar un análisis que todavía no tiene resultado. W-08 solo se pinta COMPLETADO. */
+  ANALISIS_NO_COMPLETADO: "ANALISIS_NO_COMPLETADO",
+  /**
+   * 409 · `POST /analisis/{id}/explicacion/reintentar` cuando la explicación ya está GENERADA
+   * o sigue PENDIENTE. `puede_reintentar` del GET evita llegar aquí; queda por si el estado
+   * cambió entre la consulta y el clic.
+   */
+  EXPLICACION_NO_REINTENTABLE: "EXPLICACION_NO_REINTENTABLE",
+  /**
+   * 429 · Ya se hicieron los tres intentos de la explicación (ANA-04). Trae `max_intentos`
+   * (ver `ErrorApi.maxIntentos`): el número lo dice el servidor, no una constante de aquí.
+   */
+  REINTENTOS_AGOTADOS: "REINTENTOS_AGOTADOS",
   /** 429 · Límite por IP en login y códigos (10/min); trae `Retry-After`. */
   DEMASIADOS_INTENTOS: "DEMASIADOS_INTENTOS",
 } as const;

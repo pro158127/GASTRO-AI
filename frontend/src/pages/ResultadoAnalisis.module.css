@@ -1,0 +1,262 @@
+/* Pantalla W-08 · Resultado del análisis (Figma 47:870), con W-08b (95:2376), T-08
+   (109:893) y M-08 (109:1147).
+
+   Dos columnas en escritorio y una sola desde tableta hacia abajo, como M-08. A 320 px no
+   hay desplazamiento horizontal (WCAG 1.4.10): todo rejilla fluida, `min-width: 0` en los
+   hijos y los textos largos (el repositorio del modelo, «Infección por H. pylori») parten
+   antes que desbordar. */
+
+.columnas {
+  display: grid;
+  gap: var(--espacio-6);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .columnas {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* Características, explicación y valoración, una debajo de otra. */
+.columnaDerecha {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+/* El título y el distintivo comparten línea y se apilan cuando no caben. */
+.cabeceraTarjeta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.tituloTarjeta {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Encabezado de la pantalla ---------- */
+
+.iconoBoton {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+/* Las acciones de la cabecera: en W-08 solo «Nuevo análisis», en W-17 también «Descargar
+   reporte» a su izquierda. En una línea, y si no caben, pasan a la siguiente. */
+.accionEncabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
+/* En celular los botones se apilan a todo el ancho y alcanzan el objetivo táctil de 44 px. */
+@media (max-width: 767px) {
+  .accionEncabezado {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .accionEncabezado > a,
+  .accionEncabezado > button {
+    width: 100%;
+  }
+}
+
+/* ---------- Carga y fallo sin datos ---------- */
+
+.cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+}
+
+.textoCargando {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.avisoSolo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
+
+/* ---------- Tarjeta de la imagen ---------- */
+
+/* Los dos marcos lado a lado como en M-08; por debajo de ~360 px pasan a uno por fila en
+   vez de encogerse hasta no verse. */
+.imagenes {
+  display: grid;
+  gap: var(--espacio-3);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.sinMapa {
+  margin: 0;
+  padding: var(--espacio-3);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.regiones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  padding: var(--espacio-3);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie-sutil);
+}
+
+.tituloRegiones {
+  margin: 0;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+}
+
+.listaRegiones {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: 0;
+  list-style: none;
+}
+
+.regionHallazgo,
+.regionDato {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Tarjeta de las características ---------- */
+
+.caracteristicas {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-5);
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-2);
+}
+
+.filaCabecera {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+.nombre {
+  min-width: 0;
+  flex: 1 1 auto;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.probabilidad {
+  margin-left: auto;
+  font: var(--texto-cuerpo-base-enfasis);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-primario);
+}
+
+/* La barra es decorativa (`aria-hidden`): el número y la insignia ya dan el dato y el
+   estado, así que el color nunca es la única señal (WCAG 1.4.1). */
+.barra {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radio-completo);
+  background: var(--color-borde-sutil);
+}
+
+.rellenoSupera,
+.rellenoBajo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--radio-completo);
+}
+
+.rellenoSupera {
+  background: var(--color-marca-primario);
+}
+
+/* Gris medio del dibujo para lo que queda bajo el umbral. */
+.rellenoBajo {
+  background: var(--color-borde-campo);
+}
+
+.marcaUmbral {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--color-texto-primario);
+  transform: translateX(-50%);
+}
+
+.umbral {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-secundario);
+}
+
+/* Fecha de un análisis fallido. Es la de la solicitud, no la del fallo: el backend no
+   escribe `completado_en` cuando algo falla. */
+.fechaFallo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-secundario);
+}
+
+.sinCaracteristicas,
+.pieTarjeta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}

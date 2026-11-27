@@ -1,0 +1,192 @@
+/* Recorrido de TOPOLOGO: doctor (W-13, W-14b…W-14h) y administrador (W-19e…W-19p), y sus
+   versiones de celular (M-13, M-14e, M-14g, M-14h, M-19e, M-19i, M-19f, M-19p). */
+
+/*
+ * Capa que cubre toda la ventana. TRANSPARENTE a propósito: solo captura los clics, para que
+ * nada de lo que está debajo —incluido el elemento iluminado— sea pulsable. El oscurecimiento
+ * lo pone `.velo` o la sombra de `.hueco`.
+ *
+ * z-index 52: por encima de la barra lateral, de la barra superior, de la capa oscura del menú de
+ * celular (40) y **del panel de ese menú (50)**, que el recorrido abre en los pasos de ítem del
+ * menú; y por debajo de los diálogos (55) y del aviso de inactividad (60), que deben poder
+ * aparecer sobre el recorrido. Es el orden de los frames: en M-14h (127:5448) la «Capa del
+ * recorrido» va después del «Panel de navegación».
+ *
+ * Hasta esta tarea era 45, por debajo del panel, y el comentario decía que estaba por encima
+ * «del panel del menú de celular (40)»: confundía el panel con su capa oscura. Con el menú
+ * abierto, el panel tapaba el recorrido.
+ *
+ * Que la capa esté por encima del panel es también lo que impide que se pueda tocar el ítem
+ * resaltado: sus `onActivar` navegarían y dejarían el recorrido anclado a un DOM que ya no
+ * existe.
+ */
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 52;
+}
+
+/* Pasos que no iluminan nada (1 y 5, y los que no encuentran su elemento). */
+.velo {
+  position: absolute;
+  inset: 0;
+  background: var(--color-fondo-superposicion);
+}
+
+/*
+ * El hueco: un rectángulo transparente con una sombra enorme alrededor. El agujero está
+ * PINTADO, no recortado, así que este mismo elemento sigue capturando el clic.
+ */
+.hueco {
+  position: absolute;
+  border: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  border-radius: var(--radio-md);
+  box-shadow: 0 0 0 100vmax var(--color-fondo-superposicion);
+}
+
+/* Globo de TOPOLOGO: mascota a la izquierda y tarjeta blanca, alineadas por abajo. */
+.tarjeta {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--espacio-3);
+}
+
+.centrada {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.flotante {
+  /* `top` y `left` los calcula el componente a partir del elemento iluminado. */
+  transform: none;
+}
+
+.mascota {
+  display: block;
+  flex-shrink: 0;
+  width: 108px;
+  height: 124px;
+}
+
+.globo {
+  display: flex;
+  width: 420px;
+  max-width: 100%;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  padding: var(--espacio-5);
+  border: var(--borde-grosor-foco) solid var(--color-accion-primaria);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-2-menu);
+}
+
+.paso {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-marca-acento-texto);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+}
+
+/* El título recibe el foco en cada paso: el anillo tiene que verse (WCAG 2.4.7). */
+.titulo:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+.texto {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+  padding-top: var(--espacio-2);
+}
+
+/* Empuja «Anterior» y «Siguiente» a la derecha, como en los frames. */
+.espacio {
+  flex: 1 1 0;
+}
+
+/* En tableta y escritorio los tres botones son hermanos en una fila: la caja de «Anterior» y
+   «Siguiente» no genera caja y no cambia nada. */
+.navegacion {
+  display: contents;
+}
+
+/* ---------- Celular (< 768 px) ----------
+   Panel fijo abajo, no globo flotante: una tarjeta junto al elemento no cabe a 320 px. Medidas
+   de M-13 (127:7699) y M-14h (127:8378), idénticas en los dos: 16 px de margen a los lados y
+   abajo (358 px de ancho en una ventana de 390), la mascota a ×2 **encima** de la tarjeta y
+   alineada a la izquierda, y las acciones en dos filas. El elemento iluminado se trae al
+   principio de la ventana (`useAnclaRecorrido`), así que el anillo queda arriba y el panel no lo
+   tapa. */
+@media (max-width: 767px) {
+  .tarjeta,
+  .centrada,
+  .flotante {
+    top: auto;
+    right: var(--espacio-4);
+    bottom: var(--espacio-4);
+    left: var(--espacio-4);
+    flex-direction: column;
+    align-items: flex-start;
+    transform: none;
+  }
+
+  .mascota {
+    width: 54px;
+    height: 62px;
+  }
+
+  .globo {
+    width: 100%;
+    /* En columna, `flex: 1 1 0` estiraría el alto: la tarjeta crece con su texto. */
+    flex: none;
+    min-width: 0;
+    padding: var(--espacio-4);
+  }
+
+  /* «Omitir recorrido» en su propia fila y, debajo, «Anterior» y «Siguiente» al 50 %. */
+  .acciones {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .espacio {
+    display: none;
+  }
+
+  .navegacion {
+    display: flex;
+    width: 100%;
+    gap: var(--espacio-2);
+  }
+
+  /* Objetivos táctiles de 44 px (WCAG 2.5.8 y la nota de reglas de Figma). */
+  .acciones button {
+    min-height: var(--tamano-control-tactil);
+  }
+
+  .navegacion button {
+    flex: 1 1 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hueco {
+    transition: none;
+  }
+}

@@ -1,34 +1,33 @@
 // Estructura común de las pantallas internas: enlace «Saltar al contenido», barra lateral,
 // barra superior, contenido (<main>) y pie con el aviso experimental. En celular el menú es un
 // diálogo (PanelMenuMovil). Se usa como ruta de diseño: las pantallas entran por <Outlet />.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigationType } from "react-router";
 import AvisoExperimental from "../components/AvisoExperimental";
 import { buscarPantalla, tituloDePantalla } from "../navegacion/pantallas";
 import { etiquetaRol, menusPorRol } from "../navegacion/menus";
-import { ProveedorUsuario, useUsuarioActual } from "../sesion/UsuarioActual";
+import { useUsuarioActual } from "../sesion/UsuarioActual";
 import { useSesion } from "../sesion/ProveedorSesion";
 import BarraLateral from "./BarraLateral";
 import BarraSuperior from "./BarraSuperior";
+import { ProveedorMenuMovil } from "./ContextoMenuMovil";
 import EnlaceSaltarContenido from "./EnlaceSaltarContenido";
 import PanelMenuMovil from "./PanelMenuMovil";
 import estilos from "./DisposicionInterna.module.css";
 
 export default function DisposicionInterna() {
-  return (
-    <ProveedorUsuario>
-      <Armazon />
-    </ProveedorUsuario>
-  );
-}
-
-function Armazon() {
   const { usuario, rol, casosSinRevisar } = useUsuarioActual();
   const { cerrarSesion } = useSesion();
   const ubicacion = useLocation();
   const tipoNavegacion = useNavigationType();
   const idPanel = useId();
   const [menuAbierto, setMenuAbierto] = useState(false);
+  // El menú que pide el recorrido guiado de TOPOLOGO en sus pasos de «ítem del menú» y de «su
+  // cuenta» (tabla 132:8706 de Figma). Se guarda aparte del que abre la persona con el botón ☰
+  // porque el panel se comporta distinto en cada caso: ver `PanelMenuMovil`.
+  const [menuDelRecorrido, setMenuDelRecorrido] = useState(false);
+  const menuMovil = useMemo(() => ({ pedirMenuDelRecorrido: setMenuDelRecorrido }), []);
+  const panelVisible = menuAbierto || menuDelRecorrido;
   const principalRef = useRef<HTMLElement>(null);
   const botonMenuRef = useRef<HTMLButtonElement>(null);
   const ultimaRuta = useRef<string | null>(null);
@@ -68,11 +67,17 @@ function Armazon() {
     }
   }, [ubicacion.pathname, tipoNavegacion]);
 
-  // Si la ventana pasa a tableta o escritorio con el panel abierto, se cierra.
+  // Si la ventana pasa a tableta o escritorio con el panel abierto, se cierra. También se suelta
+  // la petición del recorrido: el panel es `position: fixed` y ninguna media query lo oculta, así
+  // que un paso de menú que siguiera pidiéndolo dejaría el panel encima del escritorio. Al volver
+  // a celular, el recorrido lo vuelve a pedir desde su efecto de respaldo.
   useEffect(() => {
     const consulta = window.matchMedia("(min-width: 768px)");
     const alCambiar = () => {
-      if (consulta.matches) setMenuAbierto(false);
+      if (consulta.matches) {
+        setMenuAbierto(false);
+        setMenuDelRecorrido(false);
+      }
     };
     consulta.addEventListener("change", alCambiar);
     return () => consulta.removeEventListener("change", alCambiar);
@@ -87,25 +92,32 @@ function Armazon() {
           titulo={tituloBarra}
           nombre={nombreCompleto}
           rolEtiqueta={rolEtiqueta}
-          menuAbierto={menuAbierto}
+          // `aria-expanded` del botón ☰ describe si el panel se ve, no quién lo abrió.
+          menuAbierto={panelVisible}
           idPanel={idPanel}
           botonMenuRef={botonMenuRef}
           onAbrirMenu={() => setMenuAbierto(true)}
           onCerrarSesion={cerrarSesion}
         />
         <main id="contenido" ref={principalRef} tabIndex={-1} className={estilos.principal}>
-          <Outlet />
+          <ProveedorMenuMovil value={menuMovil}>
+            <Outlet />
+          </ProveedorMenuMovil>
         </main>
         <footer className={estilos.pie}>
           <AvisoExperimental />
         </footer>
       </div>
-      {menuAbierto && (
+      {panelVisible && (
         <PanelMenuMovil
           id={idPanel}
           items={items}
           casosSinRevisar={casosSinRevisar}
           usuario={`${nombreCompleto} · ${rolEtiqueta}`}
+          // Si lo pidió el recorrido, el panel no es un diálogo: no atrapa el foco, no se cierra
+          // con Esc ni tocando fuera y no bloquea el desplazamiento. El único diálogo en pantalla
+          // es la tarjeta del recorrido.
+          controladoPorRecorrido={menuDelRecorrido}
           onCerrar={() => setMenuAbierto(false)}
           onCerrarSesion={cerrarSesion}
         />

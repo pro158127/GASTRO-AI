@@ -79,6 +79,14 @@
   flex: 1 1 0;
 }
 
+/* «Mi perfil» y «Cerrar sesión». Caja real con el mismo gap que tenían como hermanos: el paso 9
+   del recorrido (W-14h) la mide para dibujar el anillo alrededor de los dos. */
+.cuenta {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+}
+
 /* ---------- Tableta (768 a 1279 px, T-15) ---------- */
 @media (min-width: 768px) and (max-width: 1279px) {
   .escritorio {

@@ -1,0 +1,229 @@
+/* Pantalla W-19 (Figma 68:4170) y su estado de carga W-19b (101:636).
+   La disposición interna ya separa los bloques y les pone `min-width: 0`. */
+
+/* ------------------------------------------------------------------- títulos de los bloques */
+
+/* El h1 lo pinta EncabezadoPagina; cada bloque es una <section> con su h2. Figma los dibuja a
+   dos tamaños: el rótulo suelto de «Cuentas de usuario» es más pequeño que el título dentro de
+   una tarjeta, pero los dos son el mismo nivel de encabezado. */
+.tituloSeccion {
+  margin: 0 0 var(--espacio-2);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+}
+
+.tituloBloque {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: var(--texto-titulo-h4);
+  color: var(--color-texto-primario);
+}
+
+/* ---------------------------------------------------------------------------- las tarjetas */
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+/* Título a la izquierda y el enlace («Ver detalle», «Ver logs técnicos») a la derecha. */
+.tituloTarjeta {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2);
+}
+
+/* Estado operativo y modelo desplegado, lado a lado como en el frame. Cada uno con
+   `minmax(0, 1fr)` para que un nombre de repositorio largo no ensanche la columna. */
+.estadoYModelo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espacio-4);
+  align-items: start;
+}
+
+/* Envoltorio del paso 3 del recorrido (W-19j): agrupa estado operativo, modelo y latencia para
+   que el anillo los abarque de una vez. Como son hijos de un contenedor nuevo y no del <main>,
+   pierden la separación y el `min-width: 0` que les daba la disposición interna
+   (`DisposicionInterna.module.css:19-31`): se repiten aquí, con las mismas tres medidas en los
+   mismos tres anchos, para que la pantalla se vea igual que antes del recorrido.
+
+   No puede ser `display: contents`: sin caja propia no se podría medir y el anillo no saldría
+   (ver `useAnclaRecorrido`). */
+.serviciosYModelo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-6);
+}
+
+.serviciosYModelo > * {
+  min-width: 0;
+}
+
+@media (max-width: 1279px) {
+  .serviciosYModelo {
+    gap: var(--espacio-5);
+  }
+}
+
+@media (max-width: 767px) {
+  .serviciosYModelo {
+    gap: var(--espacio-4);
+  }
+}
+
+/* ------------------------------------------------------- filas de servicio y de modelo */
+
+/* Sirve para el <ul> de servicios y para el <dl> del modelo: las dos son listas de
+   etiqueta + valor con la misma retícula. */
+.filas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-3);
+  padding: var(--espacio-1) 0;
+}
+
+.etiquetaFila {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+.valorFila {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-primario);
+  text-align: right;
+  /* Un SHA o un nombre de repositorio largo se parte antes que desbordar a 320 px. */
+  overflow-wrap: anywhere;
+}
+
+/* «Última verificación: 19/10/2026 15:20». */
+.pieTarjeta {
+  margin: 0;
+  font: var(--texto-leyenda);
+  color: var(--color-texto-terciario);
+}
+
+/* Línea «Reporte del 19/10/2026 · fuente: model card…» del bloque de evaluación (Figma
+   68:4453). No es `.pieTarjeta`: el frame la dibuja a 14 px y en texto secundario, no a 12 px
+   en terciario, porque no es un pie sino la procedencia de las cifras que vienen debajo. */
+.notaEvaluacion {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+/* ------------------------------------------------------------------- cuadrículas de cifras */
+
+/* Cuatro tarjetas en escritorio, dos en tableta y celular. Por debajo de 360 px una sola
+   columna: es lo que evita el desplazamiento horizontal a 320 px (WCAG 1.4.10) con una cifra de
+   32 px dentro de la tarjeta. La usan los tres bloques de cifras —cuentas y actividad de
+   análisis con cuatro, latencia con tres— porque `auto-fit` con un mínimo las reparte igual sin
+   una clase aparte. */
+.indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--espacio-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ------------------------------------------------------------------------- carga y error */
+
+/* W-19b: una sola tarjeta con los esqueletos dentro y el texto «Cargando…» al final. */
+.cargando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+}
+
+.esqueletoTarjetas,
+.esqueletoTarjetasAnchas {
+  display: grid;
+  gap: var(--espacio-4);
+}
+
+.esqueletoTarjetas {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.esqueletoTarjetasAnchas {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Visible, no solo para lectores de pantalla: lo dibuja W-19b. Va sin `role`, porque el
+   contenedor tiene `aria-busy` y eso silenciaría cualquier región live de dentro. */
+.textoCargando {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.errorCarga {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-4);
+}
+
+/* --------------------------------------------------------------------- tableta y celular */
+
+@media (max-width: 1023px) {
+  .estadoYModelo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .esqueletoTarjetas,
+  .esqueletoTarjetasAnchas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* El enlace de la tarjeta baja: «Ver logs técnicos» y el título no caben en una línea. */
+  .tituloTarjeta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 359px) {
+  .indicadores,
+  .esqueletoTarjetas,
+  .esqueletoTarjetasAnchas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* A 320 px, el nombre del servicio y su insignia no caben juntos. */
+  .fila {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--espacio-1);
+  }
+
+  .valorFila {
+    text-align: left;
+  }
+}

@@ -71,6 +71,14 @@
   overflow-wrap: anywhere;
 }
 
+/* Las dos listas (módulos, y «Mi perfil» + «Cerrar sesión») con la misma separación que tendrían
+   los ítems de una sola: en el frame M-00 no hay nada que las distinga a la vista. */
+.navegacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-2);
+}
+
 .lista {
   display: flex;
   flex-direction: column;

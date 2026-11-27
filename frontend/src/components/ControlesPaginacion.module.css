@@ -1,0 +1,18 @@
+/* Paginación de W-16 y W-09: los dos botones juntos, a la derecha del pie de la lista. */
+
+.paginacion {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--espacio-2);
+}
+
+@media (max-width: 767px) {
+  .paginacion {
+    width: 100%;
+  }
+
+  /* A 320 px los dos botones reparten el ancho en vez de salirse. */
+  .paginacion > button {
+    flex: 1 1 0;
+  }
+}

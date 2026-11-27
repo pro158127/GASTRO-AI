@@ -1,0 +1,69 @@
+/* «Exportar auditoría» de W-19 (Figma 101:877) y su diálogo de período, que no está en Figma.
+   Las medidas y la capa son las de los demás diálogos del proyecto (D-04, D-06): 480 px
+   centrado y, a 320 px, el ancho disponible sin desplazamiento horizontal. */
+
+.icono {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}
+
+/* Por encima del menú del celular (capa 40, panel 50) y por debajo del aviso W-05 (60). */
+.capa {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espacio-4);
+  overflow-y: auto;
+  background: var(--color-fondo-superposicion);
+}
+
+.dialogo {
+  display: flex;
+  width: 100%;
+  max-width: 480px;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  margin: auto;
+  padding: var(--espacio-6);
+  border-radius: var(--radio-lg);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-3-dialogo);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+}
+
+.mensaje {
+  margin: 0;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-secundario);
+}
+
+/* Dos columnas en escritorio; a partir de 480 px el diálogo ya no crece, así que el punto de
+   corte lo marca el propio contenido y no el ancho de la ventana. */
+.campos {
+  display: grid;
+  gap: var(--espacio-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (width <= 420px) {
+  .campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-3);
+}

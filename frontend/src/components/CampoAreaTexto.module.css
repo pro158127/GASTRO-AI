@@ -1,0 +1,130 @@
+/* Área de texto: misma caja que «Campo de texto» (Figma 13:705), con el contador al pie. */
+
+.campo {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espacio-2);
+}
+
+.etiqueta {
+  display: block;
+  font: var(--texto-etiqueta-campo);
+  color: var(--color-texto-primario);
+}
+
+.etiquetaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+.control {
+  display: flex;
+  padding: var(--espacio-2) var(--espacio-3);
+  border: var(--borde-grosor) solid var(--color-borde-campo);
+  border-radius: var(--radio-sm);
+  background: var(--color-fondo-superficie);
+}
+
+/* 2 px de grosor con borde de 1 px + sombra interior de 1 px, sin mover el diseño. */
+.control:focus-within {
+  border-color: var(--color-foco-anillo);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-foco-anillo);
+}
+
+.control[data-error] {
+  border-color: var(--color-estado-error-borde);
+  box-shadow: inset 0 0 0 var(--borde-grosor) var(--color-estado-error-borde);
+}
+
+.control[data-solo-lectura],
+.control[data-deshabilitado] {
+  border-color: var(--color-borde-sutil);
+  background: var(--color-fondo-superficie-sutil);
+}
+
+.entrada {
+  width: 100%;
+  min-width: 0;
+  /* Cuatro líneas de arranque; crece solo si la persona lo estira. */
+  min-height: 6rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  font: var(--texto-cuerpo-base);
+  color: var(--color-texto-primario);
+  /* Solo vertical: a lo ancho rompería la tarjeta en celular. */
+  resize: vertical;
+}
+
+.entrada::placeholder {
+  color: var(--color-texto-terciario);
+}
+
+.entrada:disabled {
+  color: var(--color-texto-deshabilitado);
+  -webkit-text-fill-color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
+/* Ayuda o error a la izquierda, contador a la derecha; se apilan si no caben. */
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.ayuda {
+  min-width: 0;
+  flex: 1 1 12rem;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-terciario);
+}
+
+.ayudaDeshabilitada {
+  color: var(--color-texto-deshabilitado);
+}
+
+.mensajeError {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 12rem;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.iconoError {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-estado-error-icono);
+}
+
+.textoError {
+  min-width: 0;
+  flex: 1 1 0;
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-estado-error-texto);
+}
+
+.contador {
+  margin: 0;
+  margin-left: auto;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-terciario);
+}
+
+/* El número no es la única señal de que sobra texto: el mensaje de error lo dice (WCAG 1.4.1). */
+.contadorExcedido {
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-estado-error-texto);
+}

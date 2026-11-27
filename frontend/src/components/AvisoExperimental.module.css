@@ -16,3 +16,27 @@
 .valoracion {
   display: block;
 }
+
+/* Formato «Banner» (Figma 14:549): recuadro ámbar dentro del contenido. */
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--espacio-3) var(--espacio-4);
+  border: var(--borde-grosor) solid var(--color-experimental-borde);
+  border-radius: var(--radio-md);
+  background: var(--color-experimental-fondo);
+  color: var(--color-experimental-texto);
+}
+
+.bannerEtiqueta {
+  margin: 0;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: inherit;
+}
+
+.bannerTexto {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: inherit;
+}

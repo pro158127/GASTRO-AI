@@ -11,9 +11,12 @@ interface PropiedadesEstadoVacio {
   children?: ReactNode;
   /**
    * Nivel del título: `h1` cuando el estado vacío es toda la pantalla (W-28); `h2` cuando va
-   * dentro de una pantalla que ya tiene su h1 (por ejemplo W-09b y W-09c). El aspecto no cambia.
+   * dentro de una pantalla que ya tiene su h1 (por ejemplo W-09b y W-09c); `h3` cuando va
+   * dentro de una sección que ya tiene su h2, como los vacíos de las dos listas de W-16. El
+   * aspecto no cambia: el nivel es solo para que el esquema de encabezados no salte (WCAG
+   * 1.3.1).
    */
-  nivelTitulo?: "h1" | "h2";
+  nivelTitulo?: "h1" | "h2" | "h3";
 }
 
 export default function EstadoVacio({ titulo, mensaje, children, nivelTitulo = "h1" }: PropiedadesEstadoVacio) {

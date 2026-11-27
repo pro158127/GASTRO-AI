@@ -59,6 +59,36 @@
   border-radius: var(--radio-completo);
 }
 
+/* Tarjeta de indicador (Figma 91:2292), para W-15e. Figma dibuja barras de 120, 64 y 150 px
+   sobre una tarjeta de 220; aquí van en proporción para que a 320 px, donde la tarjeta mide
+   unos 138 px, la última no se salga. La cifra es la barra alta, como en la tarjeta real. */
+.indicadorEtiqueta {
+  width: 55%;
+}
+.indicadorValor {
+  width: 30%;
+  height: 24px;
+}
+.indicadorDetalle {
+  width: 68%;
+  height: 10px;
+}
+
+/* Párrafo (W-08c): líneas a todo el ancho y la última más corta, como acaba un párrafo. */
+.parrafo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-3);
+}
+
+.parrafoLinea {
+  width: 100%;
+}
+
+.parrafoUltima {
+  width: 55%;
+}
+
 @keyframes esqueleto-pulso {
   50% {
     opacity: 0.5;

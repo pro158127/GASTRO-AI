@@ -47,13 +47,26 @@ export default function BarraSuperior({
             </p>
           </>
         )}
-        <EnlaceBoton to="/perfil">Mi perfil</EnlaceBoton>
-        <Boton jerarquia="secundario" icono={<IconoSalir className={estilos.iconoBoton} />} onClick={onCerrarSesion}>
-          Cerrar sesión
-        </Boton>
+        {/* Los dos botones van en una caja propia porque el paso 9 del recorrido de TOPOLOGO
+            (W-14h) ilumina los dos juntos. Tiene que ser una caja real, con el mismo `gap` que
+            tenían como hermanos: un `display: contents` no genera caja y se mediría como área
+            cero, así que el anillo no se dibujaría y nada fallaría a la vista. */}
+        <div className={estilos.cuenta} data-recorrido="cuenta">
+          <EnlaceBoton to="/perfil">Mi perfil</EnlaceBoton>
+          <Boton jerarquia="secundario" icono={<IconoSalir className={estilos.iconoBoton} />} onClick={onCerrarSesion}>
+            Cerrar sesión
+          </Boton>
+        </div>
       </div>
 
       <div className={estilos.movil}>
+        {/* `aria-haspopup="dialog"` se queda aunque el panel que abre el recorrido guiado no sea
+            un diálogo: describe lo que hace **este botón** al pulsarlo, y lo que abre la persona
+            sigue siendo un diálogo. El panel del recorrido no lo abre este botón —que además
+            queda debajo de la capa del recorrido y no se puede pulsar—, así que cambiar el
+            atributo describiría mal el botón para arreglar algo que no es suyo. `aria-expanded`
+            sí describe si el panel se ve, venga de donde venga, y la disposición le pasa el
+            estado de los dos casos. */}
         <button
           ref={botonMenuRef}
           type="button"

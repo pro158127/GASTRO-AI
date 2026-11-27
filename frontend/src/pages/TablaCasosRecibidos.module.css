@@ -1,0 +1,187 @@
+/* Análisis de un bloque de traslado (W-27). Tabla en escritorio, tarjetas desde tableta,
+   igual que la lista de W-16: a 320 px las columnas no caben sin desplazamiento horizontal. */
+
+.soloLector {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ escritorio: la tabla */
+
+.marcoTabla {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radio-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--texto-dato-tabla);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th {
+  padding: var(--espacio-3) var(--espacio-4);
+  background: var(--color-fondo-superficie-sutil);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-secundario);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla td {
+  padding: var(--espacio-3) var(--espacio-4);
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+  color: var(--color-texto-primario);
+  vertical-align: middle;
+}
+
+.columnaCodigo {
+  width: 1%;
+}
+
+.columnaProbabilidad,
+.probabilidad {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* La columna de la insignia pide su anchura mínima, y el `overflow-wrap: anywhere` del
+   componente compartido reduciría ese mínimo al de una letra (el mismo apilado vertical que
+   documenta TablaHistorial.module.css). Se le pone suelo aquí, sin tocar el componente. */
+.columnaMarcas {
+  width: 1%;
+  min-width: 12rem;
+}
+
+.columnaAccion {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.codigo {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.celdaMarcas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+/* En la tabla la insignia parte entre palabras, nunca a media palabra: un nombre largo
+   ensancharía la columna y la tabla lleva `overflow: hidden`. */
+.celdaMarcas .marcaOrigen > span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.enlaceDetalle {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tamano-objetivo-minimo);
+  color: var(--color-texto-enlace);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  text-decoration: none;
+}
+
+.enlaceDetalle:hover {
+  text-decoration: underline;
+}
+
+.enlaceDetalle:focus-visible {
+  outline: var(--borde-grosor-foco) solid var(--color-foco-anillo);
+  outline-offset: 2px;
+  border-radius: var(--radio-sm);
+}
+
+/* ------------------------------------------------------------ tableta y celular: tarjetas */
+
+.tarjetas {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--espacio-3);
+  padding: 0;
+  list-style: none;
+}
+
+/* Separadas por una línea, no por un borde completo: ya están dentro del bloque del traslado,
+   que es la tarjeta (M-27). */
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-1);
+  padding: var(--espacio-3) 0;
+  border-top: var(--borde-grosor) solid var(--color-borde-sutil);
+}
+
+.tarjeta:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* El dato a la izquierda y la fecha o la probabilidad a la derecha, como dibuja M-27. A 320 px
+   envuelve en dos líneas antes que desbordar. */
+.lineaTarjeta {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espacio-2);
+}
+
+.datoTarjeta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* Aquí la insignia sí conserva el `overflow-wrap: anywhere` del componente: a 320 px un
+   apellido largo tiene que poder partirse antes que desbordar, y la tarjeta no encoge al
+   mínimo del contenido como sí hacía la columna de la tabla. */
+.marcasTarjeta {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: var(--espacio-2);
+}
+
+/* ------------------------------------------------------------------------ qué se ve dónde */
+
+.soloEscritorio {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .soloEscritorio {
+    display: block;
+  }
+
+  .soloTarjetas {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .enlaceDetalle {
+    min-height: var(--tamano-control-tactil);
+  }
+}

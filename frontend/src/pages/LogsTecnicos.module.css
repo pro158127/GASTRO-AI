@@ -23,9 +23,10 @@
 .idLog { font: var(--texto-cuerpo-pequeno-enfasis); }
 .revision { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
 .numero { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.estadoLog { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espacio-2); }
 .insignia { display: inline-flex; max-width: 100%; padding: 0 var(--espacio-2); border: var(--borde-grosor) solid; border-radius: var(--radio-completo); font: var(--texto-cuerpo-pequeno-enfasis); overflow-wrap: anywhere; }
+.codigoError { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.875em; overflow-wrap: anywhere; }
 .exito { border-color: var(--color-estado-exito-borde); background: var(--color-estado-exito-fondo); color: var(--color-estado-exito-texto); }
-.advertencia { border-color: var(--color-estado-advertencia-borde); background: var(--color-estado-advertencia-fondo); color: var(--color-estado-advertencia-texto); }
 .error { border-color: var(--color-estado-error-borde); background: var(--color-estado-error-fondo); color: var(--color-estado-error-texto); }
 .tarjetas { display: none; }
 .tarjetaLog { min-width: 0; padding: var(--espacio-4); border: var(--borde-grosor) solid var(--color-borde-sutil); border-radius: var(--radio-md); background: var(--color-fondo-superficie); }

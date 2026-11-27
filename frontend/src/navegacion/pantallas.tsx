@@ -4,17 +4,25 @@
 // con una búsqueda de «TEMPORAL».
 import type { ReactNode } from "react";
 import { matchPath } from "react-router";
+import { useUsuarioActual } from "../sesion/UsuarioActual";
+import Bitacora from "../pages/Bitacora";
+import CasosRecibidos from "../pages/CasosRecibidos";
 import CrearUsuario from "../pages/CrearUsuario";
+import Dashboard from "../pages/Dashboard";
+import DashboardTecnico from "../pages/DashboardTecnico";
 import CuentasPendientes from "../pages/CuentasPendientes";
 import DetalleCuenta from "../pages/DetalleCuenta";
 import EstadoOperativo from "../pages/EstadoOperativo";
+import Historial from "../pages/Historial";
 import LogsTecnicos from "../pages/LogsTecnicos";
 import MetricasModelo from "../pages/MetricasModelo";
+import ParametrosInferencia from "../pages/ParametrosInferencia";
 import MiPerfil from "../pages/MiPerfil";
 import NuevoAnalisis from "../pages/NuevoAnalisis";
 import PantallaPendiente from "../pages/PantallaPendiente";
 import ProgresoAnalisis from "../pages/ProgresoAnalisis";
 import ReasignarCasos from "../pages/ReasignarCasos";
+import ResultadoAnalisis from "../pages/ResultadoAnalisis";
 import SinPermisos from "../pages/SinPermisos";
 import Usuarios from "../pages/Usuarios";
 import type { RolInterfaz } from "./menus";
@@ -32,12 +40,23 @@ const AMBOS: RolInterfaz[] = ["doctor", "administrador"];
 const SOLO_DOCTOR: RolInterfaz[] = ["doctor"];
 const SOLO_ADMINISTRADOR: RolInterfaz[] = ["administrador"];
 
+/**
+ * `/dashboard` es una ruta con dos pantallas distintas: W-15 para el doctor y W-19 para el
+ * administrador. El reparto se hace aquí y no duplicando la ruta. La autorización real la hace
+ * el backend: cada dashboard es un endpoint distinto y con su rol.
+ */
+function DashboardPorRol({ titulo }: { titulo: string }) {
+  const { rol } = useUsuarioActual();
+  if (rol === "doctor") return <Dashboard titulo={titulo} />;
+  return <DashboardTecnico titulo={titulo} />;
+}
+
 export const pantallas: Pantalla[] = [
   {
     ruta: "/dashboard",
     titulo: { doctor: "Dashboard", administrador: "Dashboard técnico" },
     roles: AMBOS,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-15 / W-19)
+    elemento: (titulo) => <DashboardPorRol titulo={titulo} />, // W-15 (doctor) / W-19 (administrador)
   },
   {
     ruta: "/nuevo-analisis",
@@ -59,19 +78,19 @@ export const pantallas: Pantalla[] = [
     ruta: "/analisis/:idAnalisis",
     titulo: "Resultado del análisis",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-08)
+    elemento: (titulo) => <ResultadoAnalisis titulo={titulo} />, // W-08, W-08b
   },
   {
     ruta: "/historial",
     titulo: "Historial",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-16c)
+    elemento: (titulo) => <Historial titulo={titulo} />, // W-16, W-16b a W-16g
   },
   {
     ruta: "/casos-recibidos",
     titulo: "Casos recibidos",
     roles: SOLO_DOCTOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega (W-27c)
+    elemento: (titulo) => <CasosRecibidos titulo={titulo} />, // W-27, W-27a a W-27h
   },
   {
     ruta: "/perfil",
@@ -118,7 +137,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/bitacora",
     titulo: "Bitácora",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <Bitacora titulo={titulo} />, // W-21, W-21b
   },
   {
     ruta: "/estado-operativo",
@@ -142,7 +161,7 @@ export const pantallas: Pantalla[] = [
     ruta: "/parametros",
     titulo: "Parámetros",
     roles: SOLO_ADMINISTRADOR,
-    elemento: (titulo) => <PantallaPendiente titulo={titulo} />, // TEMPORAL: reemplazar antes de la entrega
+    elemento: (titulo) => <ParametrosInferencia titulo={titulo} />, // W-26
   },
   {
     ruta: "/sin-permisos",

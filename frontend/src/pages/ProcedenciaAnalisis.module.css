@@ -1,0 +1,52 @@
+/* Tarjeta «Procedencia de este análisis» (W-17b, sin maqueta en Figma).
+   Misma caja que las demás tarjetas de la pantalla del resultado, para que el bloque no se
+   lea como un elemento de otra familia. Todo el significado está en el texto de las
+   etiquetas: no hay color ni borde que signifique nada (WCAG 1.4.1). */
+
+.tarjeta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-4);
+  padding: var(--espacio-6);
+  border: var(--borde-grosor) solid var(--color-borde-sutil);
+  border-radius: var(--radio-md);
+  background: var(--color-fondo-superficie);
+  box-shadow: var(--sombra-elevacion-1-tarjeta);
+}
+
+.titulo {
+  margin: 0;
+  font: var(--texto-titulo-h3);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+/* Un par etiqueta/valor. Los dos datos son independientes y no se mezclan en una frase, así
+   que cada uno va en su propio bloque. */
+.dato {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--espacio-1);
+}
+
+.etiqueta {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  color: var(--color-texto-secundario);
+}
+
+.valor {
+  margin: 0;
+  font: var(--texto-cuerpo-base-enfasis);
+  color: var(--color-texto-primario);
+  overflow-wrap: anywhere;
+}
+
+.fecha {
+  margin: 0;
+  font: var(--texto-cuerpo-pequeno);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-secundario);
+}

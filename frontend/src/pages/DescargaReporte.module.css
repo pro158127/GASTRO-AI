@@ -1,0 +1,10 @@
+/* «Descargar reporte» de W-17. El sitio del botón en la cabecera y su ancho en celular los
+   decide `.accionEncabezado` de ResultadoAnalisis.module.css, que es quien agrupa las dos
+   acciones; aquí solo va el icono. */
+
+.icono {
+  display: block;
+  width: var(--tamano-icono);
+  height: var(--tamano-icono);
+  flex-shrink: 0;
+}

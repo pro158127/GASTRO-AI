@@ -1,0 +1,16 @@
+/* Distintivo «Análisis experimental»: mismas medidas que la Insignia del sistema de diseño
+   (Figma 14:574), con los colores del token «experimental». */
+
+.distintivo {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: var(--espacio-0) var(--espacio-2);
+  border: var(--borde-grosor) solid var(--color-experimental-borde);
+  border-radius: var(--radio-completo);
+  background: var(--color-experimental-fondo);
+  color: var(--color-experimental-texto);
+  font: var(--texto-cuerpo-pequeno-enfasis);
+  /* A 320 px el título de la tarjeta y el distintivo comparten línea: que parta antes de desbordar. */
+  overflow-wrap: anywhere;
+}

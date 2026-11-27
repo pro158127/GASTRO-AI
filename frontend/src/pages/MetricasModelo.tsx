@@ -5,39 +5,12 @@ import Boton from "../components/Boton";
 import EncabezadoPagina from "../components/EncabezadoPagina";
 import EstadoVacio from "../components/EstadoVacio";
 import { obtenerMetricasModelo } from "../services/metricasModelo";
-import type { MetricasModelo as ValoresMetricas, RespuestaMetricasModelo } from "../services/metricasModelo";
+import type { RespuestaMetricasModelo } from "../services/metricasModelo";
 import { avisoDeError, esErrorGlobal } from "../utils/avisosError";
 import type { AvisoError } from "../utils/avisosError";
+// Movido a `utils/` para que W-19 escriba estas mismas cifras con las mismas reglas.
+import { fechaReporte, formatoNumero, metricas, valorMetrica } from "../utils/formatoMetricas";
 import estilos from "./MetricasModelo.module.css";
-
-const formatoPorcentaje = new Intl.NumberFormat("es-CO", {
-  style: "percent",
-  maximumFractionDigits: 1,
-});
-const formatoCalibracion = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 });
-const formatoNumero = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
-
-const metricas = [
-  { campo: "SENSIBILIDAD", etiqueta: "Sensibilidad", calibracion: false },
-  { campo: "ESPECIFICIDAD", etiqueta: "Especificidad", calibracion: false },
-  { campo: "F1", etiqueta: "F1", calibracion: false },
-  { campo: "ROC_AUC", etiqueta: "ROC-AUC", calibracion: false },
-  { campo: "PR_AUC", etiqueta: "PR-AUC", calibracion: false },
-  { campo: "BRIER", etiqueta: "Brier · menor es mejor", calibracion: true },
-  { campo: "ECE", etiqueta: "ECE · menor es mejor", calibracion: true },
-] as const;
-
-function valorMetrica(valores: ValoresMetricas | null | undefined, campo: (typeof metricas)[number]["campo"]): string {
-  const valor = valores?.[campo];
-  if (typeof valor !== "number" || !Number.isFinite(valor)) return "No reportada";
-  return campo === "BRIER" || campo === "ECE" ? formatoCalibracion.format(valor) : formatoPorcentaje.format(valor);
-}
-
-function fechaReporte(fecha: string | null | undefined): string {
-  if (!fecha) return "No incluida";
-  const [anio, mes, dia] = fecha.split("-");
-  return anio && mes && dia ? `${dia}/${mes}/${anio}` : "No incluida";
-}
 
 function valorRecuento(valor: string | null | undefined): string {
   if (!valor) return "No incluido";
@@ -87,9 +60,11 @@ export default function MetricasModelo({ titulo }: { titulo: string }) {
         </div>
       )}
 
-      {cargando && !reporte ? (
-        <p className={estilos.estadoCarga} role="status" aria-busy="true">Cargando el reporte de evaluación…</p>
-      ) : reporte && !disponible ? (
+      {cargando && !reporte && (
+        <p className={estilos.estadoCarga} role="status">Cargando el reporte de evaluación…</p>
+      )}
+      <div className={estilos.contenidoReporte} aria-busy={cargando}>
+        {reporte && !disponible ? (
         <section className={estilos.tarjeta} aria-labelledby="titulo-sin-reporte">
           {modelo && <p className={estilos.modeloEvaluado}>{modelo.repositorio_hf} · {modelo.revision_sha.slice(0, 7)}</p>}
           <span id="titulo-sin-reporte" className={estilos.soloLector}>Estado del reporte de evaluación</span>
@@ -171,7 +146,8 @@ export default function MetricasModelo({ titulo }: { titulo: string }) {
             ) : <p className={estilos.estadoCarga}>El reporte no incluye métricas por característica.</p>}
           </section>
         </>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
