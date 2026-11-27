@@ -153,6 +153,7 @@ backend/
 ├── scripts/cargar_metricas.py  # carga el reporte de evaluación del modelo (RM-06)
 ├── scripts/respaldar.sh, restaurar.sh, respaldo.py  # respaldo y restauración (RNF-26)
 ├── scripts/recuperar_admin.py  # recupera al único administrador (RF-U09 CA 10)
+├── scripts/sembrar_casos.py  # casos y análisis de prueba para un doctor (solo desarrollo)
 └── app/
     ├── main.py              # FastAPI, manejadores de error y routers
     ├── seed.py              # carga inicial (python -m app.seed)
