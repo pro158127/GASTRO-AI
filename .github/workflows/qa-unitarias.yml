@@ -91,6 +91,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
     - uses: actions/setup-python@v6
       with:
         python-version: '3.12'
@@ -98,10 +101,5 @@ jobs:
       with:
         name: backend-resultados-${{ github.run_id }}-${{ github.run_attempt }}
         path: reports
-    - name: Exigir 70 por ciento sin redondear
-      shell: bash
-      run: "python - <<'PY'\nimport json\nfrom pathlib import Path\nr = json.loads(Path(\"reports/cobertura.json\").read_text())\n\
-        t = r[\"totals\"]\ncubiertas, total = t[\"covered_lines\"], t[\"num_statements\"]\nif total <= 0:\n    raise SystemExit(\"\
-        Cobertura sin lineas ejecutables: no se puede aprobar\")\nporcentaje = 100 * cubiertas / total\nprint(f\"Cobertura\
-        \ global: {porcentaje:.6f}% ({cubiertas}/{total}); minimo 70%\")\nif cubiertas * 100 < total * 70:\n    raise SystemExit(\"\
-        No cumple el umbral GLOBAL del 70%\")\nPY"
+    - name: Exigir cobertura global y seis grupos críticos >=70%
+      run: python backend/scripts/check_critical_coverage.py reports/cobertura.json
