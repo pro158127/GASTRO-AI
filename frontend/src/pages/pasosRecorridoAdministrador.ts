@@ -3,7 +3,7 @@
 // Frames: W-19e (105:4412), W-19i (122:8403), W-19j (122:8855), W-19f (105:4725), W-19k
 // (122:9308), W-19g (105:5175), W-19h (105:5625), W-19l (122:9762), W-19m (122:10214), W-19n
 // (122:10666), W-19o (122:11118) y W-19p (122:11570). Los doce miden 1440×1400, igual que W-19:
-// **todos ocurren sobre el dashboard técnico** y el recorrido no navega entre rutas, como el del
+// **todos ocurren sobre el panel técnico** y el recorrido no navega entre rutas, como el del
 // doctor.
 //
 // Los textos son los de Figma, palabra por palabra, con **una** corrección y **una** errata que
@@ -39,7 +39,7 @@ export const PASOS_RECORRIDO_ADMINISTRADOR: PasoRecorrido[] = [
   {
     clave: "cuentas",
     tipo: "zona",
-    titulo: "Su dashboard técnico",
+    titulo: "Su panel técnico",
     texto:
       "Muestra el estado de la plataforma, sin datos clínicos. Arriba verá el resumen de las cuentas de usuario; con «Exportar auditoría» descarga el registro de acciones.",
     // El anillo del frame abarca las cuatro tarjetas de «Cuentas de usuario», no la pantalla

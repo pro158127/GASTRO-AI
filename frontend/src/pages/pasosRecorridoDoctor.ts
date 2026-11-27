@@ -2,7 +2,7 @@
 //
 // Frames: W-13 (54:2624), W-14e (122:4255), W-14f (122:4799), W-14 (54:3090), W-14b (105:2737),
 // W-14c (105:2996), W-14d (105:3323), W-14g (122:5347) y W-14h (122:5891). Los nueve ocurren
-// sobre el dashboard clínico (W-12, 54:2087): el recorrido no navega entre rutas.
+// sobre el panel clínico (W-12, 54:2087): el recorrido no navega entre rutas.
 //
 // Los textos son los de Figma, palabra por palabra. Los pasos 2 y 3 hablan del primer uso
 // («Hoy están en cero…», «Cuando haga análisis…») y se dejan así aunque el doctor ya tenga
@@ -36,7 +36,7 @@ export const PASOS_RECORRIDO_DOCTOR: PasoRecorrido[] = [
   {
     clave: "dashboard",
     tipo: "zona",
-    titulo: "Este es su dashboard",
+    titulo: "Este es su panel de control",
     texto:
       "Aquí verá sus análisis del mes y acumulados, su concordancia con el modelo, los casos con seguimiento y los casos recibidos. Hoy están en cero porque aún no tiene análisis.",
     ancla: '[data-recorrido="indicadores"]',
@@ -72,7 +72,7 @@ export const PASOS_RECORRIDO_DOCTOR: PasoRecorrido[] = [
     tipo: "zona",
     titulo: "Su opinión cuenta",
     texto:
-      "Después de cada resultado puede indicar si coincide con el modelo. Así se calcula esta concordancia en su dashboard.",
+      "Después de cada resultado puede indicar si coincide con el modelo. Así se calcula esta concordancia en su panel de control.",
     ancla: '[data-recorrido="concordancia"]',
   },
   {
